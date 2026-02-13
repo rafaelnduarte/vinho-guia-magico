@@ -42,7 +42,7 @@ export default function LoginPage() {
         <div className="relative z-10 text-center px-12">
           <Wine className="h-20 w-20 text-gold mx-auto mb-6" />
           <h1 className="text-4xl font-display text-primary-foreground mb-4">
-            Radar do Jovem do Vinho
+            Radar do Jovem
           </h1>
           <p className="text-primary-foreground/80 text-lg">
             Curadoria exclusiva de vinhos selecionados para você.
@@ -55,7 +55,7 @@ export default function LoginPage() {
         <div className="w-full max-w-sm space-y-8">
           <div className="text-center lg:hidden">
             <Wine className="h-12 w-12 text-primary mx-auto mb-3" />
-            <h1 className="text-2xl font-display text-foreground">Radar do Jovem do Vinho</h1>
+            <h1 className="text-2xl font-display text-foreground">Radar do Jovem</h1>
           </div>
 
           <div>
