@@ -6,7 +6,7 @@ const shortcuts = [
     to: "/curadoria",
     icon: GlassWater,
     title: "Curadoria",
-    desc: "Vinhos selecionados pelo Jovem do Vinho",
+    desc: "Vinhos selecionados pelo Radar do Jovem",
   },
   {
     to: "/parceiros",
@@ -29,7 +29,7 @@ export default function HomePage() {
       <section className="px-6 py-16 md:py-24 max-w-4xl mx-auto text-center">
         <Wine className="h-14 w-14 text-primary mx-auto mb-6" />
         <h1 className="text-3xl md:text-5xl font-display text-foreground mb-4">
-          Bem-vindo ao Radar do Jovem do Vinho
+          Bem-vindo ao Radar do Jovem
         </h1>
         <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
           O Radar é a sua curadoria exclusiva de vinhos. Aqui você encontra seleções criteriosas,

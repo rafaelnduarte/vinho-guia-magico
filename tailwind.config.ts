@@ -86,8 +86,8 @@ export default {
   			'accordion-up': 'accordion-up 0.2s ease-out'
   		},
   		fontFamily: {
-  			sans: [
-  				'Inter',
+		sans: [
+				'Open Sans',
   				'ui-sans-serif',
   				'system-ui',
   				'-apple-system',

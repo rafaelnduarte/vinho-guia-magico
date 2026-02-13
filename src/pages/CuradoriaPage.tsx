@@ -8,7 +8,7 @@ export default function CuradoriaPage() {
         <h1 className="text-3xl font-display text-foreground">Curadoria</h1>
       </div>
       <p className="text-muted-foreground mb-8">
-        Explore os vinhos selecionados pelo Jovem do Vinho. Use os filtros para encontrar o rótulo ideal.
+        Explore os vinhos selecionados pelo Radar do Jovem. Use os filtros para encontrar o rótulo ideal.
       </p>
       <div className="rounded-xl border border-border bg-card p-12 text-center text-muted-foreground">
         Em breve: catálogo completo com filtros e detalhes.
