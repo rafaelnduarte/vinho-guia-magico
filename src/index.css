@@ -48,13 +48,13 @@
     --sidebar-border: 201 40% 35%;
     --sidebar-ring: 198 93% 59%;
 
-    /* Custom tokens */
-    --wine: 348 60% 32%;
-    --wine-light: 348 40% 45%;
-    --wine-dark: 348 65% 18%;
-    --gold: 38 70% 50%;
-    --gold-light: 38 60% 65%;
-    --cream: 30 30% 96%;
+    /* Custom tokens - blue-based */
+    --wine: 201 57% 28%;
+    --wine-light: 201 45% 40%;
+    --wine-dark: 201 65% 18%;
+    --gold: 201 30% 55%;
+    --gold-light: 201 25% 70%;
+    --cream: 210 20% 96%;
     --chart-1: 198 93% 59%;
     --chart-2: 213 93% 67%;
     --chart-3: 215 20% 65%;
@@ -104,12 +104,12 @@
     --sidebar-accent-foreground: 228 84% 4%;
     --sidebar-border: 215 19% 34%;
     --sidebar-ring: 198 93% 59%;
-    --wine: 348 50% 45%;
-    --wine-light: 348 40% 55%;
-    --wine-dark: 348 65% 18%;
-    --gold: 38 60% 50%;
-    --gold-light: 38 50% 60%;
-    --cream: 30 10% 15%;
+    --wine: 201 50% 45%;
+    --wine-light: 201 40% 55%;
+    --wine-dark: 201 65% 18%;
+    --gold: 201 30% 50%;
+    --gold-light: 201 25% 60%;
+    --cream: 210 10% 15%;
     --chart-1: 199 95% 73%;
     --chart-2: 211 96% 78%;
     --chart-3: 215 20% 65%;
