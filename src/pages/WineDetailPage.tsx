@@ -1,14 +1,17 @@
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Wine, Loader2 } from "lucide-react";
 import WineVoting from "@/components/curadoria/WineVoting";
 import WineComments from "@/components/curadoria/WineComments";
+import { useAnalytics } from "@/hooks/useAnalytics";
 
 export default function WineDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const { trackWineOpened } = useAnalytics();
 
   const { data: wine, isLoading } = useQuery({
     queryKey: ["wine-detail", id],
@@ -36,6 +39,13 @@ export default function WineDetailPage() {
     },
     enabled: !!id,
   });
+
+  // Track wine opened
+  useEffect(() => {
+    if (wine) {
+      trackWineOpened(wine.id, wine.name);
+    }
+  }, [wine?.id, trackWineOpened]);
 
   if (isLoading) {
     return (

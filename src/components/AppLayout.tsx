@@ -1,5 +1,7 @@
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAnalytics } from "@/hooks/useAnalytics";
+import { useEffect, useRef } from "react";
 import {
   Home,
   GlassWater,
@@ -25,7 +27,29 @@ const memberLinks = [
 export default function AppLayout() {
   const { signOut, role, user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { trackPageView } = useAnalytics();
+  const lastTrackedPath = useRef("");
+
+  // Track page views on route change
+  useEffect(() => {
+    if (location.pathname !== lastTrackedPath.current) {
+      lastTrackedPath.current = location.pathname;
+      trackPageView(location.pathname);
+
+      // Update last_seen_at for current user
+      if (user?.id) {
+        import("@/integrations/supabase/client").then(({ supabase }) => {
+          supabase
+            .from("profiles")
+            .update({ last_seen_at: new Date().toISOString() })
+            .eq("user_id", user.id)
+            .then(() => {});
+        });
+      }
+    }
+  }, [location.pathname, trackPageView, user?.id]);
 
   const handleSignOut = async () => {
     await signOut();

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useEffect, useRef } from "react";
 import { GlassWater, Search, Loader2, ArrowUpDown, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import WineCard from "@/components/curadoria/WineCard";
 import { useFilterParams } from "@/hooks/useFilterParams";
+import { useAnalytics } from "@/hooks/useAnalytics";
 
 const PAGE_SIZE = 9;
 
@@ -27,12 +28,28 @@ const SORT_OPTIONS = [
 
 export default function CuradoriaPage() {
   const { get, getNum, set } = useFilterParams();
+  const { trackFilterUsed } = useAnalytics();
+  const prevFilters = useRef({ tipo: "", pais: "", ordem: "" });
 
   const search = get("q");
   const typeFilter = get("tipo", "all");
   const countryFilter = get("pais", "all");
   const sort = get("ordem", "newest");
   const page = getNum("page", 1);
+
+  // Track filter usage
+  useEffect(() => {
+    if (typeFilter !== "all" && typeFilter !== prevFilters.current.tipo) {
+      trackFilterUsed("tipo", typeFilter, "/curadoria");
+    }
+    if (countryFilter !== "all" && countryFilter !== prevFilters.current.pais) {
+      trackFilterUsed("pais", countryFilter, "/curadoria");
+    }
+    if (sort !== "newest" && sort !== prevFilters.current.ordem) {
+      trackFilterUsed("ordem", sort, "/curadoria");
+    }
+    prevFilters.current = { tipo: typeFilter, pais: countryFilter, ordem: sort };
+  }, [typeFilter, countryFilter, sort, trackFilterUsed]);
 
   const { data: wines, isLoading } = useQuery({
     queryKey: ["curadoria-wines"],
