@@ -245,6 +245,41 @@ export type Database = {
         }
         Relationships: []
       }
+      wine_comments: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          updated_at: string
+          user_id: string
+          wine_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+          wine_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+          wine_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wine_comments_wine_id_fkey"
+            columns: ["wine_id"]
+            isOneToOne: false
+            referencedRelation: "wines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       wine_seals: {
         Row: {
           id: string
@@ -271,6 +306,38 @@ export type Database = {
           },
           {
             foreignKeyName: "wine_seals_wine_id_fkey"
+            columns: ["wine_id"]
+            isOneToOne: false
+            referencedRelation: "wines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wine_votes: {
+        Row: {
+          created_at: string
+          id: string
+          user_id: string
+          vote: string
+          wine_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          user_id: string
+          vote: string
+          wine_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          user_id?: string
+          vote?: string
+          wine_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wine_votes_wine_id_fkey"
             columns: ["wine_id"]
             isOneToOne: false
             referencedRelation: "wines"
