@@ -14,7 +14,7 @@ export interface MockWine {
   type: string;
   country: string;
   importer: string;
-  price_range: string;
+  price: string;
   image_url: string;
   tasting_notes: string;
   seal_wine_type: string;
@@ -26,14 +26,14 @@ interface WineCardProps {
 }
 
 const sealColors: Record<string, string> = {
-  "Encorpado": "bg-red-900/90 text-white",
-  "Leve": "bg-amber-500/90 text-white",
-  "Médio": "bg-orange-700/90 text-white",
-  "Frutado": "bg-pink-600/90 text-white",
-  "Iniciante": "bg-emerald-600/90 text-white",
-  "Intermediário": "bg-blue-600/90 text-white",
-  "Avançado": "bg-violet-700/90 text-white",
-  "Curioso": "bg-teal-600/90 text-white",
+  "Encorpado": "bg-wine-dark/90 text-primary-foreground",
+  "Leve": "bg-gold/90 text-primary-foreground",
+  "Médio": "bg-wine-light/90 text-primary-foreground",
+  "Frutado": "bg-wine/90 text-primary-foreground",
+  "Iniciante": "bg-primary/90 text-primary-foreground",
+  "Intermediário": "bg-secondary/90 text-secondary-foreground",
+  "Avançado": "bg-wine-dark/90 text-primary-foreground",
+  "Curioso": "bg-primary/90 text-primary-foreground",
 };
 
 export default function WineCard({ wine }: WineCardProps) {
@@ -97,8 +97,8 @@ export default function WineCard({ wine }: WineCardProps) {
                 <p className="text-foreground font-medium">{wine.importer}</p>
               </div>
               <div className="col-span-2">
-                <span className="text-muted-foreground">Faixa de Preço</span>
-                <p className="text-foreground font-medium">{wine.price_range}</p>
+                <span className="text-muted-foreground">Preço</span>
+                <p className="text-foreground font-medium">{wine.price}</p>
               </div>
             </div>
 
