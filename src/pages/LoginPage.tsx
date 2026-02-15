@@ -39,10 +39,10 @@ export default function LoginPage() {
     <div className="flex min-h-screen">
       {/* Left panel - decorative */}
       <div className="hidden lg:flex lg:w-1/2 bg-primary items-center justify-center relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-wine-dark via-primary to-wine-light opacity-90" />
+        <div className="absolute inset-0 bg-gradient-to-br from-secondary via-primary to-primary/80 opacity-90" />
         <div className="relative z-10 text-center px-12">
-          <img src={logoJovem} alt="Jovem do Vinho" className="h-24 w-24 mx-auto mb-6" />
-          <h1 className="text-4xl font-display text-primary-foreground mb-4">
+          <img src={logoJovem} alt="Jovem do Vinho" className="h-28 w-28 mx-auto mb-6 rounded-full bg-white/10 p-2" />
+          <h1 className="text-4xl font-sans font-bold text-primary-foreground mb-4">
             Radar do Jovem
           </h1>
           <p className="text-primary-foreground/80 text-lg">
@@ -55,8 +55,8 @@ export default function LoginPage() {
       <div className="flex w-full lg:w-1/2 items-center justify-center px-6 py-12">
         <div className="w-full max-w-sm space-y-8">
           <div className="text-center lg:hidden">
-            <img src={logoJovem} alt="Jovem do Vinho" className="h-14 w-14 mx-auto mb-3" />
-            <h1 className="text-2xl font-display text-foreground">Radar do Jovem</h1>
+            <img src={logoJovem} alt="Jovem do Vinho" className="h-16 w-16 mx-auto mb-3" />
+            <h1 className="text-2xl font-sans font-bold text-foreground">Radar do Jovem</h1>
           </div>
 
           <div>
