@@ -3,6 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AdminWines from "@/components/admin/AdminWines";
 import AdminPartners from "@/components/admin/AdminPartners";
 import AdminSeals from "@/components/admin/AdminSeals";
+import AdminMembers from "@/components/admin/AdminMembers";
 
 export default function AdminPage() {
   return (
@@ -13,14 +14,18 @@ export default function AdminPage() {
       </div>
 
       <Tabs defaultValue="wines" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 max-w-md">
+        <TabsList className="grid w-full grid-cols-4 max-w-lg">
           <TabsTrigger value="wines">Vinhos</TabsTrigger>
+          <TabsTrigger value="members">Membros</TabsTrigger>
           <TabsTrigger value="partners">Parceiros</TabsTrigger>
           <TabsTrigger value="seals">Selos</TabsTrigger>
         </TabsList>
 
         <TabsContent value="wines">
           <AdminWines />
+        </TabsContent>
+        <TabsContent value="members">
+          <AdminMembers />
         </TabsContent>
         <TabsContent value="partners">
           <AdminPartners />

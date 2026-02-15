@@ -10,8 +10,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Wine, Loader2, Link2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Wine, Loader2, Link2, Upload } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
+import CsvImportDialog, { type CsvColumn, type CsvImportResult } from "./CsvImportDialog";
+import { supabase as supabaseClient } from "@/integrations/supabase/client";
 
 type WineRow = Tables<"wines">;
 
@@ -56,6 +58,73 @@ export default function AdminWines() {
   const [editing, setEditing] = useState<string | null>(null);
   const [form, setForm] = useState<WineForm>(emptyForm);
   const [sealDialogWineId, setSealDialogWineId] = useState<string | null>(null);
+  const [csvOpen, setCsvOpen] = useState(false);
+
+  const wineColumns: CsvColumn[] = [
+    { key: "name", label: "Nome", required: true },
+    { key: "producer", label: "Produtor" },
+    { key: "vintage", label: "Safra", validate: (v) => v && isNaN(Number(v)) ? "Deve ser um número" : null, transform: (v) => v ? parseInt(v) : null },
+    { key: "grape", label: "Uva" },
+    { key: "type", label: "Tipo", validate: (v) => v && !["Tinto","Branco","Rosé","Espumante","Sobremesa"].includes(v) ? "Tipo inválido" : null },
+    { key: "country", label: "País" },
+    { key: "region", label: "Região" },
+    { key: "importer", label: "Importadora" },
+    { key: "price_range", label: "Preço" },
+    { key: "rating", label: "Nota", validate: (v) => v && (isNaN(Number(v)) || Number(v) < 0 || Number(v) > 100) ? "Nota entre 0 e 100" : null, transform: (v) => v ? parseFloat(v) : null },
+    { key: "image_url", label: "URL Imagem" },
+    { key: "tasting_notes", label: "Notas de Degustação" },
+    { key: "description", label: "Descrição" },
+  ];
+
+  const handleCsvImport = async (rows: Record<string, any>[]): Promise<CsvImportResult> => {
+    let success = 0;
+    let skipped = 0;
+    const errors: CsvImportResult["errors"] = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      try {
+        // Check for existing wine by name + vintage for upsert
+        const { data: existing } = await supabase
+          .from("wines")
+          .select("id")
+          .eq("name", row.name)
+          .maybeSingle();
+
+        const payload = {
+          name: row.name,
+          producer: row.producer || null,
+          vintage: row.vintage,
+          grape: row.grape || null,
+          type: row.type || "Tinto",
+          country: row.country || null,
+          region: row.region || null,
+          importer: row.importer || null,
+          price_range: row.price_range || null,
+          rating: row.rating,
+          image_url: row.image_url || null,
+          tasting_notes: row.tasting_notes || null,
+          description: row.description || null,
+          is_published: true,
+        };
+
+        if (existing) {
+          const { error } = await supabase.from("wines").update(payload).eq("id", existing.id);
+          if (error) throw error;
+          skipped++;
+        } else {
+          const { error } = await supabase.from("wines").insert(payload);
+          if (error) throw error;
+          success++;
+        }
+      } catch (err: any) {
+        errors.push({ row: i + 2, field: "geral", message: err.message });
+      }
+    }
+
+    queryClient.invalidateQueries({ queryKey: ["admin-wines"] });
+    return { success, errors, skipped };
+  };
 
   const { data: wines, isLoading } = useQuery({
     queryKey: ["admin-wines"],
@@ -165,7 +234,12 @@ export default function AdminWines() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-foreground">Vinhos ({wines?.length ?? 0})</h2>
-        <Button onClick={openNew} className="gap-2"><Plus className="h-4 w-4" /> Novo Vinho</Button>
+        <div className="flex gap-2">
+          <Button onClick={() => setCsvOpen(true)} variant="outline" className="gap-2">
+            <Upload className="h-4 w-4" /> Importar CSV
+          </Button>
+          <Button onClick={openNew} className="gap-2"><Plus className="h-4 w-4" /> Novo Vinho</Button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -352,6 +426,15 @@ export default function AdminWines() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <CsvImportDialog
+        open={csvOpen}
+        onOpenChange={setCsvOpen}
+        title="Importar Vinhos via CSV"
+        columns={wineColumns}
+        onImport={handleCsvImport}
+        templateFileName="vinhos-template.csv"
+      />
     </div>
   );
 }
