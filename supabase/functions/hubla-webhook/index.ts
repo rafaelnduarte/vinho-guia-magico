@@ -6,33 +6,32 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const REPLAY_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), {
-      status: 405,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse(405, { error: "Method not allowed" });
   }
 
   const WEBHOOK_SECRET = Deno.env.get("HUBLA_WEBHOOK_SECRET");
   if (!WEBHOOK_SECRET) {
     console.error("HUBLA_WEBHOOK_SECRET not configured");
-    return new Response(JSON.stringify({ error: "Server misconfigured" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse(500, { error: "Server misconfigured" });
   }
 
-  const supabase = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-  );
+  // --- Token Validation (Hubla sends plain token in x-hubla-token) ---
+  const token = req.headers.get("x-hubla-token");
+  if (!token) {
+    console.error("Missing x-hubla-token header");
+    return jsonResponse(401, { error: "Missing signature" });
+  }
+
+  if (token !== WEBHOOK_SECRET) {
+    console.error("Token mismatch");
+    return jsonResponse(401, { error: "Invalid signature" });
+  }
 
   let body: string;
   let payload: any;
@@ -44,31 +43,18 @@ Deno.serve(async (req) => {
     return jsonResponse(400, { error: "Invalid JSON" });
   }
 
-  // --- HMAC Validation ---
-  const signature = req.headers.get("x-hubla-signature") ?? req.headers.get("x-webhook-signature") ?? "";
-  if (!signature) {
-    return jsonResponse(401, { error: "Missing signature" });
-  }
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+  );
 
-  const isValid = await verifyHmac(WEBHOOK_SECRET, body, signature);
-  if (!isValid) {
-    await logWebhook(supabase, null, "signature_invalid", "error", { signature });
-    return jsonResponse(401, { error: "Invalid signature" });
-  }
-
-  // --- Replay Protection ---
-  const timestamp = req.headers.get("x-hubla-timestamp") ?? req.headers.get("x-webhook-timestamp");
-  if (timestamp) {
-    const tsMs = parseInt(timestamp) * 1000 || Date.parse(timestamp);
-    if (!isNaN(tsMs) && Math.abs(Date.now() - tsMs) > REPLAY_WINDOW_MS) {
-      await logWebhook(supabase, null, "replay_rejected", "error", { timestamp });
-      return jsonResponse(403, { error: "Request too old or too far in future" });
-    }
-  }
-
-  // --- Idempotency ---
-  const eventId = payload.id ?? payload.event_id ?? crypto.randomUUID();
-  const eventType = payload.event ?? payload.type ?? "unknown";
+  // --- Idempotency (via x-hubla-idempotency header or payload) ---
+  const eventId =
+    req.headers.get("x-hubla-idempotency") ??
+    payload.id ??
+    payload.event_id ??
+    crypto.randomUUID();
+  const eventType = payload.type ?? "unknown";
 
   const { data: existing } = await supabase
     .from("webhook_events")
@@ -90,9 +76,10 @@ Deno.serve(async (req) => {
 
   // --- Process event ---
   try {
-    const email = payload.customer?.email ?? payload.buyer?.email ?? payload.user?.email;
-    const fullName = payload.customer?.name ?? payload.buyer?.name ?? payload.user?.name;
-    const externalId = payload.subscription_id ?? payload.purchase_id ?? eventId;
+    const event = payload.event ?? {};
+    const email = event.userEmail;
+    const fullName = event.userName;
+    const externalId = event.subscriptionId ?? event.invoiceId ?? eventId;
 
     if (!email) {
       await logWebhook(supabase, eventId, "no_email_found", "warn", { payload });
@@ -124,35 +111,9 @@ function jsonResponse(status: number, body: Record<string, any>) {
   });
 }
 
-async function verifyHmac(secret: string, body: string, signature: string): Promise<boolean> {
-  try {
-    const key = await crypto.subtle.importKey(
-      "raw",
-      new TextEncoder().encode(secret),
-      { name: "HMAC", hash: "SHA-256" },
-      false,
-      ["sign"]
-    );
-    const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(body));
-    const computed = Array.from(new Uint8Array(sig))
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("");
-
-    // Compare constant-time (strip sha256= prefix if present)
-    const clean = signature.replace(/^sha256=/, "").toLowerCase();
-    if (computed.length !== clean.length) return false;
-    let diff = 0;
-    for (let i = 0; i < computed.length; i++) {
-      diff |= computed.charCodeAt(i) ^ clean.charCodeAt(i);
-    }
-    return diff === 0;
-  } catch {
-    return false;
-  }
-}
-
 function isActivationEvent(type: string): boolean {
   const activations = [
+    "NewUser",
     "subscription.activated",
     "subscription.renewed",
     "purchase.approved",
@@ -160,7 +121,7 @@ function isActivationEvent(type: string): boolean {
     "payment.approved",
     "invoice.paid",
   ];
-  return activations.includes(type.toLowerCase());
+  return activations.includes(type);
 }
 
 function isCancellationEvent(type: string): boolean {
@@ -172,7 +133,7 @@ function isCancellationEvent(type: string): boolean {
     "purchase.chargeback",
     "payment.refunded",
   ];
-  return cancellations.includes(type.toLowerCase());
+  return cancellations.includes(type);
 }
 
 async function logWebhook(
@@ -207,7 +168,6 @@ async function handleActivation(
   if (existingUser) {
     userId = existingUser.id;
   } else {
-    // Create user with random password (they'll use password reset)
     const tempPassword = crypto.randomUUID() + "Aa1!";
     const { data: newUser, error: createErr } = await supabase.auth.admin.createUser({
       email: email.toLowerCase(),
@@ -242,7 +202,7 @@ async function handleActivation(
     });
   }
 
-  // 3. Ensure role exists (trigger may have already created it)
+  // 3. Ensure role exists
   const { data: existingRole } = await supabase
     .from("user_roles")
     .select("id")
@@ -262,7 +222,6 @@ async function handleCancellation(
   email: string,
   externalId: string
 ) {
-  // Find user
   const { data: existingUsers } = await supabase.auth.admin.listUsers();
   const user = existingUsers?.users?.find(
     (u: any) => u.email?.toLowerCase() === email.toLowerCase()
@@ -273,7 +232,6 @@ async function handleCancellation(
     return;
   }
 
-  // Deactivate membership
   const { data: membership } = await supabase
     .from("memberships")
     .select("id")
