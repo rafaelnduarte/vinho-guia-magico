@@ -1,4 +1,10 @@
 import type { MockWine } from "./WineCard";
+import catenaMalbec from "@/assets/wines/catena-zapata-malbec.jpg";
+import cloudyBay from "@/assets/wines/cloudy-bay-sauvignon-blanc.jpg";
+import penfoldsBin389 from "@/assets/wines/penfolds-bin-389.jpg";
+import marquesMurrieta from "@/assets/wines/marques-murrieta-reserva.jpg";
+import whisperingAngel from "@/assets/wines/whispering-angel-rose.jpg";
+import brunelloBanfi from "@/assets/wines/brunello-banfi.jpg";
 
 export const mockWines: MockWine[] = [
   {
@@ -10,8 +16,8 @@ export const mockWines: MockWine[] = [
     type: "Tinto",
     country: "Argentina",
     importer: "Grand Cru",
-    price_range: "R$ 150–200",
-    image_url: "https://images.vivino.com/thumbs/ApThIPGaTGIFCdO2WJkDkQ_375x500.jpg",
+    price: "R$ 179,90",
+    image_url: catenaMalbec,
     tasting_notes: "Malbec clássico de altitude com taninos aveludados, notas de ameixa preta e um toque de chocolate. Excelente custo-benefício para quem quer conhecer o terroir de Mendoza.",
     seal_wine_type: "Encorpado",
     seal_drinker_type: "Intermediário",
@@ -25,8 +31,8 @@ export const mockWines: MockWine[] = [
     type: "Branco",
     country: "Nova Zelândia",
     importer: "World Wine",
-    price_range: "R$ 180–250",
-    image_url: "https://images.vivino.com/thumbs/3gQVlmYATruyxZLSZArujA_375x500.jpg",
+    price: "R$ 219,90",
+    image_url: cloudyBay,
     tasting_notes: "Aromático e vibrante, com notas de maracujá e grama cortada. Acidez refrescante que pede frutos do mar. Um branco para converter quem só bebe tinto.",
     seal_wine_type: "Frutado",
     seal_drinker_type: "Iniciante",
@@ -40,8 +46,8 @@ export const mockWines: MockWine[] = [
     type: "Tinto",
     country: "Austrália",
     importer: "Decanter",
-    price_range: "R$ 350–450",
-    image_url: "https://images.vivino.com/thumbs/4RQAgsvMSe1FJEPjkRkarg_375x500.jpg",
+    price: "R$ 399,90",
+    image_url: penfoldsBin389,
     tasting_notes: "O 'Baby Grange'. Blend poderoso com camadas de cassis, cedro e especiarias. Vinho de guarda que já entrega muito jovem. Para quem quer entender a grandeza australiana.",
     seal_wine_type: "Encorpado",
     seal_drinker_type: "Avançado",
@@ -55,8 +61,8 @@ export const mockWines: MockWine[] = [
     type: "Tinto",
     country: "Espanha",
     importer: "Mistral",
-    price_range: "R$ 200–280",
-    image_url: "https://images.vivino.com/thumbs/jtv1DVz9S12msl9gvYHi-g_375x500.jpg",
+    price: "R$ 249,90",
+    image_url: marquesMurrieta,
     tasting_notes: "Rioja elegante e clássico. Frutas vermelhas maduras, baunilha e um final longo com notas de couro. Harmoniza perfeitamente com cordeiro ou queijos curados.",
     seal_wine_type: "Médio",
     seal_drinker_type: "Intermediário",
@@ -70,8 +76,8 @@ export const mockWines: MockWine[] = [
     type: "Rosé",
     country: "França",
     importer: "Expand",
-    price_range: "R$ 180–230",
-    image_url: "https://images.vivino.com/thumbs/vALbrMxSwQTKh4FJP7QLOQ_375x500.jpg",
+    price: "R$ 199,90",
+    image_url: whisperingAngel,
     tasting_notes: "O rosé mais famoso do mundo não decepciona. Pálido, delicado, com notas de morango e flor de cerejeira. Perfeito para o verão brasileiro.",
     seal_wine_type: "Leve",
     seal_drinker_type: "Iniciante",
@@ -85,8 +91,8 @@ export const mockWines: MockWine[] = [
     type: "Tinto",
     country: "Itália",
     importer: "Grand Cru",
-    price_range: "R$ 400–550",
-    image_url: "https://images.vivino.com/thumbs/K2UOIq2pRVKs-5D0ndPJSQ_375x500.jpg",
+    price: "R$ 489,90",
+    image_url: brunelloBanfi,
     tasting_notes: "Brunello majestoso com notas de cereja seca, tabaco e terra. Taninos firmes mas polidos. Um vinho para momentos especiais que recompensa cada gole.",
     seal_wine_type: "Encorpado",
     seal_drinker_type: "Avançado",
