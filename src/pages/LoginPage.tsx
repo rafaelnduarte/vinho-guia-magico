@@ -3,7 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Wine, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import logoJovem from "@/assets/logo-jovem-do-vinho.png";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 
@@ -40,7 +41,7 @@ export default function LoginPage() {
       <div className="hidden lg:flex lg:w-1/2 bg-primary items-center justify-center relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-wine-dark via-primary to-wine-light opacity-90" />
         <div className="relative z-10 text-center px-12">
-          <Wine className="h-20 w-20 text-gold mx-auto mb-6" />
+          <img src={logoJovem} alt="Jovem do Vinho" className="h-24 w-24 mx-auto mb-6" />
           <h1 className="text-4xl font-display text-primary-foreground mb-4">
             Radar do Jovem
           </h1>
@@ -54,7 +55,7 @@ export default function LoginPage() {
       <div className="flex w-full lg:w-1/2 items-center justify-center px-6 py-12">
         <div className="w-full max-w-sm space-y-8">
           <div className="text-center lg:hidden">
-            <Wine className="h-12 w-12 text-primary mx-auto mb-3" />
+            <img src={logoJovem} alt="Jovem do Vinho" className="h-14 w-14 mx-auto mb-3" />
             <h1 className="text-2xl font-display text-foreground">Radar do Jovem</h1>
           </div>
 
