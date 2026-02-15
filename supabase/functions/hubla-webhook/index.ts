@@ -6,6 +6,48 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+// Sensitive fields to redact from stored payloads
+const SENSITIVE_KEYS = [
+  "userDocument", "user_document", "document", "cpf", "cnpj",
+  "creditCardLR", "credit_card", "card_number", "card_hash",
+  "card_expiration", "card_cvv", "card_holder",
+  "password", "token", "secret",
+];
+
+function redactPayload(obj: any): any {
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj !== "object") return obj;
+  if (Array.isArray(obj)) return obj.map(redactPayload);
+
+  const result: any = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (SENSITIVE_KEYS.some((sk) => key.toLowerCase().includes(sk.toLowerCase()))) {
+      result[key] = "[REDACTED]";
+    } else if (typeof value === "object") {
+      result[key] = redactPayload(value);
+    } else {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
+function extractRelevantHeaders(req: Request): Record<string, string> {
+  const relevant = [
+    "x-hubla-token", "x-hubla-idempotency", "x-hubla-sandbox",
+    "content-type", "user-agent",
+  ];
+  const headers: Record<string, string> = {};
+  for (const key of relevant) {
+    const val = req.headers.get(key);
+    if (val) {
+      // Redact the token value
+      headers[key] = key === "x-hubla-token" ? "[REDACTED]" : val;
+    }
+  }
+  return headers;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -67,14 +109,17 @@ Deno.serve(async (req) => {
     return jsonResponse(200, { status: "already_processed" });
   }
 
-  // --- Store webhook event ---
+  // --- Store webhook event (with redacted payload and headers) ---
+  const redactedPayload = redactPayload(payload);
+  const relevantHeaders = extractRelevantHeaders(req);
+
   await supabase.from("webhook_events").insert({
     event_id: eventId,
     event_type: eventType,
-    payload,
+    payload: { ...redactedPayload, _headers: relevantHeaders },
   });
 
-  // --- Process event ---
+  // --- Process event (use original payload for data extraction) ---
   try {
     const event = payload.event ?? {};
     const email = event.userEmail;
@@ -82,7 +127,9 @@ Deno.serve(async (req) => {
     const externalId = event.subscriptionId ?? event.invoiceId ?? eventId;
 
     if (!email) {
-      await logWebhook(supabase, eventId, "no_email_found", "warn", { payload });
+      await logWebhook(supabase, eventId, "no_email_found", "warn", {
+        event_type: eventType,
+      });
       return jsonResponse(200, { status: "no_email" });
     }
 
@@ -143,11 +190,12 @@ async function logWebhook(
   status: string,
   details?: Record<string, any>
 ) {
+  // Redact details too before storing
   await supabase.from("webhook_logs").insert({
     event_id: eventId,
     action,
     status,
-    details: details ?? {},
+    details: details ? redactPayload(details) : {},
   });
 }
 
@@ -158,7 +206,6 @@ async function handleActivation(
   fullName: string | null,
   externalId: string
 ) {
-  // 1. Ensure user exists in auth
   let userId: string;
   const { data: existingUsers } = await supabase.auth.admin.listUsers();
   const existingUser = existingUsers?.users?.find(
@@ -180,7 +227,6 @@ async function handleActivation(
     await logWebhook(supabase, eventId, "user_created", "success", { userId, email });
   }
 
-  // 2. Ensure membership exists and is active
   const { data: existingMembership } = await supabase
     .from("memberships")
     .select("id, status")
@@ -202,7 +248,6 @@ async function handleActivation(
     });
   }
 
-  // 3. Ensure role exists
   const { data: existingRole } = await supabase
     .from("user_roles")
     .select("id")

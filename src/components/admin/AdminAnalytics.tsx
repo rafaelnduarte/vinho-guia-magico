@@ -44,8 +44,19 @@ export default function AdminAnalytics() {
   const [eventTypeFilter, setEventTypeFilter] = useState<string>("all");
   const [pageFilter, setPageFilter] = useState<string>("all");
 
+  // --- Fetch admin user IDs to exclude from analytics ---
+  const { data: adminRoles } = useQuery({
+    queryKey: ["admin-analytics-admin-ids"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("user_roles").select("user_id").eq("role", "admin");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  const adminUserIds = useMemo(() => new Set(adminRoles?.map((r) => r.user_id) ?? []), [adminRoles]);
+
   // --- Fetch analytics events ---
-  const { data: events, isLoading } = useQuery({
+  const { data: rawEvents, isLoading } = useQuery({
     queryKey: ["admin-analytics", period],
     queryFn: async () => {
       let query = supabase
@@ -59,6 +70,12 @@ export default function AdminAnalytics() {
       return data ?? [];
     },
   });
+
+  // Exclude admin events
+  const events = useMemo(() =>
+    (rawEvents ?? []).filter((e) => !e.user_id || !adminUserIds.has(e.user_id)),
+    [rawEvents, adminUserIds]
+  );
 
   // --- Fetch votes (all time, filtered client-side by period) ---
   const { data: votes } = useQuery({
@@ -102,24 +119,26 @@ export default function AdminAnalytics() {
 
   const lastAccesses = useMemo(() => {
     return (profiles ?? [])
-      .filter((p) => p.last_seen_at)
+      .filter((p) => p.last_seen_at && !adminUserIds.has(p.user_id))
       .sort((a, b) => new Date(b.last_seen_at!).getTime() - new Date(a.last_seen_at!).getTime())
       .slice(0, 20);
-  }, [profiles]);
+  }, [profiles, adminUserIds]);
 
   // --- Period-filtered votes & comments ---
   const periodStart = getPeriodStart(period);
   const filteredVotes = useMemo(() => {
     if (!votes) return [];
-    if (!periodStart) return votes;
-    return votes.filter((v) => v.created_at >= periodStart);
-  }, [votes, periodStart]);
+    let filtered = votes.filter((v) => !adminUserIds.has(v.user_id));
+    if (periodStart) filtered = filtered.filter((v) => v.created_at >= periodStart);
+    return filtered;
+  }, [votes, periodStart, adminUserIds]);
 
   const filteredComments = useMemo(() => {
     if (!comments) return [];
-    if (!periodStart) return comments;
-    return comments.filter((c) => c.created_at >= periodStart);
-  }, [comments, periodStart]);
+    let filtered = comments.filter((c) => !adminUserIds.has(c.user_id));
+    if (periodStart) filtered = filtered.filter((c) => c.created_at >= periodStart);
+    return filtered;
+  }, [comments, periodStart, adminUserIds]);
 
   // --- Filtered events (search + event type + page) ---
   const filteredEvents = useMemo(() => {

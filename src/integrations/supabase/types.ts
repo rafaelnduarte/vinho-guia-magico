@@ -410,6 +410,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      has_active_access: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

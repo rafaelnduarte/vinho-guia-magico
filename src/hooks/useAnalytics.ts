@@ -10,10 +10,13 @@ interface TrackOptions {
 }
 
 export function useAnalytics() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
 
   const track = useCallback(
     async (eventType: EventType, options?: TrackOptions) => {
+      // Skip tracking for admin users
+      if (role === "admin") return;
+
       try {
         await supabase.from("analytics_events").insert({
           event_type: eventType,
@@ -26,7 +29,7 @@ export function useAnalytics() {
         console.warn("Analytics track error:", err);
       }
     },
-    [user?.id]
+    [user?.id, role]
   );
 
   const trackPageView = useCallback(
