@@ -1,4 +1,5 @@
-import { GlassWater, Handshake, Award, Wine } from "lucide-react";
+import { GlassWater, Handshake, Award } from "lucide-react";
+import logoJovem from "@/assets/logo-jovem-do-vinho.png";
 import { Link } from "react-router-dom";
 
 const shortcuts = [
@@ -27,7 +28,7 @@ export default function HomePage() {
     <div className="animate-fade-in">
       {/* Hero */}
       <section className="px-6 py-16 md:py-24 max-w-4xl mx-auto text-center">
-        <Wine className="h-14 w-14 text-primary mx-auto mb-6" />
+        <img src={logoJovem} alt="Jovem do Vinho" className="h-16 w-16 mx-auto mb-6" />
         <h1 className="text-3xl md:text-5xl font-display text-foreground mb-4">
           Bem-vindo ao Radar do Jovem
         </h1>
