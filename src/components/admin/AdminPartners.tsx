@@ -1,0 +1,180 @@
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+import { Plus, Pencil, Trash2, Loader2 } from "lucide-react";
+import type { Tables } from "@/integrations/supabase/types";
+
+type PartnerRow = Tables<"partners">;
+
+interface PartnerForm {
+  name: string;
+  logo_url: string;
+  website_url: string;
+  coupon_code: string;
+  conditions: string;
+  is_active: boolean;
+}
+
+const emptyForm: PartnerForm = {
+  name: "", logo_url: "", website_url: "", coupon_code: "", conditions: "", is_active: true,
+};
+
+export default function AdminPartners() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [form, setForm] = useState<PartnerForm>(emptyForm);
+
+  const { data: partners, isLoading } = useQuery({
+    queryKey: ["admin-partners"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("partners").select("*").order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!form.name.trim()) throw new Error("Nome é obrigatório");
+      const payload = {
+        name: form.name.trim(),
+        logo_url: form.logo_url.trim() || null,
+        website_url: form.website_url.trim() || null,
+        coupon_code: form.coupon_code.trim() || null,
+        conditions: form.conditions.trim() || null,
+        is_active: form.is_active,
+      };
+      if (editing) {
+        const { error } = await supabase.from("partners").update(payload).eq("id", editing);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("partners").insert(payload);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-partners"] });
+      setOpen(false);
+      setEditing(null);
+      setForm(emptyForm);
+      toast({ title: editing ? "Parceiro atualizado" : "Parceiro criado" });
+    },
+    onError: (e) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("partners").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-partners"] });
+      toast({ title: "Parceiro removido" });
+    },
+    onError: (e) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+
+  const openEdit = (p: PartnerRow) => {
+    setForm({
+      name: p.name, logo_url: p.logo_url ?? "", website_url: p.website_url ?? "",
+      coupon_code: p.coupon_code ?? "", conditions: p.conditions ?? "", is_active: p.is_active,
+    });
+    setEditing(p.id);
+    setOpen(true);
+  };
+
+  const setField = (key: keyof PartnerForm, value: string | boolean) =>
+    setForm((f) => ({ ...f, [key]: value }));
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-foreground">Parceiros ({partners?.length ?? 0})</h2>
+        <Button onClick={() => { setForm(emptyForm); setEditing(null); setOpen(true); }} className="gap-2">
+          <Plus className="h-4 w-4" /> Novo Parceiro
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {partners?.map((p) => (
+            <div key={p.id} className="rounded-lg border border-border bg-card p-4 space-y-3">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="font-medium text-foreground">{p.name}</p>
+                  {p.coupon_code && <Badge variant="secondary" className="mt-1 text-xs">{p.coupon_code}</Badge>}
+                </div>
+                <Badge variant={p.is_active ? "default" : "outline"}>{p.is_active ? "Ativo" : "Inativo"}</Badge>
+              </div>
+              {p.conditions && <p className="text-xs text-muted-foreground">{p.conditions}</p>}
+              <div className="flex gap-1 justify-end">
+                <Button variant="ghost" size="icon" onClick={() => openEdit(p)}><Pencil className="h-4 w-4" /></Button>
+                <Button variant="ghost" size="icon" onClick={() => { if (confirm("Remover?")) deleteMutation.mutate(p.id); }}>
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </div>
+            </div>
+          ))}
+          {partners?.length === 0 && (
+            <div className="col-span-full rounded-lg border border-border bg-card p-12 text-center text-muted-foreground">
+              Nenhum parceiro cadastrado.
+            </div>
+          )}
+        </div>
+      )}
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editing ? "Editar Parceiro" : "Novo Parceiro"}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={(e) => { e.preventDefault(); saveMutation.mutate(); }} className="space-y-4">
+            <div className="space-y-1">
+              <Label>Nome *</Label>
+              <Input value={form.name} onChange={(e) => setField("name", e.target.value)} required />
+            </div>
+            <div className="space-y-1">
+              <Label>URL do Logo</Label>
+              <Input value={form.logo_url} onChange={(e) => setField("logo_url", e.target.value)} placeholder="https://..." />
+            </div>
+            <div className="space-y-1">
+              <Label>Website</Label>
+              <Input value={form.website_url} onChange={(e) => setField("website_url", e.target.value)} placeholder="https://..." />
+            </div>
+            <div className="space-y-1">
+              <Label>Cupom</Label>
+              <Input value={form.coupon_code} onChange={(e) => setField("coupon_code", e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label>Condições</Label>
+              <Textarea value={form.conditions} onChange={(e) => setField("conditions", e.target.value)} rows={2} />
+            </div>
+            <div className="flex items-center gap-3">
+              <Switch checked={form.is_active} onCheckedChange={(v) => setField("is_active", v)} id="active" />
+              <Label htmlFor="active">Ativo</Label>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+              <Button type="submit" disabled={saveMutation.isPending}>
+                {saveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                {editing ? "Salvar" : "Criar"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
