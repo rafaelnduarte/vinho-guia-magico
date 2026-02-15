@@ -1,9 +1,6 @@
-import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Wine, MessageSquare } from "lucide-react";
-import WineVoting from "./WineVoting";
-import WineComments from "./WineComments";
+import { Wine } from "lucide-react";
+import { Link } from "react-router-dom";
 
 export interface MockWine {
   id: string;
@@ -25,101 +22,51 @@ interface WineCardProps {
   wine: MockWine;
 }
 
-const sealColors: Record<string, string> = {
-  "Encorpado": "bg-wine-dark/90 text-primary-foreground",
-  "Leve": "bg-gold/90 text-primary-foreground",
-  "Médio": "bg-wine-light/90 text-primary-foreground",
-  "Frutado": "bg-wine/90 text-primary-foreground",
-  "Iniciante": "bg-primary/90 text-primary-foreground",
-  "Intermediário": "bg-secondary/90 text-secondary-foreground",
-  "Avançado": "bg-wine-dark/90 text-primary-foreground",
-  "Curioso": "bg-primary/90 text-primary-foreground",
-};
-
 export default function WineCard({ wine }: WineCardProps) {
-  const [tab, setTab] = useState("info");
-
   return (
-    <div className="rounded-xl border border-border bg-card overflow-hidden flex flex-col">
+    <Link
+      to={`/curadoria/${wine.id}`}
+      className="group rounded-xl border border-border bg-card overflow-hidden flex flex-col hover:shadow-md transition-shadow"
+    >
       {/* Image with seals */}
       <div className="relative aspect-[3/4] bg-muted/30 flex items-center justify-center overflow-hidden">
         {wine.image_url ? (
           <img
             src={wine.image_url}
             alt={wine.name}
-            className="h-full w-full object-cover"
+            className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
             loading="lazy"
           />
         ) : (
           <Wine className="h-16 w-16 text-muted-foreground/30" />
         )}
-        {/* Seals overlay */}
         <div className="absolute top-2 right-2 flex flex-col gap-1.5">
-          <Badge className={`text-[10px] px-1.5 py-0.5 shadow-md ${sealColors[wine.seal_wine_type] ?? "bg-primary text-primary-foreground"}`}>
-            {wine.seal_wine_type}
-          </Badge>
-          <Badge className={`text-[10px] px-1.5 py-0.5 shadow-md ${sealColors[wine.seal_drinker_type] ?? "bg-primary text-primary-foreground"}`}>
-            {wine.seal_drinker_type}
-          </Badge>
+          {wine.seal_wine_type && (
+            <Badge className="text-[10px] px-1.5 py-0.5 shadow-md bg-primary/90 text-primary-foreground">
+              {wine.seal_wine_type}
+            </Badge>
+          )}
+          {wine.seal_drinker_type && (
+            <Badge className="text-[10px] px-1.5 py-0.5 shadow-md bg-secondary/90 text-secondary-foreground">
+              {wine.seal_drinker_type}
+            </Badge>
+          )}
         </div>
       </div>
 
       {/* Content */}
       <div className="flex-1 p-4 flex flex-col">
-        <h3 className="font-display text-base text-foreground leading-tight mb-1">{wine.name}</h3>
-        <p className="text-xs text-muted-foreground mb-3">{wine.producer} · {wine.vintage}</p>
-
-        <Tabs value={tab} onValueChange={setTab} className="flex-1 flex flex-col">
-          <TabsList className="w-full grid grid-cols-2 h-8">
-            <TabsTrigger value="info" className="text-xs">Detalhes</TabsTrigger>
-            <TabsTrigger value="comments" className="text-xs gap-1">
-              <MessageSquare className="h-3 w-3" />
-              Comentários
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="info" className="flex-1 mt-3 space-y-3">
-            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
-              <div>
-                <span className="text-muted-foreground">Uva</span>
-                <p className="text-foreground font-medium">{wine.grape}</p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Tipo</span>
-                <p className="text-foreground font-medium">{wine.type}</p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">País</span>
-                <p className="text-foreground font-medium">{wine.country}</p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Importadora</span>
-                <p className="text-foreground font-medium">{wine.importer}</p>
-              </div>
-              <div className="col-span-2">
-                <span className="text-muted-foreground">Preço</span>
-                <p className="text-foreground font-medium">{wine.price}</p>
-              </div>
-            </div>
-
-            {/* Thomas comment */}
-            <div className="rounded-lg bg-primary/5 border border-primary/10 p-3">
-              <p className="text-xs font-medium text-primary mb-1">Comentário do Thomas</p>
-              <p className="text-xs text-muted-foreground leading-relaxed">{wine.tasting_notes}</p>
-            </div>
-
-            {/* Voting */}
-            <div className="pt-1">
-              <p className="text-xs text-muted-foreground mb-2">Você recomenda este vinho?</p>
-              <WineVoting wineId={wine.id} />
-            </div>
-          </TabsContent>
-
-          <TabsContent value="comments" className="flex-1 mt-3">
-            <WineComments wineId={wine.id} />
-          </TabsContent>
-        </Tabs>
+        <h3 className="font-sans font-semibold text-base text-foreground leading-tight mb-1 group-hover:text-primary transition-colors">
+          {wine.name}
+        </h3>
+        <p className="text-xs text-muted-foreground mb-2">
+          {wine.producer} {wine.vintage ? `· ${wine.vintage}` : ""}
+        </p>
+        <div className="flex items-center justify-between mt-auto pt-2 border-t border-border/50">
+          <span className="text-xs text-muted-foreground">{wine.type} · {wine.country}</span>
+          {wine.price && <span className="text-sm font-medium text-foreground">{wine.price}</span>}
+        </div>
       </div>
-    </div>
+    </Link>
   );
 }
