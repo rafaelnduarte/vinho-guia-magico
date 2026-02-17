@@ -66,7 +66,11 @@ export default {
 				DEFAULT: 'hsl(var(--gold))',
 				light: 'hsl(var(--gold-light))'
 			},
-			cream: 'hsl(var(--cream))'
+			cream: 'hsl(var(--cream))',
+			highlight: {
+				DEFAULT: 'hsl(var(--highlight))',
+				foreground: 'hsl(var(--highlight-foreground))'
+			}
   		},
   		borderRadius: {
   			lg: 'var(--radius)',
@@ -109,8 +113,14 @@ export default {
   				'Noto Sans',
   				'sans-serif'
   			],
+			display: [
+				'Lore',
+				'ui-serif',
+				'Georgia',
+				'sans-serif'
+			],
   			serif: [
-  				'Lora',
+  				'Lore',
   				'ui-serif',
   				'Georgia',
   				'Cambria',
