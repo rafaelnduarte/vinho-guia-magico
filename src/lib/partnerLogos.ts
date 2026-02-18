@@ -16,11 +16,21 @@ import adegasMetier from "@/assets/partners/adegas-metier.png";
 import elevadoBar from "@/assets/partners/elevado-bar.png";
 import vinivivo from "@/assets/partners/vinivivo.png";
 import vingardeValise from "@/assets/partners/vingarde-valise.png";
+import goodClothing from "@/assets/partners/good-clothing.png";
+import saintVivant from "@/assets/partners/saint-vivant.png";
+import elevageNew from "@/assets/partners/elevage-new.png";
+import maisonSirino from "@/assets/partners/maison-sirino.png";
+import mistral from "@/assets/partners/mistral.png";
+import saidaDeEmergencia from "@/assets/partners/saida-de-emergencia.png";
+import tanynoGlass from "@/assets/partners/tanyno-glass.png";
+import tanyno from "@/assets/partners/tanyno.png";
+import vibrana from "@/assets/partners/vibrana.png";
+import vinhaSolo from "@/assets/partners/vinha-solo.png";
 
 const partnerLogos: Record<string, string> = {
   "a-casa-do-produtor": aCasaDoProdutor,
   castas,
-  elevage,
+  elevage: elevageNew,
   wines4u,
   curavino,
   "arte-da-vinha": arteDaVinha,
@@ -36,6 +46,15 @@ const partnerLogos: Record<string, string> = {
   "elevado-bar": elevadoBar,
   vinivivo,
   "vingarde-valise": vingardeValise,
+  "good-clothing": goodClothing,
+  "saint-vivant": saintVivant,
+  "maison-sirino": maisonSirino,
+  mistral,
+  "saida-de-emergencia": saidaDeEmergencia,
+  "tanyno-glass": tanynoGlass,
+  tanyno,
+  vibrana,
+  "vinha-solo": vinhaSolo,
 };
 
 export function getPartnerLogo(key: string | null): string | undefined {
