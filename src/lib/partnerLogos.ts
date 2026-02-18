@@ -29,6 +29,10 @@ import vinhaSolo from "@/assets/partners/vinha-solo.png";
 import vinveneto from "@/assets/partners/vinveneto.png";
 import vivente from "@/assets/partners/vivente.png";
 import worldWine from "@/assets/partners/world-wine.png";
+import cecconello from "@/assets/partners/cecconello.webp";
+import italyImport from "@/assets/partners/italy-import.webp";
+import pesoDaRegua from "@/assets/partners/peso-da-regua.webp";
+import vitaeEterna from "@/assets/partners/vitae-eterna.webp";
 
 const partnerLogos: Record<string, string> = {
   "a-casa-do-produtor": aCasaDoProdutor,
@@ -61,6 +65,10 @@ const partnerLogos: Record<string, string> = {
   "vin-veneto": vinveneto,
   vivente,
   "world-wine": worldWine,
+  cecconello,
+  "italy-import": italyImport,
+  "peso-da-regua": pesoDaRegua,
+  "vitae-eterna": vitaeEterna,
 };
 
 export function getPartnerLogo(key: string | null): string | undefined {
