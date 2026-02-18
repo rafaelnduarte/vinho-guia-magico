@@ -79,9 +79,12 @@ export type Database = {
       }
       partners: {
         Row: {
+          category: string
           conditions: string | null
+          contact_info: string | null
           coupon_code: string | null
           created_at: string
+          discount: string | null
           id: string
           is_active: boolean
           logo_url: string | null
@@ -90,9 +93,12 @@ export type Database = {
           website_url: string | null
         }
         Insert: {
+          category?: string
           conditions?: string | null
+          contact_info?: string | null
           coupon_code?: string | null
           created_at?: string
+          discount?: string | null
           id?: string
           is_active?: boolean
           logo_url?: string | null
@@ -101,9 +107,12 @@ export type Database = {
           website_url?: string | null
         }
         Update: {
+          category?: string
           conditions?: string | null
+          contact_info?: string | null
           coupon_code?: string | null
           created_at?: string
+          discount?: string | null
           id?: string
           is_active?: boolean
           logo_url?: string | null
