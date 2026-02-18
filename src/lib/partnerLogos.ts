@@ -26,6 +26,9 @@ import tanynoGlass from "@/assets/partners/tanyno-glass.png";
 import tanyno from "@/assets/partners/tanyno.png";
 import vibrana from "@/assets/partners/vibrana.png";
 import vinhaSolo from "@/assets/partners/vinha-solo.png";
+import vinveneto from "@/assets/partners/vinveneto.png";
+import vivente from "@/assets/partners/vivente.png";
+import worldWine from "@/assets/partners/world-wine.png";
 
 const partnerLogos: Record<string, string> = {
   "a-casa-do-produtor": aCasaDoProdutor,
@@ -55,6 +58,9 @@ const partnerLogos: Record<string, string> = {
   tanyno,
   vibrana,
   "vinha-solo": vinhaSolo,
+  vinveneto,
+  vivente,
+  "world-wine": worldWine,
 };
 
 export function getPartnerLogo(key: string | null): string | undefined {
