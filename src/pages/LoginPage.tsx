@@ -62,12 +62,12 @@ export default function LoginPage() {
       <div className="hidden lg:flex lg:w-1/2 bg-secondary items-center justify-center relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-secondary via-primary to-secondary opacity-80" />
         <div className="relative z-10 text-center px-12">
-          <img src={logoJovem} alt="Jovem do Vinho" className="h-32 w-32 mx-auto mb-6 drop-shadow-lg" />
-          <h1 className="text-4xl font-display font-normal text-accent mb-4">
+          <img src={logoJovem} alt="Jovem do Vinho" className="h-32 w-32 mx-auto mb-6 bg-white rounded-full p-2 shadow-lg" />
+          <h1 className="text-4xl font-display font-normal text-primary-foreground mb-4">
             Radar do Jovem
           </h1>
           <p className="text-primary-foreground/80 text-lg">
-            Curadoria exclusiva de vinhos selecionados para você.
+            A maior curadoria independente do Brasil
           </p>
         </div>
       </div>
