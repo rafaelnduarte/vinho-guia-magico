@@ -63,7 +63,7 @@ export default function LoginPage() {
         <div className="absolute inset-0 bg-gradient-to-br from-secondary via-primary to-secondary opacity-80" />
         <div className="relative z-10 text-center px-12">
           <img src={logoJovem} alt="Jovem do Vinho" className="h-32 w-32 mx-auto mb-6 drop-shadow-lg" />
-          <h1 className="text-4xl font-display font-bold text-accent mb-4">
+          <h1 className="text-4xl font-display font-normal text-accent mb-4">
             Radar do Jovem
           </h1>
           <p className="text-primary-foreground/80 text-lg">
@@ -77,7 +77,7 @@ export default function LoginPage() {
         <div className="w-full max-w-sm space-y-8">
           <div className="text-center lg:hidden">
             <img src={logoJovem} alt="Jovem do Vinho" className="h-20 w-20 mx-auto mb-3 drop-shadow-lg" />
-            <h1 className="text-2xl font-display font-bold text-foreground">Radar do Jovem</h1>
+            <h1 className="text-2xl font-display font-normal text-foreground">Radar do Jovem</h1>
           </div>
 
           {forgotMode ? (
