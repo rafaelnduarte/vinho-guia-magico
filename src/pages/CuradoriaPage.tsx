@@ -126,14 +126,10 @@ export default function CuradoriaPage() {
   const getSealsForWine = (wineId: string) => {
     const entries = wineSealsData?.filter((ws) => ws.wine_id === wineId) ?? [];
     const wineType = entries.find((e) => (e.seals as any)?.category === "perfil_vinho");
-    const drinkerType = entries.find((e) => (e.seals as any)?.category === "perfil_bebedor");
+    const clienteType = entries.find((e) => (e.seals as any)?.category === "perfil_cliente");
     return {
-      seal_wine_type: wineType
-        ? `${(wineType.seals as any)?.icon ?? ""} ${(wineType.seals as any)?.name}`.trim()
-        : "",
-      seal_drinker_type: drinkerType
-        ? `${(drinkerType.seals as any)?.icon ?? ""} ${(drinkerType.seals as any)?.name}`.trim()
-        : "",
+      seal_wine_type: wineType ? (wineType.seals as any)?.icon ?? "" : "",
+      seal_drinker_type: clienteType ? (clienteType.seals as any)?.icon ?? "" : "",
     };
   };
 

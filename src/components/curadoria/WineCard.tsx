@@ -1,6 +1,6 @@
-import { Badge } from "@/components/ui/badge";
 import { Wine } from "lucide-react";
 import { Link } from "react-router-dom";
+import { getSealIcon } from "@/lib/sealIcons";
 
 export interface MockWine {
   id: string;
@@ -23,6 +23,9 @@ interface WineCardProps {
 }
 
 export default function WineCard({ wine }: WineCardProps) {
+  const wineIcon = getSealIcon(wine.seal_wine_type);
+  const drinkerIcon = getSealIcon(wine.seal_drinker_type);
+
   return (
     <Link
       to={`/curadoria/${wine.id}`}
@@ -41,15 +44,19 @@ export default function WineCard({ wine }: WineCardProps) {
           <Wine className="h-16 w-16 text-muted-foreground/30" />
         )}
         <div className="absolute top-2 right-2 flex flex-col gap-1.5">
-          {wine.seal_wine_type && (
-            <Badge className="text-[10px] px-1.5 py-0.5 shadow-md bg-primary/90 text-primary-foreground">
-              {wine.seal_wine_type}
-            </Badge>
+          {wineIcon && (
+            <img
+              src={wineIcon}
+              alt={wine.seal_wine_type}
+              className="h-10 w-10 drop-shadow-lg"
+            />
           )}
-          {wine.seal_drinker_type && (
-            <Badge className="text-[10px] px-1.5 py-0.5 shadow-md bg-secondary/90 text-secondary-foreground">
-              {wine.seal_drinker_type}
-            </Badge>
+          {drinkerIcon && (
+            <img
+              src={drinkerIcon}
+              alt={wine.seal_drinker_type}
+              className="h-10 w-10 drop-shadow-lg"
+            />
           )}
         </div>
       </div>
