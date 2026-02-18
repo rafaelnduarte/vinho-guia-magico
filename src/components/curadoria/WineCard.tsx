@@ -29,40 +29,46 @@ export default function WineCard({ wine }: WineCardProps) {
   return (
     <Link
       to={`/curadoria/${wine.id}`}
-      className="group rounded-xl border border-border bg-card overflow-hidden flex flex-col hover:shadow-md transition-shadow"
+      className="group flex flex-col hover:opacity-90 transition-opacity"
     >
-      {/* Image with seals */}
-      <div className="relative aspect-[3/4] bg-muted/30 flex items-center justify-center overflow-hidden">
-        {wine.image_url ? (
-          <img
-            src={wine.image_url}
-            alt={wine.name}
-            className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
-            loading="lazy"
-          />
-        ) : (
-          <Wine className="h-16 w-16 text-muted-foreground/30" />
-        )}
-        <div className="absolute top-2 right-2 flex flex-col gap-1.5">
-          {wineIcon && (
+      {/* Image area with floating seals */}
+      <div className="relative">
+        <div className="aspect-[3/4] flex items-center justify-center overflow-hidden">
+          {wine.image_url ? (
             <img
-              src={wineIcon}
-              alt={wine.seal_wine_type}
-              className="h-10 w-10 drop-shadow-lg"
+              src={wine.image_url}
+              alt={wine.name}
+              className="h-full w-full object-contain group-hover:scale-105 transition-transform duration-300"
+              loading="lazy"
             />
-          )}
-          {drinkerIcon && (
-            <img
-              src={drinkerIcon}
-              alt={wine.seal_drinker_type}
-              className="h-10 w-10 drop-shadow-lg"
-            />
+          ) : (
+            <Wine className="h-16 w-16 text-muted-foreground/30" />
           )}
         </div>
+
+        {/* Seals floating outside top-right */}
+        {(drinkerIcon || wineIcon) && (
+          <div className="absolute -top-2 -right-2 flex flex-col gap-2">
+            {drinkerIcon && (
+              <img
+                src={drinkerIcon}
+                alt={wine.seal_drinker_type}
+                className="h-12 w-12 drop-shadow-md"
+              />
+            )}
+            {wineIcon && (
+              <img
+                src={wineIcon}
+                alt={wine.seal_wine_type}
+                className="h-12 w-12 drop-shadow-md"
+              />
+            )}
+          </div>
+        )}
       </div>
 
       {/* Content */}
-      <div className="flex-1 p-4 flex flex-col">
+      <div className="flex-1 pt-3 flex flex-col">
         <h3 className="font-sans font-semibold text-base text-foreground leading-tight mb-1 group-hover:text-primary transition-colors">
           {wine.name}
         </h3>
