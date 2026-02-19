@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_knowledge_base: {
+        Row: {
+          category: string
+          content: string
+          created_at: string
+          id: string
+          is_active: boolean
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          content: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          content?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ai_pricing_config: {
         Row: {
           id: string
@@ -26,6 +56,7 @@ export type Database = {
           price_out_per_1k: number
           rate_limit_per_5min: number
           rate_limit_per_day: number
+          system_prompt: string
           updated_at: string
           usd_brl_rate: number
         }
@@ -40,6 +71,7 @@ export type Database = {
           price_out_per_1k?: number
           rate_limit_per_5min?: number
           rate_limit_per_day?: number
+          system_prompt?: string
           updated_at?: string
           usd_brl_rate?: number
         }
@@ -54,6 +86,7 @@ export type Database = {
           price_out_per_1k?: number
           rate_limit_per_5min?: number
           rate_limit_per_day?: number
+          system_prompt?: string
           updated_at?: string
           usd_brl_rate?: number
         }

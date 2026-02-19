@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -9,7 +9,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   BarChart3, DollarSign, Users, MessageSquare, Settings,
-  Loader2, Save, Wine, Plus, Trash2, Edit2, Check, X
+  Loader2, Save, Wine, Plus, Trash2, Edit2, Check, X,
+  BookOpen, FileText, ToggleLeft, ToggleRight
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -24,11 +25,15 @@ export default function AdminChat() {
           <TabsList className="inline-flex w-auto min-w-full sm:min-w-0 h-auto p-1 gap-0.5">
             <TabsTrigger value="metrics" className="text-xs px-3 py-2">Métricas</TabsTrigger>
             <TabsTrigger value="config" className="text-xs px-3 py-2">Configuração</TabsTrigger>
+            <TabsTrigger value="prompt" className="text-xs px-3 py-2">System Prompt</TabsTrigger>
+            <TabsTrigger value="knowledge" className="text-xs px-3 py-2">Base de Conhecimento</TabsTrigger>
             <TabsTrigger value="thomas" className="text-xs px-3 py-2">Notas Thomas</TabsTrigger>
           </TabsList>
         </div>
         <TabsContent value="metrics"><ChatMetrics /></TabsContent>
         <TabsContent value="config"><ChatConfig /></TabsContent>
+        <TabsContent value="prompt"><SystemPromptEditor /></TabsContent>
+        <TabsContent value="knowledge"><KnowledgeBase /></TabsContent>
         <TabsContent value="thomas"><ThomasNotes /></TabsContent>
       </Tabs>
     </div>
@@ -175,7 +180,6 @@ function ChatConfig() {
 
   const [form, setForm] = useState<Record<string, any>>({});
 
-  // Sync form when config loads
   useMemo(() => {
     if (config && Object.keys(form).length === 0) {
       setForm({
@@ -243,6 +247,273 @@ function ChatConfig() {
       <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="gap-2">
         <Save className="h-4 w-4" /> Salvar
       </Button>
+    </div>
+  );
+}
+
+// ---- SYSTEM PROMPT EDITOR ----
+function SystemPromptEditor() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: config, isLoading } = useQuery({
+    queryKey: ["admin-chat-config"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("ai_pricing_config").select("*").limit(1);
+      if (error) throw error;
+      return data?.[0] ?? null;
+    },
+  });
+
+  const [prompt, setPrompt] = useState("");
+
+  useEffect(() => {
+    if (config?.system_prompt && !prompt) {
+      setPrompt(config.system_prompt);
+    }
+  }, [config]);
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!config) return;
+      const { error } = await supabase
+        .from("ai_pricing_config")
+        .update({ system_prompt: prompt })
+        .eq("id", config.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: "System prompt salvo!" });
+      queryClient.invalidateQueries({ queryKey: ["admin-chat-config"] });
+    },
+    onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+
+  if (isLoading) return <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>;
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
+        <FileText className="h-4 w-4" /> System Prompt
+      </h3>
+      <p className="text-xs text-muted-foreground">
+        Este é o prompt base que define a personalidade, regras e comportamento do Sommelier AI. 
+        Os vinhos do portal e a base de conhecimento são injetados automaticamente.
+      </p>
+      <Textarea
+        value={prompt}
+        onChange={e => setPrompt(e.target.value)}
+        rows={16}
+        className="font-mono text-xs"
+        placeholder="Insira o system prompt..."
+      />
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-muted-foreground">{prompt.length} caracteres</span>
+        <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="gap-2">
+          <Save className="h-4 w-4" /> Salvar Prompt
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ---- KNOWLEDGE BASE ----
+function KnowledgeBase() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({ title: "", content: "", category: "geral" });
+  const [newEntry, setNewEntry] = useState({ title: "", content: "", category: "geral" });
+
+  const { data: entries, isLoading } = useQuery({
+    queryKey: ["admin-knowledge-base"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("ai_knowledge_base")
+        .select("*")
+        .order("category")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const addMutation = useMutation({
+    mutationFn: async () => {
+      if (!newEntry.title.trim() || !newEntry.content.trim()) throw new Error("Preencha título e conteúdo");
+      const { error } = await supabase.from("ai_knowledge_base").insert(newEntry);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: "Documento adicionado!" });
+      setNewEntry({ title: "", content: "", category: "geral" });
+      queryClient.invalidateQueries({ queryKey: ["admin-knowledge-base"] });
+    },
+    onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("ai_knowledge_base")
+        .update({ title: editForm.title, content: editForm.content, category: editForm.category })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: "Documento atualizado!" });
+      setEditingId(null);
+      queryClient.invalidateQueries({ queryKey: ["admin-knowledge-base"] });
+    },
+    onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
+      const { error } = await supabase
+        .from("ai_knowledge_base")
+        .update({ is_active })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-knowledge-base"] });
+    },
+    onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("ai_knowledge_base").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: "Documento removido" });
+      queryClient.invalidateQueries({ queryKey: ["admin-knowledge-base"] });
+    },
+    onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+
+  const categories = [
+    { value: "geral", label: "Geral" },
+    { value: "regioes", label: "Regiões" },
+    { value: "uvas", label: "Uvas" },
+    { value: "harmonizacao", label: "Harmonização" },
+    { value: "degustacao", label: "Degustação" },
+    { value: "producao", label: "Produção" },
+    { value: "cultura", label: "Cultura do Vinho" },
+  ];
+
+  if (isLoading) return <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>;
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
+        <BookOpen className="h-4 w-4" /> Base de Conhecimento
+      </h3>
+      <p className="text-xs text-muted-foreground">
+        Adicione documentos, artigos e textos que o Sommelier AI usará como referência. 
+        Esses conteúdos são injetados automaticamente no contexto quando relevantes à pergunta do usuário.
+      </p>
+
+      {/* Add new entry */}
+      <div className="rounded-lg border border-border p-3 space-y-3 bg-card">
+        <p className="text-xs font-medium text-muted-foreground">Novo documento</p>
+        <Input
+          value={newEntry.title}
+          onChange={e => setNewEntry(p => ({ ...p, title: e.target.value }))}
+          placeholder="Título do documento (ex: Guia de Harmonização)"
+        />
+        <Select value={newEntry.category} onValueChange={v => setNewEntry(p => ({ ...p, category: v }))}>
+          <SelectTrigger className="text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {categories.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Textarea
+          value={newEntry.content}
+          onChange={e => setNewEntry(p => ({ ...p, content: e.target.value }))}
+          placeholder="Cole aqui o conteúdo do documento, artigo ou texto de referência..."
+          rows={6}
+        />
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">{newEntry.content.length} caracteres</span>
+          <Button size="sm" onClick={() => addMutation.mutate()} disabled={addMutation.isPending} className="gap-1">
+            <Plus className="h-3 w-3" /> Adicionar
+          </Button>
+        </div>
+      </div>
+
+      {/* Entries list */}
+      <div className="space-y-2">
+        {entries?.map((entry: any) => (
+          <div key={entry.id} className={`rounded-lg border border-border p-3 bg-card ${!entry.is_active ? 'opacity-50' : ''}`}>
+            {editingId === entry.id ? (
+              <div className="space-y-2">
+                <Input
+                  value={editForm.title}
+                  onChange={e => setEditForm(p => ({ ...p, title: e.target.value }))}
+                />
+                <Select value={editForm.category} onValueChange={v => setEditForm(p => ({ ...p, category: v }))}>
+                  <SelectTrigger className="text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Textarea
+                  value={editForm.content}
+                  onChange={e => setEditForm(p => ({ ...p, content: e.target.value }))}
+                  rows={6}
+                />
+                <div className="flex gap-1">
+                  <Button size="sm" variant="ghost" onClick={() => updateMutation.mutate(entry.id)} className="gap-1">
+                    <Check className="h-3 w-3" /> Salvar
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
+                    <X className="h-3 w-3" /> Cancelar
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-start justify-between gap-2 mb-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-foreground">{entry.title}</span>
+                    <Badge variant="outline" className="text-xs">{categories.find(c => c.value === entry.category)?.label ?? entry.category}</Badge>
+                  </div>
+                  <div className="flex gap-1 shrink-0">
+                    <Button
+                      size="icon" variant="ghost" className="h-7 w-7"
+                      onClick={() => toggleMutation.mutate({ id: entry.id, is_active: !entry.is_active })}
+                      title={entry.is_active ? "Desativar" : "Ativar"}
+                    >
+                      {entry.is_active ? <ToggleRight className="h-3 w-3 text-green-500" /> : <ToggleLeft className="h-3 w-3" />}
+                    </Button>
+                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => {
+                      setEditingId(entry.id);
+                      setEditForm({ title: entry.title, content: entry.content, category: entry.category });
+                    }}>
+                      <Edit2 className="h-3 w-3" />
+                    </Button>
+                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => deleteMutation.mutate(entry.id)}>
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground line-clamp-3">{entry.content}</p>
+                <span className="text-xs text-muted-foreground mt-1 block">{entry.content.length} caracteres</span>
+              </>
+            )}
+          </div>
+        ))}
+        {(!entries || entries.length === 0) && (
+          <p className="text-sm text-muted-foreground text-center py-4">Nenhum documento na base de conhecimento</p>
+        )}
+      </div>
     </div>
   );
 }
@@ -323,7 +594,6 @@ function ThomasNotes() {
         <Wine className="h-4 w-4" /> Notas do Thomas
       </h3>
 
-      {/* Add new note */}
       <div className="rounded-lg border border-border p-3 space-y-3 bg-card">
         <p className="text-xs font-medium text-muted-foreground">Nova nota</p>
         <Select value={newNote.wine_id} onValueChange={v => setNewNote(p => ({ ...p, wine_id: v }))}>
@@ -355,7 +625,6 @@ function ThomasNotes() {
         </Button>
       </div>
 
-      {/* Notes list */}
       <div className="space-y-2">
         {notes?.map((n: any) => (
           <div key={n.id} className="rounded-lg border border-border p-3 bg-card">
