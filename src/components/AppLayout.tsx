@@ -11,6 +11,7 @@ import {
   LogOut,
   Menu,
   X,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -20,6 +21,7 @@ import logoJovem from "@/assets/logo-jovem-do-vinho.png";
 const memberLinks = [
   { to: "/", label: "Home", icon: Home },
   { to: "/curadoria", label: "Curadoria", icon: Wine },
+  { to: "/sommelier", label: "Sommelier AI", icon: Sparkles },
   { to: "/parceiros", label: "Parceiros", icon: Handshake },
   { to: "/selos", label: "Selos", icon: Award },
 ];

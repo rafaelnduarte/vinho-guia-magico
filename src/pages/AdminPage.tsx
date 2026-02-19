@@ -7,6 +7,7 @@ import AdminSeals from "@/components/admin/AdminSeals";
 import AdminMembers from "@/components/admin/AdminMembers";
 import AdminAnalytics from "@/components/admin/AdminAnalytics";
 import AdminTutorials from "@/components/admin/AdminTutorials";
+import AdminChat from "@/components/admin/AdminChat";
 
 export default function AdminPage() {
   return (
@@ -25,6 +26,7 @@ export default function AdminPage() {
             <TabsTrigger value="partners" className="text-xs sm:text-sm px-3 py-2">Parceiros</TabsTrigger>
             <TabsTrigger value="seals" className="text-xs sm:text-sm px-3 py-2">Selos</TabsTrigger>
             <TabsTrigger value="tutorials" className="text-xs sm:text-sm px-3 py-2">Tutoriais</TabsTrigger>
+            <TabsTrigger value="chat" className="text-xs sm:text-sm px-3 py-2">Sommelier AI</TabsTrigger>
           </TabsList>
         </div>
 
@@ -45,6 +47,9 @@ export default function AdminPage() {
         </TabsContent>
         <TabsContent value="tutorials">
           <AdminTutorials />
+        </TabsContent>
+        <TabsContent value="chat">
+          <AdminChat />
         </TabsContent>
       </Tabs>
     </div>
