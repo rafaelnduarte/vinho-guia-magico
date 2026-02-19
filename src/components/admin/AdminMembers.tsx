@@ -1,10 +1,14 @@
 import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, Loader2, Users } from "lucide-react";
+import { Upload, Loader2, Users, Plus, Search, ArrowLeft, BarChart3, KeyRound, Pencil, Clock, ThumbsUp, MessageSquare, Eye } from "lucide-react";
 import CsvImportDialog, { type CsvColumn, type CsvImportResult } from "./CsvImportDialog";
 
 const memberColumns: CsvColumn[] = [
@@ -15,26 +19,47 @@ const memberColumns: CsvColumn[] = [
   { key: "external_id", label: "ID Externo" },
 ];
 
+async function callAdminMembers(action: string, params: Record<string, any> = {}) {
+  const { data: { session } } = await supabase.auth.getSession();
+  const resp = await supabase.functions.invoke("admin-members", {
+    body: { action, ...params },
+  });
+  if (resp.error) throw new Error(resp.error.message);
+  if (resp.data?.error) throw new Error(resp.data.error);
+  return resp.data;
+}
+
 export default function AdminMembers() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [csvOpen, setCsvOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [createForm, setCreateForm] = useState({ email: "", full_name: "", status: "active" });
 
   const { data: members, isLoading } = useQuery({
-    queryKey: ["admin-members"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("memberships")
-        .select("*, profiles!memberships_user_id_fkey(full_name, avatar_url)")
-        .order("created_at", { ascending: false });
-      // If join fails, fall back to just memberships
-      if (error) {
-        const { data: fallback, error: e2 } = await supabase.from("memberships").select("*").order("created_at", { ascending: false });
-        if (e2) throw e2;
-        return fallback;
-      }
-      return data;
+    queryKey: ["admin-members-enriched"],
+    queryFn: () => callAdminMembers("list_members"),
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async () => {
+      if (!createForm.email.trim() || !createForm.full_name.trim()) throw new Error("Email e nome são obrigatórios");
+      return callAdminMembers("create_member", {
+        email: createForm.email.trim(),
+        full_name: createForm.full_name.trim(),
+        status: createForm.status,
+        source: "manual",
+      });
     },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-members-enriched"] });
+      setCreateOpen(false);
+      setCreateForm({ email: "", full_name: "", status: "active" });
+      toast({ title: "Membro criado com sucesso" });
+    },
+    onError: (e) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
   });
 
   const handleImport = async (rows: Record<string, any>[]): Promise<CsvImportResult> => {
@@ -43,89 +68,64 @@ export default function AdminMembers() {
     const errors: CsvImportResult["errors"] = [];
 
     for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      const email = row.email?.toLowerCase();
-      const fullName = row.full_name;
-      const status = row.status?.toLowerCase() || "active";
-      const source = row.source || "csv_import";
-      const externalId = row.external_id || null;
-
       try {
-        // Check if user exists in auth
-        const { data: existingUsers } = await supabase.auth.admin.listUsers();
-        const existingUser = existingUsers?.users?.find(
-          (u: any) => u.email?.toLowerCase() === email
-        );
-
-        let userId: string;
-        if (existingUser) {
-          userId = existingUser.id;
-        } else {
-          // Create user
-          const tempPassword = crypto.randomUUID() + "Aa1!";
-          const { data: newUser, error: createErr } = await supabase.auth.admin.createUser({
-            email,
-            password: tempPassword,
-            email_confirm: true,
-            user_metadata: { full_name: fullName },
-          });
-          if (createErr) {
-            errors.push({ row: i + 2, field: "email", message: createErr.message });
-            continue;
-          }
-          userId = newUser.user.id;
-        }
-
-        // Upsert membership
-        const { data: existingMembership } = await supabase
-          .from("memberships")
-          .select("id")
-          .eq("user_id", userId)
-          .eq("source", source)
-          .maybeSingle();
-
-        if (existingMembership) {
-          await supabase
-            .from("memberships")
-            .update({ status, external_id: externalId })
-            .eq("id", existingMembership.id);
+        await callAdminMembers("create_member", {
+          email: rows[i].email?.toLowerCase(),
+          full_name: rows[i].full_name,
+          status: rows[i].status?.toLowerCase() || "active",
+          source: rows[i].source || "csv_import",
+        });
+        success++;
+      } catch (err: any) {
+        if (err.message?.includes("already")) {
           skipped++;
         } else {
-          await supabase.from("memberships").insert({
-            user_id: userId,
-            status,
-            source,
-            external_id: externalId,
-          });
-          success++;
+          errors.push({ row: i + 2, field: "geral", message: err.message });
         }
-
-        // Ensure role exists
-        const { data: existingRole } = await supabase
-          .from("user_roles")
-          .select("id")
-          .eq("user_id", userId)
-          .maybeSingle();
-
-        if (!existingRole) {
-          await supabase.from("user_roles").insert({ user_id: userId, role: "member" });
-        }
-      } catch (err: any) {
-        errors.push({ row: i + 2, field: "geral", message: err.message });
       }
     }
 
-    queryClient.invalidateQueries({ queryKey: ["admin-members"] });
+    queryClient.invalidateQueries({ queryKey: ["admin-members-enriched"] });
     return { success, errors, skipped };
   };
 
+  const filteredMembers = (members ?? []).filter((m: any) => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      m.email?.toLowerCase().includes(q) ||
+      m.profiles?.full_name?.toLowerCase().includes(q)
+    );
+  });
+
+  // If a member is selected, show detail view
+  if (selectedUserId) {
+    return <MemberDetail userId={selectedUserId} onBack={() => setSelectedUserId(null)} />;
+  }
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-lg font-semibold text-foreground">Membros ({members?.length ?? 0})</h2>
-        <Button onClick={() => setCsvOpen(true)} variant="outline" className="gap-2">
-          <Upload className="h-4 w-4" /> Importar CSV
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={() => setCsvOpen(true)} variant="outline" className="gap-2">
+            <Upload className="h-4 w-4" /> Importar CSV
+          </Button>
+          <Button onClick={() => setCreateOpen(true)} className="gap-2">
+            <Plus className="h-4 w-4" /> Novo Membro
+          </Button>
+        </div>
+      </div>
+
+      {/* Search */}
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Buscar por nome ou email..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-9"
+        />
       </div>
 
       {isLoading ? (
@@ -137,27 +137,27 @@ export default function AdminMembers() {
               <thead className="bg-muted/50 text-left">
                 <tr>
                   <th className="px-4 py-3 font-medium">Membro</th>
+                  <th className="px-4 py-3 font-medium">Email</th>
                   <th className="px-4 py-3 font-medium hidden md:table-cell">Origem</th>
                   <th className="px-4 py-3 font-medium">Status</th>
                   <th className="px-4 py-3 font-medium hidden lg:table-cell">Desde</th>
+                  <th className="px-4 py-3 font-medium text-right">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {members?.map((m: any) => (
-                  <tr key={m.id} className="hover:bg-muted/30">
+                {filteredMembers.map((m: any) => (
+                  <tr key={m.id} className="hover:bg-muted/30 cursor-pointer" onClick={() => setSelectedUserId(m.user_id)}>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
                           <Users className="h-4 w-4 text-muted-foreground" />
                         </div>
-                        <div>
-                          <p className="font-medium text-foreground">
-                            {m.profiles?.full_name || m.user_id.slice(0, 8)}
-                          </p>
-                          <p className="text-xs text-muted-foreground">{m.external_id ?? "—"}</p>
-                        </div>
+                        <p className="font-medium text-foreground">
+                          {m.profiles?.full_name || "Sem nome"}
+                        </p>
                       </div>
                     </td>
+                    <td className="px-4 py-3 text-muted-foreground">{m.email}</td>
                     <td className="px-4 py-3 hidden md:table-cell text-muted-foreground">{m.source}</td>
                     <td className="px-4 py-3">
                       <Badge variant={m.status === "active" ? "default" : "secondary"}>
@@ -167,16 +167,57 @@ export default function AdminMembers() {
                     <td className="px-4 py-3 hidden lg:table-cell text-muted-foreground">
                       {new Date(m.started_at).toLocaleDateString("pt-BR")}
                     </td>
+                    <td className="px-4 py-3 text-right">
+                      <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setSelectedUserId(m.user_id); }}>
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </td>
                   </tr>
                 ))}
-                {members?.length === 0 && (
-                  <tr><td colSpan={4} className="px-4 py-12 text-center text-muted-foreground">Nenhum membro cadastrado.</td></tr>
+                {filteredMembers.length === 0 && (
+                  <tr><td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">Nenhum membro encontrado.</td></tr>
                 )}
               </tbody>
             </table>
           </div>
         </div>
       )}
+
+      {/* Create Member Dialog */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Novo Membro</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={(e) => { e.preventDefault(); createMutation.mutate(); }} className="space-y-4">
+            <div className="space-y-1">
+              <Label>Email *</Label>
+              <Input type="email" value={createForm.email} onChange={(e) => setCreateForm(f => ({ ...f, email: e.target.value }))} required />
+            </div>
+            <div className="space-y-1">
+              <Label>Nome Completo *</Label>
+              <Input value={createForm.full_name} onChange={(e) => setCreateForm(f => ({ ...f, full_name: e.target.value }))} required />
+            </div>
+            <div className="space-y-1">
+              <Label>Status</Label>
+              <Select value={createForm.status} onValueChange={(v) => setCreateForm(f => ({ ...f, status: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Ativo</SelectItem>
+                  <SelectItem value="inactive">Inativo</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>Cancelar</Button>
+              <Button type="submit" disabled={createMutation.isPending}>
+                {createMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                Criar Membro
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <CsvImportDialog
         open={csvOpen}
@@ -186,6 +227,227 @@ export default function AdminMembers() {
         onImport={handleImport}
         templateFileName="membros-template.csv"
       />
+    </div>
+  );
+}
+
+// ─── Member Detail View ───
+function MemberDetail({ userId, onBack }: { userId: string; onBack: () => void }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [editOpen, setEditOpen] = useState(false);
+  const [editForm, setEditForm] = useState({ full_name: "", status: "" });
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin-member-detail", userId],
+    queryFn: () => callAdminMembers("get_member_detail", { userId }),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: () => callAdminMembers("update_member", {
+      userId,
+      full_name: editForm.full_name.trim(),
+      status: editForm.status,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-member-detail", userId] });
+      queryClient.invalidateQueries({ queryKey: ["admin-members-enriched"] });
+      setEditOpen(false);
+      toast({ title: "Membro atualizado" });
+    },
+    onError: (e) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+
+  const resetMutation = useMutation({
+    mutationFn: () => callAdminMembers("reset_password", { email: data?.email }),
+    onSuccess: (resp) => {
+      toast({ title: "Link de recuperação gerado", description: "O link foi gerado. Copie e envie ao membro." });
+    },
+    onError: (e) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <Button variant="ghost" onClick={onBack} className="gap-2"><ArrowLeft className="h-4 w-4" /> Voltar</Button>
+        <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="space-y-4">
+        <Button variant="ghost" onClick={onBack} className="gap-2"><ArrowLeft className="h-4 w-4" /> Voltar</Button>
+        <p className="text-muted-foreground text-center py-12">Membro não encontrado.</p>
+      </div>
+    );
+  }
+
+  const openEdit = () => {
+    setEditForm({
+      full_name: data.profile?.full_name ?? "",
+      status: data.membership?.status ?? "active",
+    });
+    setEditOpen(true);
+  };
+
+  // Group activity by type
+  const pageViewCount = data.stats?.pageViews ?? 0;
+  const voteCount = data.stats?.voteCount ?? 0;
+  const commentCount = data.stats?.commentCount ?? 0;
+
+  // Recent activity
+  const recentActivity = (data.recentActivity ?? []).slice(0, 20);
+
+  return (
+    <div className="space-y-6">
+      <Button variant="ghost" onClick={onBack} className="gap-2"><ArrowLeft className="h-4 w-4" /> Voltar aos membros</Button>
+
+      {/* Header */}
+      <div className="flex items-start justify-between flex-wrap gap-4">
+        <div className="flex items-center gap-4">
+          <div className="h-14 w-14 rounded-full bg-muted flex items-center justify-center">
+            <Users className="h-7 w-7 text-muted-foreground" />
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold text-foreground">{data.profile?.full_name || "Sem nome"}</h2>
+            <p className="text-sm text-muted-foreground">{data.email}</p>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={openEdit} className="gap-2">
+            <Pencil className="h-4 w-4" /> Editar
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => { if (confirm("Enviar link de redefinição de senha?")) resetMutation.mutate(); }}
+            disabled={resetMutation.isPending}
+            className="gap-2"
+          >
+            <KeyRound className="h-4 w-4" /> Redefinir Senha
+          </Button>
+        </div>
+      </div>
+
+      {/* Info cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="rounded-lg border border-border bg-card p-4">
+          <p className="text-xs text-muted-foreground mb-1">Membro desde</p>
+          <p className="font-medium text-foreground">
+            {data.membership?.started_at ? new Date(data.membership.started_at).toLocaleDateString("pt-BR") : "—"}
+          </p>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-4">
+          <p className="text-xs text-muted-foreground mb-1">Status</p>
+          <Badge variant={data.membership?.status === "active" ? "default" : "secondary"}>
+            {data.membership?.status === "active" ? "Ativo" : "Inativo"}
+          </Badge>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-4">
+          <p className="text-xs text-muted-foreground mb-1">Último acesso</p>
+          <p className="font-medium text-foreground">
+            {data.profile?.last_seen_at ? new Date(data.profile.last_seen_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "Nunca"}
+          </p>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-4">
+          <p className="text-xs text-muted-foreground mb-1">Origem</p>
+          <p className="font-medium text-foreground">{data.membership?.source ?? "—"}</p>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div>
+        <h3 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
+          <BarChart3 className="h-4 w-4" /> Engajamento
+        </h3>
+        <div className="grid grid-cols-3 gap-4">
+          <div className="rounded-lg border border-border bg-card p-4 text-center">
+            <Eye className="h-5 w-5 mx-auto text-muted-foreground mb-1" />
+            <p className="text-2xl font-bold text-foreground">{pageViewCount}</p>
+            <p className="text-xs text-muted-foreground">Páginas vistas</p>
+          </div>
+          <div className="rounded-lg border border-border bg-card p-4 text-center">
+            <ThumbsUp className="h-5 w-5 mx-auto text-muted-foreground mb-1" />
+            <p className="text-2xl font-bold text-foreground">{voteCount}</p>
+            <p className="text-xs text-muted-foreground">Votos</p>
+          </div>
+          <div className="rounded-lg border border-border bg-card p-4 text-center">
+            <MessageSquare className="h-5 w-5 mx-auto text-muted-foreground mb-1" />
+            <p className="text-2xl font-bold text-foreground">{commentCount}</p>
+            <p className="text-xs text-muted-foreground">Comentários</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Recent Activity */}
+      <div>
+        <h3 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
+          <Clock className="h-4 w-4" /> Atividade Recente
+        </h3>
+        {recentActivity.length > 0 ? (
+          <div className="rounded-lg border border-border overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/50 text-left">
+                  <tr>
+                    <th className="px-4 py-2 font-medium">Evento</th>
+                    <th className="px-4 py-2 font-medium">Página</th>
+                    <th className="px-4 py-2 font-medium">Data</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {recentActivity.map((e: any) => (
+                    <tr key={e.id} className="hover:bg-muted/30">
+                      <td className="px-4 py-2">
+                        <Badge variant="outline" className="text-xs">{e.event_type}</Badge>
+                      </td>
+                      <td className="px-4 py-2 text-muted-foreground">{e.page || "—"}</td>
+                      <td className="px-4 py-2 text-muted-foreground">
+                        {new Date(e.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">Nenhuma atividade registrada.</p>
+        )}
+      </div>
+
+      {/* Edit Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar Membro</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={(e) => { e.preventDefault(); updateMutation.mutate(); }} className="space-y-4">
+            <div className="space-y-1">
+              <Label>Nome Completo</Label>
+              <Input value={editForm.full_name} onChange={(e) => setEditForm(f => ({ ...f, full_name: e.target.value }))} />
+            </div>
+            <div className="space-y-1">
+              <Label>Status</Label>
+              <Select value={editForm.status} onValueChange={(v) => setEditForm(f => ({ ...f, status: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Ativo</SelectItem>
+                  <SelectItem value="inactive">Inativo</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>Cancelar</Button>
+              <Button type="submit" disabled={updateMutation.isPending}>
+                {updateMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                Salvar
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
