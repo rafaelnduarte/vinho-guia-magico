@@ -21,7 +21,7 @@ export default function WineDetailPage() {
         .from("wines")
         .select("*")
         .eq("id", id!)
-        .eq("is_published", true)
+        .in("status", ["curadoria", "acervo"])
         .maybeSingle();
       if (error) throw error;
       return data;
@@ -109,7 +109,12 @@ export default function WineDetailPage() {
         {/* Info */}
         <div className="space-y-6">
           <div>
-            <h1 className="text-2xl font-sans font-bold text-foreground">{wine.name}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-sans font-bold text-foreground">{wine.name}</h1>
+              {(wine as any).status === "acervo" && (
+                <Badge variant="secondary" className="text-xs">Acervo</Badge>
+              )}
+            </div>
             <p className="text-muted-foreground mt-1">
               {wine.producer} {wine.vintage ? `· ${wine.vintage}` : ""}
             </p>
