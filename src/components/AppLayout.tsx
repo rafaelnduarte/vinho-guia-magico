@@ -12,6 +12,7 @@ import {
   Menu,
   X,
   Sparkles,
+  User,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -106,6 +107,20 @@ export default function AppLayout() {
         </nav>
 
         <div className="px-3 py-4 border-t border-sidebar-border">
+          <NavLink
+            to="/minha-conta"
+            className={({ isActive }) =>
+              cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
+                isActive
+                  ? "bg-sidebar-accent text-sidebar-primary"
+                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+              )
+            }
+          >
+            <User className="h-4 w-4" />
+            Minha Conta
+          </NavLink>
           <div className="px-3 py-2 text-xs text-sidebar-foreground/50 truncate mb-2">
             {user?.email}
           </div>
@@ -167,6 +182,19 @@ export default function AppLayout() {
                   Admin
                 </NavLink>
               )}
+              <NavLink
+                to="/minha-conta"
+                onClick={() => setMobileOpen(false)}
+                className={({ isActive }) =>
+                  cn(
+                    "flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium transition-colors",
+                    isActive ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-muted"
+                  )
+                }
+              >
+                <User className="h-5 w-5" />
+                Minha Conta
+              </NavLink>
               <button
                 onClick={handleSignOut}
                 className="flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium text-foreground hover:bg-muted w-full mt-4"
