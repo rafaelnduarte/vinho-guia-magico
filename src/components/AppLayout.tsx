@@ -4,7 +4,7 @@ import { useAnalytics } from "@/hooks/useAnalytics";
 import { useEffect, useRef } from "react";
 import {
   Home,
-  GlassWater,
+  Wine,
   Handshake,
   Award,
   Settings,
@@ -19,7 +19,7 @@ import logoJovem from "@/assets/logo-jovem-do-vinho.png";
 
 const memberLinks = [
   { to: "/", label: "Home", icon: Home },
-  { to: "/curadoria", label: "Curadoria", icon: GlassWater },
+  { to: "/curadoria", label: "Curadoria", icon: Wine },
   { to: "/parceiros", label: "Parceiros", icon: Handshake },
   { to: "/selos", label: "Selos", icon: Award },
 ];

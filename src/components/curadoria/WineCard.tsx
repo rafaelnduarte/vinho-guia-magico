@@ -1,4 +1,4 @@
-import { Wine } from "lucide-react";
+import { Wine, ThumbsUp } from "lucide-react";
 import { Link } from "react-router-dom";
 import { getSealIcon } from "@/lib/sealIcons";
 
@@ -20,9 +20,10 @@ export interface MockWine {
 
 interface WineCardProps {
   wine: MockWine;
+  likeCount?: number;
 }
 
-export default function WineCard({ wine }: WineCardProps) {
+export default function WineCard({ wine, likeCount = 0 }: WineCardProps) {
   const wineIcon = getSealIcon(wine.seal_wine_type);
   const drinkerIcon = getSealIcon(wine.seal_drinker_type);
 
@@ -77,7 +78,14 @@ export default function WineCard({ wine }: WineCardProps) {
         </p>
         <div className="flex items-center justify-between mt-auto pt-2 border-t border-border/50">
           <span className="text-xs text-muted-foreground">{wine.type} · {wine.country}</span>
-          {wine.price && <span className="text-sm font-medium text-foreground">{wine.price}</span>}
+          <div className="flex items-center gap-2">
+            {likeCount > 0 && (
+              <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                <ThumbsUp className="h-3 w-3" /> {likeCount}
+              </span>
+            )}
+            {wine.price && <span className="text-sm font-medium text-foreground">{wine.price}</span>}
+          </div>
         </div>
       </div>
     </Link>

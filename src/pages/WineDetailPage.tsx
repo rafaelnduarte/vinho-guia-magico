@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Wine, Loader2 } from "lucide-react";
+import { getSealIcon } from "@/lib/sealIcons";
 import WineVoting from "@/components/curadoria/WineVoting";
 import WineComments from "@/components/curadoria/WineComments";
 import { useAnalytics } from "@/hooks/useAnalytics";
@@ -91,12 +92,17 @@ export default function WineDetailPage() {
             </div>
           )}
           {/* Seal badges */}
-          <div className="absolute top-3 right-3 flex flex-col gap-1.5">
-            {[...wineSeals, ...drinkerSeals].map((entry) => (
-              <Badge key={entry.seal_id} className="text-xs px-2 py-1 bg-primary/90 text-primary-foreground shadow-md">
-                {(entry.seals as any)?.icon} {(entry.seals as any)?.name}
-              </Badge>
-            ))}
+          <div className="absolute top-3 right-3 flex flex-col gap-2">
+            {[...wineSeals, ...drinkerSeals].map((entry) => {
+              const iconSrc = getSealIcon((entry.seals as any)?.icon);
+              return iconSrc ? (
+                <img key={entry.seal_id} src={iconSrc} alt={(entry.seals as any)?.name} className="h-12 w-12 drop-shadow-md" />
+              ) : (
+                <Badge key={entry.seal_id} className="text-xs px-2 py-1 bg-primary/90 text-primary-foreground shadow-md">
+                  {(entry.seals as any)?.name}
+                </Badge>
+              );
+            })}
           </div>
         </div>
 
@@ -151,8 +157,15 @@ export default function WineDetailPage() {
               <h3 className="text-sm font-medium text-foreground mb-2">Selos</h3>
               <div className="space-y-2">
                 {sealEntries.map((entry) => (
-                  <div key={entry.seal_id} className="flex items-start gap-2 text-sm">
-                    <span className="text-base shrink-0">{(entry.seals as any)?.icon}</span>
+                  <div key={entry.seal_id} className="flex items-start gap-3 text-sm">
+                    {(() => {
+                      const iconSrc = getSealIcon((entry.seals as any)?.icon);
+                      return iconSrc ? (
+                        <img src={iconSrc} alt={(entry.seals as any)?.name} className="h-10 w-10 shrink-0 object-contain" />
+                      ) : (
+                        <span className="text-base shrink-0">{(entry.seals as any)?.icon}</span>
+                      );
+                    })()}
                     <div>
                       <span className="font-medium text-foreground">{(entry.seals as any)?.name}</span>
                       {(entry.seals as any)?.description && (
