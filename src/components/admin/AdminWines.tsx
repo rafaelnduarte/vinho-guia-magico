@@ -232,13 +232,13 @@ export default function AdminWines() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <h2 className="text-lg font-semibold text-foreground">Vinhos ({wines?.length ?? 0})</h2>
         <div className="flex gap-2">
-          <Button onClick={() => setCsvOpen(true)} variant="outline" className="gap-2">
+          <Button onClick={() => setCsvOpen(true)} variant="outline" size="sm" className="gap-2 text-xs sm:text-sm">
             <Upload className="h-4 w-4" /> Importar CSV
           </Button>
-          <Button onClick={openNew} className="gap-2"><Plus className="h-4 w-4" /> Novo Vinho</Button>
+          <Button onClick={openNew} size="sm" className="gap-2 text-xs sm:text-sm"><Plus className="h-4 w-4" /> Novo Vinho</Button>
         </div>
       </div>
 
