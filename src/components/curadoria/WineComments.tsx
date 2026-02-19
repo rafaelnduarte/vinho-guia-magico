@@ -35,18 +35,18 @@ export default function WineComments({ wineId }: WineCommentsProps) {
   const userIds = [...new Set(comments?.map((c) => c.user_id) ?? [])];
   const { data: profiles } = useQuery({
     queryKey: ["profiles-for-comments", userIds],
-    queryFn: async () => {
+    queryFn: async (): Promise<Array<{ user_id: string; full_name: string | null }>> => {
       if (userIds.length === 0) return [];
       const { data } = await supabase
-        .from("profiles")
+        .from("profiles_public" as any)
         .select("user_id, full_name")
         .in("user_id", userIds);
-      return data ?? [];
+      return (data as any[]) ?? [];
     },
     enabled: userIds.length > 0,
   });
 
-  const profileMap = new Map(profiles?.map((p) => [p.user_id, p.full_name]) ?? []);
+  const profileMap = new Map(profiles?.map((p: any) => [p.user_id, p.full_name]) ?? []);
 
   const addComment = useMutation({
     mutationFn: async () => {
