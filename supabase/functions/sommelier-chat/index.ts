@@ -7,7 +7,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const SYSTEM_PROMPT = `Você é o Sommelier AI do portal "Radar do Jovem do Vinho". Você é um especialista em vinhos, amigável e acessível.
+const FALLBACK_SYSTEM_PROMPT = `Você é o Sommelier AI do portal "Radar do Jovem do Vinho". Você é um especialista em vinhos, amigável e acessível.
 
 REGRAS:
 1. Responda SEMPRE em português brasileiro, de forma concisa e direta.
@@ -52,13 +52,30 @@ serve(async (req) => {
     }
     if (message.length > 2000) throw new Error("Mensagem muito longa (max 2000 chars)");
 
-    // 1. Get pricing config
+    // 1. Get pricing config (includes system_prompt)
     const { data: pricingArr } = await adminClient
       .from("ai_pricing_config")
       .select("*")
       .limit(1);
     const pricing = pricingArr?.[0];
     if (!pricing) throw new Error("Configuração de preços não encontrada");
+
+    const systemPrompt = pricing.system_prompt || FALLBACK_SYSTEM_PROMPT;
+
+    // 1b. Get active knowledge base entries
+    const { data: knowledgeEntries } = await adminClient
+      .from("ai_knowledge_base")
+      .select("title, content, category")
+      .eq("is_active", true)
+      .order("category");
+
+    let knowledgeContext = "";
+    if (knowledgeEntries && knowledgeEntries.length > 0) {
+      const knowledgeText = knowledgeEntries
+        .map(e => `### ${e.title} [${e.category}]\n${e.content}`)
+        .join("\n\n");
+      knowledgeContext = `\n\nBASE DE CONHECIMENTO (use como referência):\n${knowledgeText}`;
+    }
 
     const maxTokensMap: Record<string, number> = {
       economico: pricing.max_tokens_economico,
@@ -264,8 +281,9 @@ serve(async (req) => {
     });
 
     // 8. Call Lovable AI
+    const fullSystemPrompt = systemPrompt + knowledgeContext + contextMessage;
     const aiMessages = [
-      { role: "system", content: SYSTEM_PROMPT + contextMessage },
+      { role: "system", content: fullSystemPrompt },
       ...conversationMessages.map(m => ({ role: m.role === "system" ? "user" : m.role, content: m.content })),
       { role: "user", content: message },
     ];
