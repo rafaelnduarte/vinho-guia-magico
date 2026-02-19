@@ -201,7 +201,7 @@ export default function SommelierPage() {
           <MessageSquare className="h-4 w-4" />
         </Button>
         <Wine className="h-5 w-5 text-primary" />
-        <h1 className="font-display text-lg flex-1">Sommelier AI</h1>
+        <h1 className="font-display text-lg flex-1">Jovem AI</h1>
         <Button variant="outline" size="sm" onClick={startNewChat} className="text-xs gap-1">
           <Plus className="h-3 w-3" /> Nova
         </Button>
@@ -277,7 +277,7 @@ export default function SommelierPage() {
                     </div>
                   </div>
                   <div>
-                    <h2 className="font-display text-xl text-foreground mb-2">Olá! Sou o Sommelier AI</h2>
+                    <h2 className="font-display text-xl text-foreground mb-2">Olá! Sou o Jovem AI</h2>
                     <p className="text-sm text-muted-foreground max-w-md mx-auto">
                       Especialista em vinhos do portal Radar do Jovem. Posso ajudar com harmonizações,
                       sugestões de flights e tudo sobre os vinhos do nosso catálogo.
