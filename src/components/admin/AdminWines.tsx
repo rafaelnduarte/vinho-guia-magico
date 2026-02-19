@@ -61,19 +61,22 @@ export default function AdminWines() {
   const [csvOpen, setCsvOpen] = useState(false);
 
   const wineColumns: CsvColumn[] = [
-    { key: "name", label: "Nome", required: true },
-    { key: "producer", label: "Produtor" },
-    { key: "vintage", label: "Safra", validate: (v) => v && isNaN(Number(v)) ? "Deve ser um número" : null, transform: (v) => v ? parseInt(v) : null },
-    { key: "grape", label: "Uva" },
-    { key: "type", label: "Tipo", validate: (v) => v && !["Tinto","Branco","Rosé","Espumante","Sobremesa"].includes(v) ? "Tipo inválido" : null },
-    { key: "country", label: "País" },
-    { key: "region", label: "Região" },
-    { key: "importer", label: "Importadora" },
-    { key: "price_range", label: "Preço" },
-    { key: "rating", label: "Nota", validate: (v) => v && (isNaN(Number(v)) || Number(v) < 0 || Number(v) > 100) ? "Nota entre 0 e 100" : null, transform: (v) => v ? parseFloat(v) : null },
-    { key: "image_url", label: "URL Imagem" },
-    { key: "tasting_notes", label: "Notas de Degustação" },
-    { key: "description", label: "Descrição" },
+    { key: "vinho", label: "VINHO", required: true },
+    { key: "vinicola", label: "VINÍCOLA" },
+    { key: "uva", label: "Uva" },
+    { key: "safra", label: "SAFRA", validate: (v) => v && isNaN(Number(v)) ? "Deve ser um número" : null, transform: (v) => v ? parseInt(v) : null },
+    { key: "tipo", label: "TIPO" },
+    { key: "preco", label: "PREÇO" },
+    { key: "radar", label: "RADAR" },
+    { key: "comentario", label: "COMENTÁRIO" },
+    { key: "guardar_ou_beber", label: "GUARDAR OU BEBER?" },
+    { key: "para_quem", label: "Para quem é este vinho?" },
+    { key: "categoria_vinho", label: "Categoria Vinho" },
+    { key: "volume", label: "Volume" },
+    { key: "url", label: "URL" },
+    { key: "importadora", label: "IMPORTADORA" },
+    { key: "pais", label: "PAÍS" },
+    { key: "regiao", label: "REGIÃO" },
     { key: "status", label: "Status", validate: (v) => v && !["curadoria", "acervo", "rascunho"].includes(v) ? "Status inválido (curadoria/acervo/rascunho)" : null },
   ];
 
@@ -84,30 +87,47 @@ export default function AdminWines() {
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
+      const wineName = (row.vinho || "").trim();
+      if (!wineName) {
+        errors.push({ row: i + 2, field: "vinho", message: "Nome do vinho vazio" });
+        continue;
+      }
+
       try {
-        // Check for existing wine by name + vintage for upsert
         const { data: existing } = await supabase
           .from("wines")
           .select("id")
-          .eq("name", row.name)
+          .eq("name", wineName)
           .maybeSingle();
 
+        // Normalize type from CSV
+        const rawType = (row.tipo || "").trim();
+        let type: string | null = null;
+        if (/tinto/i.test(rawType)) type = "Tinto";
+        else if (/branco/i.test(rawType)) type = "Branco";
+        else if (/ros[eé]/i.test(rawType)) type = "Rosé";
+        else if (/espumante/i.test(rawType)) type = "Espumante";
+        else if (/sobremesa|doce/i.test(rawType)) type = "Sobremesa";
+        else if (rawType) type = rawType;
+
+        const status = row.status || "curadoria";
+
         const payload = {
-          name: row.name,
-          producer: row.producer || null,
-          vintage: row.vintage,
-          grape: row.grape || null,
-          type: row.type || "Tinto",
-          country: row.country || null,
-          region: row.region || null,
-          importer: row.importer || null,
-          price_range: row.price_range || null,
-          rating: row.rating,
-          image_url: row.image_url || null,
-          tasting_notes: row.tasting_notes || null,
-          description: row.description || null,
-          status: row.status || "curadoria",
-          is_published: (row.status || "curadoria") !== "rascunho",
+          name: wineName,
+          producer: row.vinicola || null,
+          vintage: row.safra ? parseInt(row.safra) : null,
+          grape: row.uva || null,
+          type,
+          country: row.pais || null,
+          region: row.regiao || null,
+          importer: row.importadora || null,
+          price_range: row.preco || null,
+          image_url: row.url || null,
+          tasting_notes: row.comentario || null,
+          description: [row.guardar_ou_beber, row.para_quem, row.categoria_vinho].filter(Boolean).join(" · ") || null,
+          status,
+          is_published: status !== "rascunho",
+          rating: null as number | null,
         };
 
         if (existing) {
