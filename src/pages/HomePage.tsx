@@ -1,11 +1,11 @@
-import { GlassWater, Handshake, Award } from "lucide-react";
+import { Wine, Handshake, Award } from "lucide-react";
 import logoJovem from "@/assets/logo-jovem-do-vinho.png";
 import { Link } from "react-router-dom";
 
 const shortcuts = [
   {
     to: "/curadoria",
-    icon: GlassWater,
+    icon: Wine,
     title: "Curadoria",
     desc: "Vinhos selecionados pelo Radar do Jovem",
   },
