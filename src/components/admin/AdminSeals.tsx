@@ -89,7 +89,7 @@ export default function AdminSeals() {
     setForm((f) => ({ ...f, [key]: value }));
 
   const wineSeals = seals?.filter((s) => s.category === "perfil_vinho") ?? [];
-  const drinkerSeals = seals?.filter((s) => s.category === "perfil_bebedor") ?? [];
+  const drinkerSeals = seals?.filter((s) => s.category === "perfil_cliente") ?? [];
 
   return (
     <div className="space-y-4">
@@ -147,7 +147,7 @@ export default function AdminSeals() {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="perfil_vinho">Perfil de Vinho</SelectItem>
-                  <SelectItem value="perfil_bebedor">Perfil de Bebedor</SelectItem>
+                  <SelectItem value="perfil_cliente">Perfil de Bebedor</SelectItem>
                 </SelectContent>
               </Select>
             </div>

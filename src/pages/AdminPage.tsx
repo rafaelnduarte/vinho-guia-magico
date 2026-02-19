@@ -5,6 +5,7 @@ import AdminPartners from "@/components/admin/AdminPartners";
 import AdminSeals from "@/components/admin/AdminSeals";
 import AdminMembers from "@/components/admin/AdminMembers";
 import AdminAnalytics from "@/components/admin/AdminAnalytics";
+import AdminTutorials from "@/components/admin/AdminTutorials";
 
 export default function AdminPage() {
   return (
@@ -15,12 +16,13 @@ export default function AdminPage() {
       </div>
 
       <Tabs defaultValue="wines" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5 max-w-xl">
+        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 max-w-2xl">
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
           <TabsTrigger value="wines">Vinhos</TabsTrigger>
           <TabsTrigger value="members">Membros</TabsTrigger>
           <TabsTrigger value="partners">Parceiros</TabsTrigger>
           <TabsTrigger value="seals">Selos</TabsTrigger>
+          <TabsTrigger value="tutorials">Tutoriais</TabsTrigger>
         </TabsList>
 
         <TabsContent value="analytics">
@@ -37,6 +39,9 @@ export default function AdminPage() {
         </TabsContent>
         <TabsContent value="seals">
           <AdminSeals />
+        </TabsContent>
+        <TabsContent value="tutorials">
+          <AdminTutorials />
         </TabsContent>
       </Tabs>
     </div>
