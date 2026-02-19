@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_pricing_config: {
+        Row: {
+          id: string
+          max_tokens_detalhado: number
+          max_tokens_economico: number
+          max_tokens_ultra_economico: number
+          model_name: string
+          monthly_cap_brl: number
+          price_in_per_1k: number
+          price_out_per_1k: number
+          rate_limit_per_5min: number
+          rate_limit_per_day: number
+          updated_at: string
+          usd_brl_rate: number
+        }
+        Insert: {
+          id?: string
+          max_tokens_detalhado?: number
+          max_tokens_economico?: number
+          max_tokens_ultra_economico?: number
+          model_name?: string
+          monthly_cap_brl?: number
+          price_in_per_1k?: number
+          price_out_per_1k?: number
+          rate_limit_per_5min?: number
+          rate_limit_per_day?: number
+          updated_at?: string
+          usd_brl_rate?: number
+        }
+        Update: {
+          id?: string
+          max_tokens_detalhado?: number
+          max_tokens_economico?: number
+          max_tokens_ultra_economico?: number
+          model_name?: string
+          monthly_cap_brl?: number
+          price_in_per_1k?: number
+          price_out_per_1k?: number
+          rate_limit_per_5min?: number
+          rate_limit_per_day?: number
+          updated_at?: string
+          usd_brl_rate?: number
+        }
+        Relationships: []
+      }
       analytics_events: {
         Row: {
           created_at: string
@@ -38,6 +83,115 @@ export type Database = {
           metadata?: Json | null
           page?: string | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      chat_feedback: {
+        Row: {
+          comment: string | null
+          created_at: string
+          id: string
+          message_id: string
+          rating: number | null
+          user_id: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          id?: string
+          message_id: string
+          rating?: number | null
+          user_id: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          id?: string
+          message_id?: string
+          rating?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_feedback_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "chat_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_messages: {
+        Row: {
+          content: string
+          cost_brl: number | null
+          cost_usd: number | null
+          created_at: string
+          id: string
+          mode: string | null
+          role: string
+          session_id: string
+          tokens_in: number | null
+          tokens_out: number | null
+        }
+        Insert: {
+          content: string
+          cost_brl?: number | null
+          cost_usd?: number | null
+          created_at?: string
+          id?: string
+          mode?: string | null
+          role: string
+          session_id: string
+          tokens_in?: number | null
+          tokens_out?: number | null
+        }
+        Update: {
+          content?: string
+          cost_brl?: number | null
+          cost_usd?: number | null
+          created_at?: string
+          id?: string
+          mode?: string | null
+          role?: string
+          session_id?: string
+          tokens_in?: number | null
+          tokens_out?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "chat_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_sessions: {
+        Row: {
+          created_at: string
+          id: string
+          summary: string | null
+          title: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          summary?: string | null
+          title?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          summary?: string | null
+          title?: string | null
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -179,6 +333,83 @@ export type Database = {
           id?: string
           name?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      thomas_notes: {
+        Row: {
+          created_at: string
+          id: string
+          note_text: string
+          note_type: string
+          updated_at: string
+          visibility: string
+          wine_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          note_text: string
+          note_type?: string
+          updated_at?: string
+          visibility?: string
+          wine_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          note_text?: string
+          note_type?: string
+          updated_at?: string
+          visibility?: string
+          wine_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "thomas_notes_wine_id_fkey"
+            columns: ["wine_id"]
+            isOneToOne: false
+            referencedRelation: "wines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      usage_ledger: {
+        Row: {
+          estimated_cost_brl: number | null
+          estimated_cost_usd: number | null
+          id: string
+          input_tokens: number | null
+          last_request_at: string | null
+          month: string
+          output_tokens: number | null
+          request_count: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          estimated_cost_brl?: number | null
+          estimated_cost_usd?: number | null
+          id?: string
+          input_tokens?: number | null
+          last_request_at?: string | null
+          month: string
+          output_tokens?: number | null
+          request_count?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          estimated_cost_brl?: number | null
+          estimated_cost_usd?: number | null
+          id?: string
+          input_tokens?: number | null
+          last_request_at?: string | null
+          month?: string
+          output_tokens?: number | null
+          request_count?: number | null
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }

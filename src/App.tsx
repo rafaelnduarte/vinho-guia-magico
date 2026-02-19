@@ -13,6 +13,7 @@ import CuradoriaPage from "@/pages/CuradoriaPage";
 import WineDetailPage from "@/pages/WineDetailPage";
 import ParceirosPage from "@/pages/ParceirosPage";
 import SelosPage from "@/pages/SelosPage";
+import SommelierPage from "@/pages/SommelierPage";
 import AdminPage from "@/pages/AdminPage";
 import NotFound from "@/pages/NotFound";
 
@@ -38,6 +39,7 @@ const App = () => (
               <Route path="/" element={<HomePage />} />
               <Route path="/curadoria" element={<CuradoriaPage />} />
               <Route path="/curadoria/:id" element={<WineDetailPage />} />
+              <Route path="/sommelier" element={<SommelierPage />} />
               <Route path="/parceiros" element={<ParceirosPage />} />
               <Route path="/selos" element={<SelosPage />} />
               <Route
