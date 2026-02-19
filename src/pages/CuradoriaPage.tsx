@@ -1,5 +1,5 @@
 import { useMemo, useEffect, useRef } from "react";
-import { GlassWater, Search, Loader2, ArrowUpDown, X } from "lucide-react";
+import { Wine as WineIcon, Search, Loader2, ArrowUpDown, X, ThumbsUp } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,6 +34,8 @@ export default function CuradoriaPage() {
   const search = get("q");
   const typeFilter = get("tipo", "all");
   const countryFilter = get("pais", "all");
+  const importerFilter = get("importadora", "all");
+  const regionFilter = get("regiao", "all");
   const sort = get("ordem", "newest");
   const page = getNum("page", 1);
 
@@ -74,12 +76,37 @@ export default function CuradoriaPage() {
     },
   });
 
+  // Fetch like counts for all wines
+  const { data: voteCounts } = useQuery({
+    queryKey: ["curadoria-vote-counts"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("wine_votes")
+        .select("wine_id, vote");
+      const counts: Record<string, number> = {};
+      (data ?? []).forEach((v) => {
+        if (v.vote === "up") {
+          counts[v.wine_id] = (counts[v.wine_id] ?? 0) + 1;
+        }
+      });
+      return counts;
+    },
+  });
+
   const allTypes = useMemo(
     () => [...new Set(wines?.map((w) => w.type).filter(Boolean) ?? [])].sort(),
     [wines]
   );
   const allCountries = useMemo(
     () => [...new Set(wines?.map((w) => w.country).filter(Boolean) ?? [])].sort(),
+    [wines]
+  );
+  const allImporters = useMemo(
+    () => [...new Set(wines?.map((w) => w.importer).filter(Boolean) ?? [])].sort(),
+    [wines]
+  );
+  const allRegions = useMemo(
+    () => [...new Set(wines?.map((w) => w.region).filter(Boolean) ?? [])].sort(),
     [wines]
   );
 
@@ -93,7 +120,9 @@ export default function CuradoriaPage() {
         w.grape?.toLowerCase().includes(s);
       const matchType = typeFilter === "all" || w.type === typeFilter;
       const matchCountry = countryFilter === "all" || w.country === countryFilter;
-      return matchSearch && matchType && matchCountry;
+      const matchImporter = importerFilter === "all" || w.importer === importerFilter;
+      const matchRegion = regionFilter === "all" || w.region === regionFilter;
+      return matchSearch && matchType && matchCountry && matchImporter && matchRegion;
     });
 
     // Sort
@@ -115,13 +144,13 @@ export default function CuradoriaPage() {
     });
 
     return result;
-  }, [wines, search, typeFilter, countryFilter, sort]);
+  }, [wines, search, typeFilter, countryFilter, importerFilter, regionFilter, sort]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
-  const hasActiveFilters = search || typeFilter !== "all" || countryFilter !== "all";
+  const hasActiveFilters = search || typeFilter !== "all" || countryFilter !== "all" || importerFilter !== "all" || regionFilter !== "all";
 
   const getSealsForWine = (wineId: string) => {
     const entries = wineSealsData?.filter((ws) => ws.wine_id === wineId) ?? [];
@@ -136,7 +165,7 @@ export default function CuradoriaPage() {
   return (
     <div className="animate-fade-in px-6 py-10 max-w-7xl mx-auto">
       <div className="flex items-center gap-3 mb-2">
-        <GlassWater className="h-7 w-7 text-primary" />
+        <WineIcon className="h-7 w-7 text-primary" />
         <h1 className="text-3xl font-sans font-bold text-foreground">Curadoria</h1>
       </div>
       <p className="text-muted-foreground mb-6">
@@ -181,6 +210,32 @@ export default function CuradoriaPage() {
               ))}
             </SelectContent>
           </Select>
+          <Select value={importerFilter} onValueChange={(v) => set({ importadora: v })}>
+            <SelectTrigger className="w-full sm:w-48">
+              <SelectValue placeholder="Importadora" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas importadoras</SelectItem>
+              {allImporters.map((i) => (
+                <SelectItem key={i!} value={i!}>
+                  {i}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={regionFilter} onValueChange={(v) => set({ regiao: v })}>
+            <SelectTrigger className="w-full sm:w-44">
+              <SelectValue placeholder="Região" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas regiões</SelectItem>
+              {allRegions.map((r) => (
+                <SelectItem key={r!} value={r!}>
+                  {r}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Select value={sort} onValueChange={(v) => set({ ordem: v })}>
             <SelectTrigger className="w-full sm:w-48">
               <ArrowUpDown className="h-4 w-4 mr-2 text-muted-foreground" />
@@ -207,7 +262,7 @@ export default function CuradoriaPage() {
                 variant="ghost"
                 size="sm"
                 className="h-7 text-xs gap-1"
-                onClick={() => set({ q: null, tipo: null, pais: null })}
+                onClick={() => set({ q: null, tipo: null, pais: null, importadora: null, regiao: null })}
               >
                 <X className="h-3 w-3" /> Limpar filtros
               </Button>
@@ -244,6 +299,7 @@ export default function CuradoriaPage() {
                     seal_wine_type: seals.seal_wine_type,
                     seal_drinker_type: seals.seal_drinker_type,
                   }}
+                  likeCount={voteCounts?.[wine.id] ?? 0}
                 />
               );
             })}
