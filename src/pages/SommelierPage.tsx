@@ -149,7 +149,7 @@ export default function SommelierPage() {
           ...prev,
           {
             role: "assistant",
-            content: `⚠️ ${data.message}\n\nVocê pode:\n- 📖 **Ver fichas dos vinhos** na curadoria\n- 💬 Voltar no próximo mês com cota renovada`,
+            content: `⚠️ Seus créditos mensais acabaram!\n\nVocê pode:\n- 📖 **Ver fichas dos vinhos** na curadoria\n- 💬 Voltar no próximo mês com créditos renovados`,
           },
         ]);
         return;
@@ -187,8 +187,11 @@ export default function SommelierPage() {
     }
   };
 
-  const usagePercent = capBrl > 0 ? Math.min((usageBrl / capBrl) * 100, 100) : 0;
-  const budgetExceeded = usageBrl >= capBrl;
+  // Convert BRL to credits (1 credit = R$0.10)
+  const usageCredits = Math.round(usageBrl * 10);
+  const capCredits = Math.round(capBrl * 10);
+  const usagePercent = capCredits > 0 ? Math.min((usageCredits / capCredits) * 100, 100) : 0;
+  const budgetExceeded = usageCredits >= capCredits;
 
   return (
     <div className="flex flex-col h-[calc(100vh-56px)] md:h-screen animate-fade-in">
@@ -245,12 +248,12 @@ export default function SommelierPage() {
           <div className="px-4 py-2 bg-muted/30 border-b border-border flex items-center gap-3 shrink-0">
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between text-xs mb-1">
-                <span className="text-muted-foreground">Uso mensal</span>
+                <span className="text-muted-foreground">Créditos mensais</span>
                 <span className={cn(
                   "font-medium",
                   usagePercent >= 80 ? "text-destructive" : "text-foreground"
                 )}>
-                  R$ {usageBrl.toFixed(2)} / R$ {capBrl.toFixed(2)}
+                  {usageCredits} / {capCredits} créditos
                 </span>
               </div>
               <Progress
@@ -327,7 +330,7 @@ export default function SommelierPage() {
                 <div className="flex justify-center">
                   <div className="bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2 text-xs text-destructive flex items-center gap-2">
                     <AlertTriangle className="h-3 w-3" />
-                    {warning}
+                    Seus créditos estão acabando. Considere usar o modo curto.
                   </div>
                 </div>
               )}
@@ -372,7 +375,7 @@ export default function SommelierPage() {
                       sendMessage();
                     }
                   }}
-                  placeholder={budgetExceeded ? "Limite mensal atingido" : "Pergunte sobre vinhos..."}
+                  placeholder={budgetExceeded ? "Créditos esgotados este mês" : "Pergunte sobre vinhos..."}
                   disabled={budgetExceeded || isLoading}
                   rows={1}
                   className="flex-1 resize-none rounded-lg border border-input bg-background px-3 py-2.5 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
