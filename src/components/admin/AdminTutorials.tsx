@@ -27,7 +27,13 @@ export default function AdminTutorials() {
                 <li>Preencha os campos obrigatórios (Nome é obrigatório). Os demais campos são opcionais mas recomendados.</li>
                 <li>No campo <strong>"URL da Imagem"</strong>, cole o link direto da imagem do vinho.</li>
                 <li>Em <strong>"Comentário do Thomas"</strong>, insira a avaliação pessoal sobre o vinho.</li>
-                <li>Ative <strong>"Publicado"</strong> para que o vinho apareça na curadoria.</li>
+                <li>Selecione o <strong>Status</strong>:
+                  <ul className="list-disc pl-5 mt-1 space-y-0.5">
+                    <li><strong>Curadoria</strong> — vinhos disponíveis atualmente para os membros.</li>
+                    <li><strong>Acervo</strong> — vinhos históricos, safras antigas, vinhos provados em viagem ou que não estão mais disponíveis no Brasil. Ficam visíveis na aba "Acervo" da curadoria.</li>
+                    <li><strong>Rascunho</strong> — não visível para os membros.</li>
+                  </ul>
+                </li>
                 <li>Clique em <strong>"Criar"</strong>.</li>
               </ol>
             </div>
@@ -38,6 +44,7 @@ export default function AdminTutorials() {
                 <li>Clique em <strong>"Importar CSV"</strong>.</li>
                 <li>Baixe o template CSV para ver o formato esperado.</li>
                 <li>Preencha a planilha com os dados dos vinhos. O campo <strong>name</strong> é obrigatório.</li>
+                <li>Para definir o status no CSV, use a coluna <strong>status</strong> com valores: <code>curadoria</code>, <code>acervo</code> ou <code>rascunho</code>. Se omitido, o padrão é <strong>curadoria</strong>.</li>
                 <li>Selecione o arquivo e visualize a prévia dos dados.</li>
                 <li>Linhas com erros serão destacadas em vermelho.</li>
                 <li>Clique em <strong>"Importar"</strong> para processar apenas as linhas válidas.</li>
@@ -55,11 +62,11 @@ export default function AdminTutorials() {
             </div>
 
             <div>
-              <h4 className="font-medium text-foreground mb-1">Editar e remover vinhos</h4>
+              <h4 className="font-medium text-foreground mb-1">Editar, mover e remover vinhos</h4>
               <ul className="list-disc pl-5 space-y-1">
                 <li>Use o ícone de <strong>lápis</strong> para editar qualquer campo.</li>
                 <li>Use o ícone de <strong>lixeira</strong> para remover. <strong>Atenção:</strong> essa ação é irreversível.</li>
-                <li>Para "despublicar" sem deletar, desative o toggle <strong>"Publicado"</strong>.</li>
+                <li>Para mover um vinho entre <strong>Curadoria</strong>, <strong>Acervo</strong> e <strong>Rascunho</strong>, edite o vinho e altere o campo <strong>Status</strong>. Reviews, comentários e votos são preservados.</li>
               </ul>
             </div>
           </AccordionContent>
