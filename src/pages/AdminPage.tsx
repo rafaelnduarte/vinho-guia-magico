@@ -26,7 +26,7 @@ export default function AdminPage() {
             <TabsTrigger value="partners" className="text-xs sm:text-sm px-3 py-2">Parceiros</TabsTrigger>
             <TabsTrigger value="seals" className="text-xs sm:text-sm px-3 py-2">Selos</TabsTrigger>
             <TabsTrigger value="tutorials" className="text-xs sm:text-sm px-3 py-2">Tutoriais</TabsTrigger>
-            <TabsTrigger value="chat" className="text-xs sm:text-sm px-3 py-2">Sommelier AI</TabsTrigger>
+            <TabsTrigger value="chat" className="text-xs sm:text-sm px-3 py-2">Jovem AI</TabsTrigger>
           </TabsList>
         </div>
 

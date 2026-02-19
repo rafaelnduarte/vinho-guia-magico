@@ -229,7 +229,7 @@ function ChatConfig() {
   return (
     <div className="space-y-4">
       <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
-        <Settings className="h-4 w-4" /> Configuração do Sommelier AI
+        <Settings className="h-4 w-4" /> Configuração do Jovem AI
       </h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {fields.map(f => (
@@ -297,7 +297,7 @@ function SystemPromptEditor() {
         <FileText className="h-4 w-4" /> System Prompt
       </h3>
       <p className="text-xs text-muted-foreground">
-        Este é o prompt base que define a personalidade, regras e comportamento do Sommelier AI. 
+        Este é o prompt base que define a personalidade, regras e comportamento do Jovem AI. 
         Os vinhos do portal e a base de conhecimento são injetados automaticamente.
       </p>
       <Textarea
@@ -412,7 +412,7 @@ function KnowledgeBase() {
         <BookOpen className="h-4 w-4" /> Base de Conhecimento
       </h3>
       <p className="text-xs text-muted-foreground">
-        Adicione documentos, artigos e textos que o Sommelier AI usará como referência. 
+        Adicione documentos, artigos e textos que o Jovem AI usará como referência. 
         Esses conteúdos são injetados automaticamente no contexto quando relevantes à pergunta do usuário.
       </p>
 
