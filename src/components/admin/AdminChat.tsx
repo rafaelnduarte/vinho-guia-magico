@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   BarChart3, DollarSign, Users, MessageSquare, Settings,
   Loader2, Save, Wine, Plus, Trash2, Edit2, Check, X,
-  BookOpen, FileText, ToggleLeft, ToggleRight
+  BookOpen, FileText, ToggleLeft, ToggleRight, Download, Clock
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -24,6 +24,7 @@ export default function AdminChat() {
         <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
           <TabsList className="inline-flex w-auto min-w-full sm:min-w-0 h-auto p-1 gap-0.5">
             <TabsTrigger value="metrics" className="text-xs px-3 py-2">Métricas</TabsTrigger>
+            <TabsTrigger value="logs" className="text-xs px-3 py-2">Logs</TabsTrigger>
             <TabsTrigger value="config" className="text-xs px-3 py-2">Configuração</TabsTrigger>
             <TabsTrigger value="prompt" className="text-xs px-3 py-2">System Prompt</TabsTrigger>
             <TabsTrigger value="knowledge" className="text-xs px-3 py-2">Base de Conhecimento</TabsTrigger>
@@ -31,11 +32,197 @@ export default function AdminChat() {
           </TabsList>
         </div>
         <TabsContent value="metrics"><ChatMetrics /></TabsContent>
+        <TabsContent value="logs"><ChatLogs /></TabsContent>
         <TabsContent value="config"><ChatConfig /></TabsContent>
         <TabsContent value="prompt"><SystemPromptEditor /></TabsContent>
         <TabsContent value="knowledge"><KnowledgeBase /></TabsContent>
         <TabsContent value="thomas"><ThomasNotes /></TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+// ---- LOGS ----
+const PERIOD_OPTIONS = [
+  { value: "7d", label: "7D", days: 7 },
+  { value: "15d", label: "15D", days: 15 },
+  { value: "30d", label: "30D", days: 30 },
+  { value: "90d", label: "90D", days: 90 },
+  { value: "mtd", label: "Month to Date", days: -1 },
+  { value: "all", label: "All-Time", days: -2 },
+] as const;
+
+function getStartDate(period: string): string | null {
+  const opt = PERIOD_OPTIONS.find(p => p.value === period);
+  if (!opt) return null;
+  if (opt.days === -2) return null; // all-time
+  if (opt.days === -1) {
+    // month to date
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01T00:00:00Z`;
+  }
+  return new Date(Date.now() - opt.days * 86400000).toISOString();
+}
+
+function ChatLogs() {
+  const [period, setPeriod] = useState("30d");
+  const { toast } = useToast();
+
+  const startDate = getStartDate(period);
+
+  const { data: logs, isLoading } = useQuery({
+    queryKey: ["admin-chat-logs", period],
+    queryFn: async () => {
+      // Fetch sessions with messages
+      let sessionsQuery = supabase
+        .from("chat_sessions")
+        .select("id, user_id, title, created_at")
+        .order("created_at", { ascending: false });
+      if (startDate) sessionsQuery = sessionsQuery.gte("created_at", startDate);
+
+      const { data: sessions, error: sessErr } = await sessionsQuery;
+      if (sessErr) throw sessErr;
+      if (!sessions || sessions.length === 0) return [];
+
+      const sessionIds = sessions.map(s => s.id);
+
+      // Fetch messages for these sessions (batch in chunks of 50)
+      const allMessages: any[] = [];
+      for (let i = 0; i < sessionIds.length; i += 50) {
+        const chunk = sessionIds.slice(i, i + 50);
+        const { data: msgs, error: msgErr } = await supabase
+          .from("chat_messages")
+          .select("session_id, role, content, created_at, mode")
+          .in("session_id", chunk)
+          .order("created_at", { ascending: true });
+        if (msgErr) throw msgErr;
+        if (msgs) allMessages.push(...msgs);
+      }
+
+      // Fetch profiles for user names
+      const userIds = [...new Set(sessions.map(s => s.user_id))];
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("user_id, full_name")
+        .in("user_id", userIds);
+      const profileMap: Record<string, string> = {};
+      profiles?.forEach(p => { profileMap[p.user_id] = p.full_name || p.user_id.slice(0, 8); });
+
+      // Group messages by session
+      const msgMap: Record<string, any[]> = {};
+      allMessages.forEach(m => {
+        if (!msgMap[m.session_id]) msgMap[m.session_id] = [];
+        msgMap[m.session_id].push(m);
+      });
+
+      return sessions.map(s => ({
+        ...s,
+        user_name: profileMap[s.user_id] || s.user_id.slice(0, 8),
+        messages: msgMap[s.id] || [],
+      }));
+    },
+  });
+
+  const exportCSV = () => {
+    if (!logs || logs.length === 0) {
+      toast({ title: "Sem dados para exportar" });
+      return;
+    }
+
+    const rows: string[] = ["Data,Sessão,Usuário,Role,Modo,Mensagem"];
+    logs.forEach(session => {
+      session.messages.forEach((msg: any) => {
+        const date = new Date(msg.created_at).toLocaleString("pt-BR");
+        const content = msg.content.replace(/"/g, '""').replace(/\n/g, " ");
+        rows.push(`"${date}","${session.title?.replace(/"/g, '""') ?? ''}","${session.user_name}","${msg.role}","${msg.mode ?? ''}","${content}"`);
+      });
+    });
+
+    const blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `jovem-ai-logs-${period}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: "CSV exportado!" });
+  };
+
+  const totalMessages = logs?.reduce((s, l) => s + l.messages.length, 0) ?? 0;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
+          <Clock className="h-4 w-4" /> Logs de Conversas
+        </h3>
+        <Button size="sm" variant="outline" onClick={exportCSV} disabled={isLoading || !logs?.length} className="gap-1 text-xs">
+          <Download className="h-3 w-3" /> Exportar CSV
+        </Button>
+      </div>
+
+      {/* Period selector */}
+      <div className="flex flex-wrap gap-1.5">
+        {PERIOD_OPTIONS.map(opt => (
+          <Button
+            key={opt.value}
+            size="sm"
+            variant={period === opt.value ? "default" : "outline"}
+            onClick={() => setPeriod(opt.value)}
+            className="text-xs h-7 px-2.5"
+          >
+            {opt.label}
+          </Button>
+        ))}
+      </div>
+
+      {isLoading ? (
+        <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
+      ) : (
+        <>
+          <p className="text-xs text-muted-foreground">
+            {logs?.length ?? 0} sessões · {totalMessages} mensagens
+          </p>
+          <ScrollArea className="max-h-[500px]">
+            <div className="space-y-3">
+              {logs?.map(session => (
+                <details key={session.id} className="rounded-lg border border-border bg-card overflow-hidden">
+                  <summary className="px-4 py-2.5 cursor-pointer hover:bg-muted/50 flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-medium text-foreground truncate">{session.title || "Sem título"}</span>
+                      <Badge variant="secondary" className="text-xs shrink-0">{session.user_name}</Badge>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0 text-xs text-muted-foreground">
+                      <span>{session.messages.length} msgs</span>
+                      <span>{new Date(session.created_at).toLocaleDateString("pt-BR")}</span>
+                    </div>
+                  </summary>
+                  <div className="border-t border-border divide-y divide-border">
+                    {session.messages.map((msg: any, i: number) => (
+                      <div key={i} className={`px-4 py-2 text-xs ${msg.role === "assistant" ? "bg-muted/30" : ""}`}>
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <Badge variant={msg.role === "user" ? "default" : "outline"} className="text-[10px] px-1.5 py-0">
+                            {msg.role === "user" ? "Usuário" : "AI"}
+                          </Badge>
+                          {msg.mode && <span className="text-muted-foreground">{msg.mode}</span>}
+                          <span className="text-muted-foreground ml-auto">{new Date(msg.created_at).toLocaleTimeString("pt-BR")}</span>
+                        </div>
+                        <p className="text-foreground whitespace-pre-wrap break-words">{msg.content}</p>
+                      </div>
+                    ))}
+                    {session.messages.length === 0 && (
+                      <p className="px-4 py-3 text-xs text-muted-foreground text-center">Sessão sem mensagens</p>
+                    )}
+                  </div>
+                </details>
+              ))}
+              {(!logs || logs.length === 0) && (
+                <p className="text-sm text-muted-foreground text-center py-4">Nenhuma conversa neste período</p>
+              )}
+            </div>
+          </ScrollArea>
+        </>
+      )}
     </div>
   );
 }
