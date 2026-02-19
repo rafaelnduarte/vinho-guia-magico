@@ -1,5 +1,6 @@
 import { Settings } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import AdminWines from "@/components/admin/AdminWines";
 import AdminPartners from "@/components/admin/AdminPartners";
 import AdminSeals from "@/components/admin/AdminSeals";
@@ -9,21 +10,23 @@ import AdminTutorials from "@/components/admin/AdminTutorials";
 
 export default function AdminPage() {
   return (
-    <div className="animate-fade-in px-6 py-10 max-w-7xl mx-auto">
-      <div className="flex items-center gap-3 mb-8">
-        <Settings className="h-7 w-7 text-primary" />
-        <h1 className="text-3xl font-sans font-bold text-foreground">Painel Admin</h1>
+    <div className="animate-fade-in px-4 sm:px-6 py-6 sm:py-10 max-w-7xl mx-auto">
+      <div className="flex items-center gap-3 mb-6">
+        <Settings className="h-6 w-6 text-primary" />
+        <h1 className="text-2xl sm:text-3xl font-sans font-bold text-foreground">Painel Admin</h1>
       </div>
 
-      <Tabs defaultValue="wines" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 max-w-2xl">
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
-          <TabsTrigger value="wines">Vinhos</TabsTrigger>
-          <TabsTrigger value="members">Membros</TabsTrigger>
-          <TabsTrigger value="partners">Parceiros</TabsTrigger>
-          <TabsTrigger value="seals">Selos</TabsTrigger>
-          <TabsTrigger value="tutorials">Tutoriais</TabsTrigger>
-        </TabsList>
+      <Tabs defaultValue="wines" className="space-y-4 sm:space-y-6">
+        <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+          <TabsList className="inline-flex w-auto min-w-full sm:min-w-0 h-auto p-1 gap-0.5">
+            <TabsTrigger value="analytics" className="text-xs sm:text-sm px-3 py-2">Analytics</TabsTrigger>
+            <TabsTrigger value="wines" className="text-xs sm:text-sm px-3 py-2">Vinhos</TabsTrigger>
+            <TabsTrigger value="members" className="text-xs sm:text-sm px-3 py-2">Membros</TabsTrigger>
+            <TabsTrigger value="partners" className="text-xs sm:text-sm px-3 py-2">Parceiros</TabsTrigger>
+            <TabsTrigger value="seals" className="text-xs sm:text-sm px-3 py-2">Selos</TabsTrigger>
+            <TabsTrigger value="tutorials" className="text-xs sm:text-sm px-3 py-2">Tutoriais</TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="analytics">
           <AdminAnalytics />

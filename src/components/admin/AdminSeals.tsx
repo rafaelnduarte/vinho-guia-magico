@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2, Loader2 } from "lucide-react";
+import { getSealIcon } from "@/lib/sealIcons";
 import type { Tables } from "@/integrations/supabase/types";
 
 type SealRow = Tables<"seals">;
@@ -109,10 +110,20 @@ export default function AdminSeals() {
               <h3 className="text-sm font-medium text-muted-foreground mb-3">{title}</h3>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {items.map((s) => (
-                  <div key={s.id} className="rounded-lg border border-border bg-card p-4 flex items-start justify-between">
-                    <div>
-                      <p className="font-medium text-foreground">{s.icon} {s.name}</p>
-                      {s.description && <p className="text-xs text-muted-foreground mt-1">{s.description}</p>}
+                  <div key={s.id} className="rounded-lg border border-border bg-card p-4 flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      {(() => {
+                        const iconSrc = getSealIcon(s.icon);
+                        return iconSrc ? (
+                          <img src={iconSrc} alt={s.name} className="h-10 w-10 shrink-0 object-contain" />
+                        ) : (
+                          <div className="h-10 w-10 shrink-0 rounded-full bg-muted flex items-center justify-center text-xs text-muted-foreground">{s.name[0]}</div>
+                        );
+                      })()}
+                      <div>
+                        <p className="font-medium text-foreground">{s.name}</p>
+                        {s.description && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{s.description}</p>}
+                      </div>
                     </div>
                     <div className="flex gap-1 shrink-0 ml-2">
                       <Button variant="ghost" size="icon" onClick={() => openEdit(s)}><Pencil className="h-4 w-4" /></Button>
