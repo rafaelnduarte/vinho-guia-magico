@@ -32,7 +32,7 @@ export default function HomePage() {
         <h1 className="text-3xl md:text-5xl font-display text-foreground mb-4">
           Bem-vindo ao Radar do Jovem
         </h1>
-        <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+        <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed font-bold">
           O Radar é a sua curadoria exclusiva de vinhos. Aqui você encontra seleções criteriosas,
           condições especiais com parceiros e um sistema de selos que facilita sua escolha.
         </p>
