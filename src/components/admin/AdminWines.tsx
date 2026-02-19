@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
+// Switch removed - replaced by status select
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -31,13 +31,13 @@ interface WineForm {
   tasting_notes: string;
   description: string;
   rating: string;
-  is_published: boolean;
+  status: string;
 }
 
 const emptyForm: WineForm = {
   name: "", producer: "", vintage: "", grape: "", type: "Tinto",
   country: "", region: "", importer: "", price_range: "", image_url: "",
-  tasting_notes: "", description: "", rating: "", is_published: true,
+  tasting_notes: "", description: "", rating: "", status: "curadoria",
 };
 
 function wineToForm(w: WineRow): WineForm {
@@ -47,7 +47,7 @@ function wineToForm(w: WineRow): WineForm {
     region: w.region ?? "", importer: w.importer ?? "", price_range: w.price_range ?? "",
     image_url: w.image_url ?? "", tasting_notes: w.tasting_notes ?? "",
     description: w.description ?? "", rating: w.rating?.toString() ?? "",
-    is_published: w.is_published,
+    status: (w as any).status ?? (w.is_published ? "curadoria" : "rascunho"),
   };
 }
 
@@ -74,6 +74,7 @@ export default function AdminWines() {
     { key: "image_url", label: "URL Imagem" },
     { key: "tasting_notes", label: "Notas de Degustação" },
     { key: "description", label: "Descrição" },
+    { key: "status", label: "Status", validate: (v) => v && !["curadoria", "acervo", "rascunho"].includes(v) ? "Status inválido (curadoria/acervo/rascunho)" : null },
   ];
 
   const handleCsvImport = async (rows: Record<string, any>[]): Promise<CsvImportResult> => {
@@ -105,7 +106,8 @@ export default function AdminWines() {
           image_url: row.image_url || null,
           tasting_notes: row.tasting_notes || null,
           description: row.description || null,
-          is_published: true,
+          status: row.status || "curadoria",
+          is_published: (row.status || "curadoria") !== "rascunho",
         };
 
         if (existing) {
@@ -168,7 +170,8 @@ export default function AdminWines() {
         tasting_notes: form.tasting_notes.trim() || null,
         description: form.description.trim() || null,
         rating: form.rating ? parseFloat(form.rating) : null,
-        is_published: form.is_published,
+        status: form.status,
+        is_published: form.status !== "rascunho",
       };
       if (editing) {
         const { error } = await supabase.from("wines").update(payload).eq("id", editing);
@@ -280,8 +283,12 @@ export default function AdminWines() {
                     <td className="px-4 py-3 hidden md:table-cell text-muted-foreground">{w.country}</td>
                     <td className="px-4 py-3 hidden lg:table-cell text-muted-foreground">{w.price_range}</td>
                     <td className="px-4 py-3">
-                      <Badge variant={w.is_published ? "default" : "secondary"}>
-                        {w.is_published ? "Publicado" : "Rascunho"}
+                      <Badge variant={
+                        (w as any).status === "curadoria" ? "default" :
+                        (w as any).status === "acervo" ? "outline" : "secondary"
+                      }>
+                        {(w as any).status === "curadoria" ? "Curadoria" :
+                         (w as any).status === "acervo" ? "Acervo" : "Rascunho"}
                       </Badge>
                     </td>
                     <td className="px-4 py-3">
@@ -380,9 +387,16 @@ export default function AdminWines() {
                 <Label>Descrição</Label>
                 <Textarea value={form.description} onChange={(e) => setField("description", e.target.value)} rows={2} />
               </div>
-              <div className="col-span-2 flex items-center gap-3">
-                <Switch checked={form.is_published} onCheckedChange={(v) => setField("is_published", v)} id="published" />
-                <Label htmlFor="published">Publicado</Label>
+              <div className="col-span-2 space-y-1">
+                <Label>Status</Label>
+                <Select value={form.status} onValueChange={(v) => setField("status", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="curadoria">Curadoria</SelectItem>
+                    <SelectItem value="acervo">Acervo</SelectItem>
+                    <SelectItem value="rascunho">Rascunho</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <div className="flex justify-end gap-2 pt-2">

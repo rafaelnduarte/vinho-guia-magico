@@ -640,6 +640,7 @@ export type Database = {
           producer: string | null
           rating: number | null
           region: string | null
+          status: string
           tasting_notes: string | null
           type: string | null
           updated_at: string
@@ -659,6 +660,7 @@ export type Database = {
           producer?: string | null
           rating?: number | null
           region?: string | null
+          status?: string
           tasting_notes?: string | null
           type?: string | null
           updated_at?: string
@@ -678,6 +680,7 @@ export type Database = {
           producer?: string | null
           rating?: number | null
           region?: string | null
+          status?: string
           tasting_notes?: string | null
           type?: string | null
           updated_at?: string

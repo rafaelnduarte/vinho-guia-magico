@@ -186,8 +186,8 @@ serve(async (req) => {
     const searchTerms = message.toLowerCase();
     let wineQuery = adminClient
       .from("wines")
-      .select("id, name, producer, country, region, vintage, type, grape, importer, price_range, description, tasting_notes, image_url, rating")
-      .eq("is_published", true)
+      .select("id, name, producer, country, region, vintage, type, grape, importer, price_range, description, tasting_notes, image_url, rating, status")
+      .in("status", ["curadoria", "acervo"])
       .limit(10);
 
     // Simple keyword matching for relevant wines
@@ -216,8 +216,8 @@ serve(async (req) => {
     if (wineContext.length === 0) {
       const { data: fallbackWines } = await adminClient
         .from("wines")
-        .select("id, name, producer, country, region, vintage, type, grape, importer, price_range, description, tasting_notes, image_url, rating")
-        .eq("is_published", true)
+        .select("id, name, producer, country, region, vintage, type, grape, importer, price_range, description, tasting_notes, image_url, rating, status")
+        .in("status", ["curadoria", "acervo"])
         .order("created_at", { ascending: false })
         .limit(5);
       wineContext = fallbackWines ?? [];
@@ -264,12 +264,13 @@ serve(async (req) => {
       descricao: w.description?.slice(0, 200),
       notas_degustacao: w.tasting_notes?.slice(0, 150),
       nota: w.rating,
+      status: (w as any).status,
       selos: sealMap[w.id] ?? [],
       notas_thomas: notesMap[w.id] ?? [],
     }));
 
     const contextMessage = contextPack.length > 0
-      ? `\n\nVINHOS DO PORTAL DISPONÍVEIS (use APENAS estes para recomendações do portal):\n${JSON.stringify(contextPack, null, 0)}`
+      ? `\n\nVINHOS DO PORTAL (use APENAS estes para recomendações do portal). Vinhos com status "acervo" são históricos e podem não estar disponíveis para compra:\n${JSON.stringify(contextPack, null, 0)}`
       : "\n\nNenhum vinho do portal encontrado para esta busca específica.";
 
     // 7. Save user message

@@ -1,6 +1,7 @@
 import { Wine, ThumbsUp } from "lucide-react";
 import { Link } from "react-router-dom";
 import { getSealIcon } from "@/lib/sealIcons";
+import { Badge } from "@/components/ui/badge";
 
 export interface MockWine {
   id: string;
@@ -21,9 +22,10 @@ export interface MockWine {
 interface WineCardProps {
   wine: MockWine;
   likeCount?: number;
+  isArchive?: boolean;
 }
 
-export default function WineCard({ wine, likeCount = 0 }: WineCardProps) {
+export default function WineCard({ wine, likeCount = 0, isArchive = false }: WineCardProps) {
   const wineIcon = getSealIcon(wine.seal_wine_type);
   const drinkerIcon = getSealIcon(wine.seal_drinker_type);
 
@@ -70,9 +72,12 @@ export default function WineCard({ wine, likeCount = 0 }: WineCardProps) {
 
       {/* Content */}
       <div className="flex-1 pt-3 flex flex-col">
-        <h3 className="font-sans font-semibold text-base text-foreground leading-tight mb-1 group-hover:text-primary transition-colors">
-          {wine.name}
-        </h3>
+        <div className="flex items-center gap-2 mb-1">
+          <h3 className="font-sans font-semibold text-base text-foreground leading-tight group-hover:text-primary transition-colors">
+            {wine.name}
+          </h3>
+          {isArchive && <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Acervo</Badge>}
+        </div>
         <p className="text-xs text-muted-foreground mb-2">
           {wine.producer} {wine.vintage ? `· ${wine.vintage}` : ""}
         </p>

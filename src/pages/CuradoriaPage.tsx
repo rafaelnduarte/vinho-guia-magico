@@ -9,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import WineCard from "@/components/curadoria/WineCard";
@@ -32,6 +33,7 @@ export default function CuradoriaPage() {
   const prevFilters = useRef({ tipo: "", pais: "", ordem: "" });
 
   const search = get("q");
+  const tab = get("aba", "curadoria");
   const typeFilter = get("tipo", "all");
   const countryFilter = get("pais", "all");
   const importerFilter = get("importadora", "all");
@@ -59,7 +61,7 @@ export default function CuradoriaPage() {
       const { data, error } = await supabase
         .from("wines")
         .select("*")
-        .eq("is_published", true)
+        .in("status", ["curadoria", "acervo"])
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
@@ -110,8 +112,12 @@ export default function CuradoriaPage() {
     [wines]
   );
 
+  const curadoriaCount = useMemo(() => (wines ?? []).filter(w => (w as any).status === "curadoria").length, [wines]);
+  const acervoCount = useMemo(() => (wines ?? []).filter(w => (w as any).status === "acervo").length, [wines]);
+
   const filtered = useMemo(() => {
     let result = (wines ?? []).filter((w) => {
+      const matchTab = (w as any).status === tab;
       const s = search.toLowerCase();
       const matchSearch =
         !search ||
@@ -122,7 +128,7 @@ export default function CuradoriaPage() {
       const matchCountry = countryFilter === "all" || w.country === countryFilter;
       const matchImporter = importerFilter === "all" || w.importer === importerFilter;
       const matchRegion = regionFilter === "all" || w.region === regionFilter;
-      return matchSearch && matchType && matchCountry && matchImporter && matchRegion;
+      return matchTab && matchSearch && matchType && matchCountry && matchImporter && matchRegion;
     });
 
     // Sort
@@ -168,9 +174,17 @@ export default function CuradoriaPage() {
         <WineIcon className="h-7 w-7 text-primary" />
         <h1 className="text-3xl font-sans font-bold text-foreground">Curadoria</h1>
       </div>
-      <p className="text-muted-foreground mb-6">
+      <p className="text-muted-foreground mb-4">
         Explore os vinhos selecionados pelo Radar do Jovem.
       </p>
+
+      {/* Tabs */}
+      <Tabs value={tab} onValueChange={(v) => set({ aba: v === "curadoria" ? null : v })} className="mb-4">
+        <TabsList>
+          <TabsTrigger value="curadoria">Curadoria ({curadoriaCount})</TabsTrigger>
+          <TabsTrigger value="acervo">Acervo ({acervoCount})</TabsTrigger>
+        </TabsList>
+      </Tabs>
 
       {/* Filters */}
       <div className="flex flex-col gap-3 mb-2">
@@ -300,6 +314,7 @@ export default function CuradoriaPage() {
                     seal_drinker_type: seals.seal_drinker_type,
                   }}
                   likeCount={voteCounts?.[wine.id] ?? 0}
+                  isArchive={tab === "acervo"}
                 />
               );
             })}
