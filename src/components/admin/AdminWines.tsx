@@ -105,15 +105,17 @@ export default function AdminWines() {
           .eq("name", wineName)
           .maybeSingle();
 
-        // Normalize type from CSV
+        // Normalize type from CSV — DB constraint requires lowercase
         const rawType = (row.tipo || "").trim();
         let type: string | null = null;
-        if (/tinto/i.test(rawType)) type = "Tinto";
-        else if (/branco/i.test(rawType)) type = "Branco";
-        else if (/ros[eé]/i.test(rawType)) type = "Rosé";
-        else if (/espumante/i.test(rawType)) type = "Espumante";
-        else if (/sobremesa|doce/i.test(rawType)) type = "Sobremesa";
-        else if (rawType) type = rawType;
+        if (/tinto/i.test(rawType)) type = "tinto";
+        else if (/branco/i.test(rawType)) type = "branco";
+        else if (/ros[eé]/i.test(rawType)) type = "rosé";
+        else if (/espumante/i.test(rawType)) type = "espumante";
+        else if (/sobremesa|doce/i.test(rawType)) type = "sobremesa";
+        else if (/laranja/i.test(rawType)) type = "laranja";
+        else if (/fortificado/i.test(rawType)) type = "fortificado";
+        else if (rawType) type = rawType.toLowerCase();
 
         const status = (row.status || "curadoria").toLowerCase();
 
