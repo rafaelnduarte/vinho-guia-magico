@@ -56,14 +56,14 @@ export default function WineCard({ wine, likeCount = 0, isArchive = false }: Win
               <img
                 src={drinkerIcon}
                 alt={wine.seal_drinker_type}
-                className="h-12 w-12 drop-shadow-md"
+               className="h-16 w-16 drop-shadow-md"
               />
             )}
             {wineIcon && (
               <img
                 src={wineIcon}
                 alt={wine.seal_wine_type}
-                className="h-12 w-12 drop-shadow-md"
+                className="h-16 w-16 drop-shadow-md"
               />
             )}
           </div>
@@ -89,7 +89,7 @@ export default function WineCard({ wine, likeCount = 0, isArchive = false }: Win
                 <ThumbsUp className="h-3 w-3" /> {likeCount}
               </span>
             )}
-            {wine.price && <span className="text-sm font-medium text-foreground">{wine.price}</span>}
+            {wine.price && <span className="text-sm font-medium text-foreground">R${wine.price.replace('.', ',')}</span>}
           </div>
         </div>
       </div>
