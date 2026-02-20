@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useToast } from "@/hooks/use-toast";
 import { Upload, Loader2, Users, Plus, Search, ArrowLeft, BarChart3, KeyRound, Pencil, Clock, ThumbsUp, MessageSquare, Eye } from "lucide-react";
 import CsvImportDialog, { type CsvColumn, type CsvImportResult } from "./CsvImportDialog";
+import MemberBadge from "@/components/MemberBadge";
 
 const memberColumns: CsvColumn[] = [
   { key: "email", label: "Email", required: true, validate: (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? null : "Email inválido" },
@@ -36,7 +37,7 @@ export default function AdminMembers() {
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [createForm, setCreateForm] = useState({ email: "", full_name: "", status: "active" });
+  const [createForm, setCreateForm] = useState({ email: "", full_name: "", status: "active", membership_type: "comunidade" });
 
   const { data: members, isLoading } = useQuery({
     queryKey: ["admin-members-enriched"],
@@ -50,13 +51,14 @@ export default function AdminMembers() {
         email: createForm.email.trim(),
         full_name: createForm.full_name.trim(),
         status: createForm.status,
+        membership_type: createForm.membership_type,
         source: "manual",
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-members-enriched"] });
       setCreateOpen(false);
-      setCreateForm({ email: "", full_name: "", status: "active" });
+      setCreateForm({ email: "", full_name: "", status: "active", membership_type: "comunidade" });
       toast({ title: "Membro criado com sucesso" });
     },
     onError: (e) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
@@ -160,9 +162,12 @@ export default function AdminMembers() {
                     <td className="px-4 py-3 text-muted-foreground">{m.email}</td>
                     <td className="px-4 py-3 hidden md:table-cell text-muted-foreground">{m.source}</td>
                     <td className="px-4 py-3">
-                      <Badge variant={m.status === "active" ? "default" : "secondary"}>
-                        {m.status === "active" ? "Ativo" : "Inativo"}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <MemberBadge type={m.role === "admin" ? "admin" : (m.membership_type || "comunidade")} />
+                        <Badge variant={m.status === "active" ? "default" : "secondary"}>
+                          {m.status === "active" ? "Ativo" : "Inativo"}
+                        </Badge>
+                      </div>
                     </td>
                     <td className="px-4 py-3 hidden lg:table-cell text-muted-foreground">
                       {new Date(m.started_at).toLocaleDateString("pt-BR")}
@@ -208,6 +213,16 @@ export default function AdminMembers() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-1">
+              <Label>Tipo</Label>
+              <Select value={createForm.membership_type} onValueChange={(v) => setCreateForm(f => ({ ...f, membership_type: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="radar">Radar</SelectItem>
+                  <SelectItem value="comunidade">Comunidade</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>Cancelar</Button>
               <Button type="submit" disabled={createMutation.isPending}>
@@ -236,7 +251,7 @@ function MemberDetail({ userId, onBack }: { userId: string; onBack: () => void }
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
-  const [editForm, setEditForm] = useState({ full_name: "", status: "" });
+  const [editForm, setEditForm] = useState({ full_name: "", status: "", membership_type: "comunidade" });
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-member-detail", userId],
@@ -248,6 +263,7 @@ function MemberDetail({ userId, onBack }: { userId: string; onBack: () => void }
       userId,
       full_name: editForm.full_name.trim(),
       status: editForm.status,
+      membership_type: editForm.membership_type,
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-member-detail", userId] });
@@ -288,6 +304,7 @@ function MemberDetail({ userId, onBack }: { userId: string; onBack: () => void }
     setEditForm({
       full_name: data.profile?.full_name ?? "",
       status: data.membership?.status ?? "active",
+      membership_type: data.membership?.membership_type ?? "comunidade",
     });
     setEditOpen(true);
   };
@@ -311,7 +328,10 @@ function MemberDetail({ userId, onBack }: { userId: string; onBack: () => void }
             <Users className="h-7 w-7 text-muted-foreground" />
           </div>
           <div>
-            <h2 className="text-xl font-semibold text-foreground">{data.profile?.full_name || "Sem nome"}</h2>
+            <div className="flex items-center gap-2 mb-1">
+              <h2 className="text-xl font-semibold text-foreground">{data.profile?.full_name || "Sem nome"}</h2>
+              <MemberBadge type={data.role === "admin" ? "admin" : (data.membership?.membership_type || "comunidade")} />
+            </div>
             <p className="text-sm text-muted-foreground">{data.email}</p>
           </div>
         </div>
@@ -435,6 +455,16 @@ function MemberDetail({ userId, onBack }: { userId: string; onBack: () => void }
                 <SelectContent>
                   <SelectItem value="active">Ativo</SelectItem>
                   <SelectItem value="inactive">Inativo</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Tipo</Label>
+              <Select value={editForm.membership_type} onValueChange={(v) => setEditForm(f => ({ ...f, membership_type: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="radar">Radar</SelectItem>
+                  <SelectItem value="comunidade">Comunidade</SelectItem>
                 </SelectContent>
               </Select>
             </div>

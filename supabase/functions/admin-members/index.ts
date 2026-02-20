@@ -53,9 +53,15 @@ Deno.serve(async (req) => {
           if (authUser?.email) emailMap[uid] = authUser.email;
         }
 
+        // Get roles
+        const { data: roles } = await adminClient.from("user_roles").select("user_id, role");
+        const roleMap: Record<string, string> = {};
+        for (const r of roles ?? []) roleMap[r.user_id] = r.role;
+
         const enriched = (memberships ?? []).map((m: any) => ({
           ...m,
           email: emailMap[m.user_id] ?? "—",
+          role: roleMap[m.user_id] ?? "member",
         }));
 
         return new Response(JSON.stringify(enriched), {
@@ -101,12 +107,20 @@ Deno.serve(async (req) => {
         // Count page views
         const pageViews = (events ?? []).filter((e: any) => e.event_type === "page_view").length;
 
+        // Get role
+        const { data: roleData2 } = await adminClient
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", userId)
+          .maybeSingle();
+
         return new Response(JSON.stringify({
           email: authUser?.email ?? "—",
           created_at: authUser?.created_at,
           last_sign_in_at: authUser?.last_sign_in_at,
           profile,
           membership,
+          role: roleData2?.role ?? "member",
           stats: { pageViews, voteCount: voteCount ?? 0, commentCount: commentCount ?? 0 },
           recentActivity: events ?? [],
         }), {
@@ -115,7 +129,7 @@ Deno.serve(async (req) => {
       }
 
       case "create_member": {
-        const { email, full_name, status = "active", source = "manual" } = params;
+        const { email, full_name, status = "active", source = "manual", membership_type = "comunidade" } = params;
 
         // Create or find user
         let userId: string;
@@ -146,9 +160,9 @@ Deno.serve(async (req) => {
           .maybeSingle();
 
         if (existingMembership) {
-          await adminClient.from("memberships").update({ status, source }).eq("id", existingMembership.id);
+          await adminClient.from("memberships").update({ status, source, membership_type }).eq("id", existingMembership.id);
         } else {
-          await adminClient.from("memberships").insert({ user_id: userId, status, source });
+          await adminClient.from("memberships").insert({ user_id: userId, status, source, membership_type });
         }
 
         // Ensure profile name
@@ -172,12 +186,15 @@ Deno.serve(async (req) => {
       }
 
       case "update_member": {
-        const { userId, full_name, status } = params;
+        const { userId, full_name, status, membership_type } = params;
         if (full_name !== undefined) {
           await adminClient.from("profiles").update({ full_name }).eq("user_id", userId);
         }
-        if (status !== undefined) {
-          await adminClient.from("memberships").update({ status }).eq("user_id", userId);
+        const membershipUpdate: Record<string, any> = {};
+        if (status !== undefined) membershipUpdate.status = status;
+        if (membership_type !== undefined) membershipUpdate.membership_type = membership_type;
+        if (Object.keys(membershipUpdate).length > 0) {
+          await adminClient.from("memberships").update(membershipUpdate).eq("user_id", userId);
         }
         return new Response(JSON.stringify({ success: true }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
