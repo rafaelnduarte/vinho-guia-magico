@@ -757,9 +757,24 @@ export type Database = {
           avatar_url: string
           comment_count: number
           full_name: string
+          membership_type: string
+          role: string
           total_points: number
           user_id: string
           vote_count: number
+        }[]
+      }
+      get_wine_rankings: {
+        Args: { period?: string }
+        Returns: {
+          comment_count: number
+          total_points: number
+          vote_count: number
+          wine_country: string
+          wine_id: string
+          wine_image_url: string
+          wine_name: string
+          wine_type: string
         }[]
       }
       has_active_access: { Args: { _user_id: string }; Returns: boolean }

@@ -8,9 +8,16 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import MemberBadge from "@/components/MemberBadge";
 
 interface WineCommentsProps {
   wineId: string;
+}
+
+interface CommentProfile {
+  user_id: string;
+  full_name: string | null;
+  avatar_url: string | null;
 }
 
 export default function WineComments({ wineId }: WineCommentsProps) {
@@ -35,18 +42,44 @@ export default function WineComments({ wineId }: WineCommentsProps) {
   const userIds = [...new Set(comments?.map((c) => c.user_id) ?? [])];
   const { data: profiles } = useQuery({
     queryKey: ["profiles-for-comments", userIds],
-    queryFn: async (): Promise<Array<{ user_id: string; full_name: string | null }>> => {
+    queryFn: async (): Promise<CommentProfile[]> => {
       if (userIds.length === 0) return [];
       const { data } = await supabase
         .from("profiles_public" as any)
-        .select("user_id, full_name")
+        .select("user_id, full_name, avatar_url")
         .in("user_id", userIds);
       return (data as any[]) ?? [];
     },
     enabled: userIds.length > 0,
   });
 
-  const profileMap = new Map(profiles?.map((p: any) => [p.user_id, p.full_name]) ?? []);
+  // Fetch roles and membership types for badge display
+  const { data: userRoles } = useQuery({
+    queryKey: ["roles-for-comments", userIds],
+    queryFn: async () => {
+      if (userIds.length === 0) return { roles: [], memberships: [] };
+      const [rolesRes, membershipsRes] = await Promise.all([
+        supabase.from("user_roles").select("user_id, role").in("user_id", userIds),
+        supabase.from("memberships").select("user_id, membership_type").in("user_id", userIds),
+      ]);
+      return {
+        roles: (rolesRes.data ?? []) as Array<{ user_id: string; role: string }>,
+        memberships: (membershipsRes.data ?? []) as Array<{ user_id: string; membership_type: string }>,
+      };
+    },
+    enabled: userIds.length > 0,
+  });
+
+  const profileMap = new Map(profiles?.map((p) => [p.user_id, p.full_name]) ?? []);
+  const roleMap = new Map(userRoles?.roles?.map((r) => [r.user_id, r.role]) ?? []);
+  const membershipMap = new Map(userRoles?.memberships?.map((m) => [m.user_id, m.membership_type]) ?? []);
+
+  function getBadgeType(uid: string): "admin" | "radar" | "comunidade" {
+    const role = roleMap.get(uid);
+    if (role === "admin") return "admin";
+    const mt = membershipMap.get(uid);
+    return mt === "radar" ? "radar" : "comunidade";
+  }
 
   const addComment = useMutation({
     mutationFn: async () => {
@@ -99,9 +132,12 @@ export default function WineComments({ wineId }: WineCommentsProps) {
           {comments.map((c) => (
             <div key={c.id} className="rounded-lg border border-border bg-muted/30 p-3">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-sm font-medium text-foreground">
-                  {profileMap.get(c.user_id) ?? "Membro"}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-foreground">
+                    {profileMap.get(c.user_id) ?? "Membro"}
+                  </span>
+                  <MemberBadge type={getBadgeType(c.user_id)} />
+                </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground">
                     {formatDistanceToNow(new Date(c.created_at), { addSuffix: true, locale: ptBR })}
