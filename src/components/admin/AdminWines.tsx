@@ -85,9 +85,26 @@ export default function AdminWines() {
     { key: "id_col", label: "ID" },
   ];
 
+  // Convert Google Drive view URLs to direct image URLs
+  const convertDriveUrl = (url: string | null): string | null => {
+    if (!url) return null;
+    const match = url.match(/\/file\/d\/([^/]+)\//);
+    if (match) return `https://lh3.googleusercontent.com/d/${match[1]}`;
+    return url;
+  };
+
+  // Lookup seal by name (case-insensitive)
+  const findSealId = (name: string | null): string | null => {
+    if (!name || !seals) return null;
+    const trimmed = name.trim().toLowerCase();
+    const found = seals.find((s) => s.name.toLowerCase() === trimmed);
+    return found?.id ?? null;
+  };
+
   const handleCsvImport = async (rows: Record<string, any>[]): Promise<CsvImportResult> => {
     let success = 0;
     let skipped = 0;
+    const skippedNames: string[] = [];
     const errors: CsvImportResult["errors"] = [];
 
     for (let i = 0; i < rows.length; i++) {
@@ -119,6 +136,10 @@ export default function AdminWines() {
 
         const status = (row.status || "curadoria").toLowerCase();
 
+        // COMENTÁRIO → description (Comentário do Jovem)
+        // para_quem / categoria_vinho → selos (wine_seals association)
+        const imageUrl = convertDriveUrl(row.imagem) || row.url || null;
+
         const payload = {
           name: wineName,
           producer: row.vinicola || null,
@@ -129,23 +150,42 @@ export default function AdminWines() {
           region: row.regiao || null,
           importer: row.importadora || null,
           price_range: row.preco || null,
-          image_url: row.imagem || row.url || null,
-          tasting_notes: row.comentario || null,
-          description: [row.para_quem, row.categoria_vinho].filter(Boolean).join(" · ") || null,
+          image_url: imageUrl,
+          tasting_notes: null as string | null,
+          description: row.comentario || null,
           drink_or_cellar: row.guardar_ou_beber || null,
           status,
           is_published: status !== "rascunho",
           rating: null as number | null,
         };
 
+        let wineId: string;
+
         if (existing) {
           const { error } = await supabase.from("wines").update(payload).eq("id", existing.id);
           if (error) throw error;
+          wineId = existing.id;
           skipped++;
+          skippedNames.push(wineName);
         } else {
-          const { error } = await supabase.from("wines").insert(payload);
+          const { data: inserted, error } = await supabase.from("wines").insert(payload).select("id").single();
           if (error) throw error;
+          wineId = inserted.id;
           success++;
+        }
+
+        // Associate seals (para_quem → Perfil Cliente, categoria_vinho → Perfil Vinho)
+        const sealNames = [row.para_quem, row.categoria_vinho].filter(Boolean);
+        if (sealNames.length > 0) {
+          // Remove existing seals for this wine first to avoid duplicates
+          await supabase.from("wine_seals").delete().eq("wine_id", wineId);
+          const sealInserts = sealNames
+            .map((name: string) => findSealId(name))
+            .filter(Boolean)
+            .map((sealId) => ({ wine_id: wineId, seal_id: sealId! }));
+          if (sealInserts.length > 0) {
+            await supabase.from("wine_seals").insert(sealInserts);
+          }
         }
       } catch (err: any) {
         errors.push({ row: i + 2, field: "geral", message: err.message });
@@ -153,7 +193,8 @@ export default function AdminWines() {
     }
 
     queryClient.invalidateQueries({ queryKey: ["admin-wines"] });
-    return { success, errors, skipped };
+    queryClient.invalidateQueries({ queryKey: ["admin-wine-seals"] });
+    return { success, errors, skipped, skippedNames };
   };
 
   const { data: wines, isLoading } = useQuery({

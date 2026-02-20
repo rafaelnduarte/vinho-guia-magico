@@ -18,6 +18,7 @@ export interface CsvImportResult {
   success: number;
   errors: Array<{ row: number; field: string; message: string }>;
   skipped: number;
+  skippedNames?: string[];
 }
 
 interface CsvImportDialogProps {
@@ -350,8 +351,18 @@ export default function CsvImportDialog({
                 <p className="font-semibold text-foreground">Importação concluída</p>
                 <p className="text-sm text-muted-foreground">
                   {result.success} inserido{result.success !== 1 ? "s" : ""} com sucesso
-                  {result.skipped > 0 && `, ${result.skipped} ignorado${result.skipped !== 1 ? "s" : ""}`}
+                  {result.skipped > 0 && `, ${result.skipped} atualizado${result.skipped !== 1 ? "s" : ""} (já existiam)`}
                 </p>
+                {result.skippedNames && result.skippedNames.length > 0 && (
+                  <div className="mt-2 rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-3 text-xs">
+                    <p className="font-medium text-yellow-700 mb-1">Vinhos atualizados (já existiam):</p>
+                    <ul className="list-disc pl-4 space-y-0.5 max-h-24 overflow-y-auto">
+                      {result.skippedNames.map((name, i) => (
+                        <li key={i} className="text-yellow-600">{name}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             </div>
 
