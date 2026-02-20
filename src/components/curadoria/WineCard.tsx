@@ -47,8 +47,6 @@ export default function WineCard({ wine, likeCount = 0, isArchive = false }: Win
           ) : (
             <Wine className="h-16 w-16 text-muted-foreground/30" />
           )}
-          {/* Cover top-right symbols from source images */}
-          <div className="absolute top-0 right-0 w-12 h-12 bg-background" />
         </div>
 
         {/* Seals floating outside top-right */}
