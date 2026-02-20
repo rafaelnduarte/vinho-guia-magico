@@ -49,21 +49,21 @@ export default function WineCard({ wine, likeCount = 0, isArchive = false }: Win
           )}
         </div>
 
-        {/* Seals floating outside top-right */}
+        {/* Seals floating top-right */}
         {(drinkerIcon || wineIcon) && (
-          <div className="absolute -top-2 -right-2 flex flex-col gap-2">
+          <div className="absolute top-0 right-0 flex flex-col gap-1">
             {drinkerIcon && (
               <img
                 src={drinkerIcon}
                 alt={wine.seal_drinker_type}
-               className="h-16 w-16 drop-shadow-md"
+                className="h-10 w-10 sm:h-14 sm:w-14 drop-shadow-md"
               />
             )}
             {wineIcon && (
               <img
                 src={wineIcon}
                 alt={wine.seal_wine_type}
-                className="h-16 w-16 drop-shadow-md"
+                className="h-10 w-10 sm:h-14 sm:w-14 drop-shadow-md"
               />
             )}
           </div>
@@ -71,25 +71,25 @@ export default function WineCard({ wine, likeCount = 0, isArchive = false }: Win
       </div>
 
       {/* Content */}
-      <div className="flex-1 pt-3 flex flex-col">
-        <div className="flex items-center gap-2 mb-1">
-          <h3 className="font-sans font-semibold text-base text-foreground leading-tight group-hover:text-primary transition-colors">
+      <div className="flex-1 pt-2 sm:pt-3 flex flex-col min-w-0">
+        <div className="flex items-center gap-1.5 mb-0.5 sm:mb-1">
+          <h3 className="font-sans font-semibold text-sm sm:text-base text-foreground leading-tight group-hover:text-primary transition-colors truncate">
             {wine.name}
           </h3>
           {isArchive && <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Acervo</Badge>}
         </div>
-        <p className="text-xs text-muted-foreground mb-2">
+        <p className="text-[11px] sm:text-xs text-muted-foreground mb-1 sm:mb-2 truncate">
           {wine.producer} {wine.vintage ? `· ${wine.vintage}` : ""}
         </p>
-        <div className="flex items-center justify-between mt-auto pt-2 border-t border-border/50">
-          <span className="text-xs text-muted-foreground">{wine.type} · {wine.country}</span>
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between mt-auto pt-1.5 sm:pt-2 border-t border-border/50 gap-1">
+          <span className="text-[10px] sm:text-xs text-muted-foreground truncate">{wine.type} · {wine.country}</span>
+          <div className="flex items-center gap-1.5 shrink-0">
             {likeCount > 0 && (
-              <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                <ThumbsUp className="h-3 w-3" /> {likeCount}
+              <span className="flex items-center gap-0.5 text-[10px] sm:text-xs text-muted-foreground">
+                <ThumbsUp className="h-2.5 w-2.5 sm:h-3 sm:w-3" /> {likeCount}
               </span>
             )}
-            {wine.price && <span className="text-sm font-medium text-foreground">R${wine.price.replace('.', ',')}</span>}
+            {wine.price && <span className="text-xs sm:text-sm font-medium text-foreground">R${wine.price.replace('.', ',')}</span>}
           </div>
         </div>
       </div>

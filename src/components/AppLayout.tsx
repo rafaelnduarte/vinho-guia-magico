@@ -137,7 +137,7 @@ export default function AppLayout() {
       </aside>
 
       {/* Mobile header */}
-      <div className="flex flex-col flex-1">
+      <div className="flex flex-col flex-1 min-w-0">
         <header className="md:hidden flex items-center justify-between px-4 py-3 border-b border-border bg-card">
           <div className="flex items-center gap-2">
             <img src={logoJovem} alt="Jovem do Vinho" className="h-7 w-7" />
@@ -209,7 +209,7 @@ export default function AppLayout() {
         )}
 
         {/* Main content */}
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden">
           <Outlet />
         </main>
       </div>

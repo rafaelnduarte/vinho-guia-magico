@@ -187,7 +187,7 @@ export default function CuradoriaPage() {
   };
 
   return (
-    <div className="animate-fade-in px-4 sm:px-6 py-6 sm:py-10 max-w-7xl mx-auto">
+    <div className="animate-fade-in px-4 sm:px-6 py-6 sm:py-10 max-w-7xl mx-auto overflow-x-hidden">
       <div className="flex items-center gap-3 mb-2">
         <WineIcon className="h-6 w-6 sm:h-7 sm:w-7 text-primary" />
         <h1 className="text-2xl sm:text-3xl font-sans font-bold text-foreground">Curadoria</h1>
@@ -215,7 +215,7 @@ export default function CuradoriaPage() {
             className="pl-9"
           />
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
           <Select value={typeFilter} onValueChange={(v) => set({ tipo: v })}>
             <SelectTrigger className="w-full">
               <SelectValue placeholder="Tipo" />
@@ -323,7 +323,7 @@ export default function CuradoriaPage() {
         </div>
       ) : paginated.length > 0 ? (
         <>
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-3">
             {paginated.map((wine) => {
               const seals = getSealsForWine(wine.id);
               return (
