@@ -128,7 +128,7 @@ export default function WineDetailPage() {
               { label: "País", value: wine.country },
               { label: "Região", value: wine.region },
               { label: "Importadora", value: wine.importer },
-              { label: "Preço", value: wine.price_range },
+              { label: "Preço", value: wine.price_range ? `R$${wine.price_range.replace('.', ',')}` : null },
               { label: "Nota", value: wine.rating ? `${wine.rating}/100` : null },
               { label: "Beber ou Guardar?", value: (wine as any).drink_or_cellar },
             ]
