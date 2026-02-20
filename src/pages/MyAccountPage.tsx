@@ -9,10 +9,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "@/hooks/use-toast";
 import { Camera, Loader2, Save, Lock } from "lucide-react";
+import MemberBadge from "@/components/MemberBadge";
 
 export default function MyAccountPage() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [membershipType, setMembershipType] = useState<string>("comunidade");
 
   const [fullName, setFullName] = useState("");
   const [bio, setBio] = useState("");
@@ -28,19 +30,28 @@ export default function MyAccountPage() {
 
   useEffect(() => {
     if (!user) return;
-    supabase
-      .from("profiles")
-      .select("full_name, bio, avatar_url")
-      .eq("user_id", user.id)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data) {
-          setFullName(data.full_name || "");
-          setBio(data.bio || "");
-          setAvatarUrl(data.avatar_url);
-        }
-        setLoading(false);
-      });
+    Promise.all([
+      supabase
+        .from("profiles")
+        .select("full_name, bio, avatar_url")
+        .eq("user_id", user.id)
+        .maybeSingle(),
+      supabase
+        .from("memberships")
+        .select("membership_type")
+        .eq("user_id", user.id)
+        .maybeSingle(),
+    ]).then(([profileRes, membershipRes]) => {
+      if (profileRes.data) {
+        setFullName(profileRes.data.full_name || "");
+        setBio(profileRes.data.bio || "");
+        setAvatarUrl(profileRes.data.avatar_url);
+      }
+      if (membershipRes.data) {
+        setMembershipType(membershipRes.data.membership_type || "comunidade");
+      }
+      setLoading(false);
+    });
   }, [user]);
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -136,7 +147,10 @@ export default function MyAccountPage() {
 
   return (
     <div className="max-w-xl mx-auto px-4 py-8 space-y-6">
-      <h1 className="text-2xl font-display">Minha Conta</h1>
+      <div className="flex items-center gap-3">
+        <h1 className="text-2xl font-display">Minha Conta</h1>
+        <MemberBadge type={role === "admin" ? "admin" : (membershipType as "radar" | "comunidade")} />
+      </div>
 
       {/* Profile Card */}
       <Card>
