@@ -1,0 +1,1 @@
+ALTER TABLE public.memberships ADD COLUMN IF NOT EXISTS membership_type text NOT NULL DEFAULT 'comunidade' CHECK (membership_type IN ('radar', 'comunidade'));

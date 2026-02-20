@@ -241,6 +241,7 @@ export type Database = {
           ended_at: string | null
           external_id: string | null
           id: string
+          membership_type: string
           source: string
           started_at: string
           status: string
@@ -252,6 +253,7 @@ export type Database = {
           ended_at?: string | null
           external_id?: string | null
           id?: string
+          membership_type?: string
           source?: string
           started_at?: string
           status?: string
@@ -263,6 +265,7 @@ export type Database = {
           ended_at?: string | null
           external_id?: string | null
           id?: string
+          membership_type?: string
           source?: string
           started_at?: string
           status?: string
