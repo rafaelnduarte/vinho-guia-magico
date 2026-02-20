@@ -91,8 +91,6 @@ export default function WineDetailPage() {
               <Wine className="h-20 w-20 text-muted-foreground/20" />
             </div>
           )}
-          {/* Cover top-right symbols from source images */}
-          <div className="absolute top-0 right-0 w-16 h-16 bg-muted/30" />
           {/* Seal badges */}
           <div className="absolute top-3 right-3 flex flex-col gap-2">
             {[...wineSeals, ...drinkerSeals].map((entry) => {
