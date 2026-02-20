@@ -194,7 +194,7 @@ export default function SommelierPage() {
   const budgetExceeded = usageCredits >= capCredits;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-56px)] md:h-screen animate-fade-in">
+    <div className="flex flex-col h-[calc(100dvh-56px)] md:h-[100dvh] animate-fade-in">
       {/* Header */}
       <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-card shrink-0">
         <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setShowSidebar(!showSidebar)}>

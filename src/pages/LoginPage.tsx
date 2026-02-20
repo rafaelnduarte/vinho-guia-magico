@@ -57,7 +57,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-[100dvh]">
       {/* Left panel - decorative */}
       <div className="hidden lg:flex lg:w-1/2 bg-secondary items-center justify-center relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-secondary via-primary to-secondary opacity-80" />

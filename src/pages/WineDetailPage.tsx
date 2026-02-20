@@ -75,15 +75,15 @@ export default function WineDetailPage() {
   const drinkerSeals = sealEntries?.filter((e) => (e.seals as any)?.category === "perfil_bebedor") ?? [];
 
   return (
-    <div className="animate-fade-in px-6 py-10 max-w-4xl mx-auto">
+    <div className="animate-fade-in px-4 sm:px-6 py-6 sm:py-10 max-w-4xl mx-auto">
       {/* Back */}
-      <Link to="/curadoria" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6">
+      <Link to="/curadoria" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4 sm:mb-6">
         <ArrowLeft className="h-4 w-4" /> Voltar à curadoria
       </Link>
 
-      <div className="grid gap-8 md:grid-cols-[320px_1fr]">
+      <div className="grid gap-6 sm:gap-8 md:grid-cols-[320px_1fr]">
         {/* Image */}
-        <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-muted/30 border border-border">
+        <div className="relative aspect-[3/4] max-h-[50vh] md:max-h-none rounded-xl overflow-hidden bg-muted/30 border border-border mx-auto md:mx-0 w-full max-w-[280px] md:max-w-none">
           {wine.image_url ? (
             <img src={wine.image_url} alt={wine.name} className="h-full w-full object-cover" />
           ) : (

@@ -77,7 +77,7 @@ export default function RankingPage() {
   const isLoading = section === "membros" ? loadingMembers : loadingWines;
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
+    <div className="max-w-2xl mx-auto px-4 py-6 sm:py-8 space-y-4 sm:space-y-6">
       <div className="flex items-center gap-3">
         <Trophy className="h-7 w-7 text-accent" />
         <h1 className="text-2xl font-display">Ranking</h1>
@@ -207,19 +207,19 @@ function MembersRanking({
       )}
 
       {/* Full list */}
-      <div className="rounded-xl border border-border overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="rounded-xl border border-border overflow-hidden overflow-x-auto">
+        <table className="w-full text-sm min-w-[360px]">
           <thead className="bg-muted/50 text-left">
             <tr>
-              <th className="px-4 py-3 font-medium w-12">#</th>
-              <th className="px-4 py-3 font-medium">Membro</th>
-              <th className="px-3 py-3 font-medium text-center" title="Votos">
+              <th className="px-3 sm:px-4 py-3 font-medium w-10">#</th>
+              <th className="px-3 sm:px-4 py-3 font-medium">Membro</th>
+              <th className="px-2 sm:px-3 py-3 font-medium text-center" title="Votos">
                 <ThumbsUp className="h-3.5 w-3.5 mx-auto" />
               </th>
-              <th className="px-3 py-3 font-medium text-center" title="Comentários">
+              <th className="px-2 sm:px-3 py-3 font-medium text-center hidden sm:table-cell" title="Comentários">
                 <MessageSquare className="h-3.5 w-3.5 mx-auto" />
               </th>
-              <th className="px-4 py-3 font-medium text-right">Pontos</th>
+              <th className="px-3 sm:px-4 py-3 font-medium text-right">Pts</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -233,7 +233,7 @@ function MembersRanking({
                     isMe && "bg-primary/5 font-semibold"
                   )}
                 >
-                  <td className="px-4 py-3">
+                  <td className="px-3 sm:px-4 py-3">
                     {i < 3 ? (
                       <Medal className={cn(
                         "h-4 w-4",
@@ -245,24 +245,24 @@ function MembersRanking({
                       <span className="text-muted-foreground">{i + 1}</span>
                     )}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 sm:px-4 py-3">
                     <div className="flex items-center gap-2">
-                      <Avatar className="h-8 w-8 shrink-0">
+                      <Avatar className="h-7 w-7 sm:h-8 sm:w-8 shrink-0">
                         <AvatarImage src={entry.avatar_url || undefined} />
-                        <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                        <AvatarFallback className="bg-primary text-primary-foreground text-[10px] sm:text-xs">
                           {getInitials(entry.full_name)}
                         </AvatarFallback>
                       </Avatar>
-                      <span className={cn("truncate", isMe && "text-primary")}>
+                      <span className={cn("truncate text-xs sm:text-sm", isMe && "text-primary")}>
                         {entry.full_name || "Anônimo"}
                         {isMe && " (você)"}
                       </span>
                       <MemberBadge type={getBadgeType(entry.role, entry.membership_type)} className="shrink-0 hidden sm:inline-flex" />
                     </div>
                   </td>
-                  <td className="px-3 py-3 text-center text-muted-foreground">{entry.vote_count}</td>
-                  <td className="px-3 py-3 text-center text-muted-foreground">{entry.comment_count}</td>
-                  <td className="px-4 py-3 text-right font-display font-bold text-foreground">
+                  <td className="px-2 sm:px-3 py-3 text-center text-muted-foreground">{entry.vote_count}</td>
+                  <td className="px-2 sm:px-3 py-3 text-center text-muted-foreground hidden sm:table-cell">{entry.comment_count}</td>
+                  <td className="px-3 sm:px-4 py-3 text-right font-display font-bold text-foreground">
                     {entry.total_points}
                   </td>
                 </tr>
@@ -356,25 +356,25 @@ function WinesRanking({ rankings }: { rankings: WineRankingEntry[] }) {
       )}
 
       {/* Full list */}
-      <div className="rounded-xl border border-border overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="rounded-xl border border-border overflow-hidden overflow-x-auto">
+        <table className="w-full text-sm min-w-[360px]">
           <thead className="bg-muted/50 text-left">
             <tr>
-              <th className="px-4 py-3 font-medium w-12">#</th>
-              <th className="px-4 py-3 font-medium">Vinho</th>
-              <th className="px-3 py-3 font-medium text-center" title="Votos">
+              <th className="px-3 sm:px-4 py-3 font-medium w-10">#</th>
+              <th className="px-3 sm:px-4 py-3 font-medium">Vinho</th>
+              <th className="px-2 sm:px-3 py-3 font-medium text-center" title="Votos">
                 <ThumbsUp className="h-3.5 w-3.5 mx-auto" />
               </th>
-              <th className="px-3 py-3 font-medium text-center" title="Comentários">
+              <th className="px-2 sm:px-3 py-3 font-medium text-center hidden sm:table-cell" title="Comentários">
                 <MessageSquare className="h-3.5 w-3.5 mx-auto" />
               </th>
-              <th className="px-4 py-3 font-medium text-right">Pontos</th>
+              <th className="px-3 sm:px-4 py-3 font-medium text-right">Pts</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {rankings.map((entry, i) => (
               <tr key={entry.wine_id} className="hover:bg-muted/30 transition-colors">
-                <td className="px-4 py-3">
+                <td className="px-3 sm:px-4 py-3">
                   {i < 3 ? (
                     <Medal className={cn(
                       "h-4 w-4",
@@ -386,8 +386,8 @@ function WinesRanking({ rankings }: { rankings: WineRankingEntry[] }) {
                     <span className="text-muted-foreground">{i + 1}</span>
                   )}
                 </td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-3">
+                <td className="px-3 sm:px-4 py-3">
+                  <div className="flex items-center gap-2 sm:gap-3">
                     {entry.wine_image_url ? (
                       <img src={entry.wine_image_url} alt="" className="h-8 w-6 rounded object-cover shrink-0" />
                     ) : (
@@ -396,16 +396,16 @@ function WinesRanking({ rankings }: { rankings: WineRankingEntry[] }) {
                       </div>
                     )}
                     <div className="min-w-0">
-                      <p className="truncate font-medium text-foreground">{entry.wine_name || "Sem nome"}</p>
+                      <p className="truncate font-medium text-foreground text-xs sm:text-sm">{entry.wine_name || "Sem nome"}</p>
                       <p className="text-xs text-muted-foreground truncate">
                         {[entry.wine_type, entry.wine_country].filter(Boolean).join(" · ")}
                       </p>
                     </div>
                   </div>
                 </td>
-                <td className="px-3 py-3 text-center text-muted-foreground">{entry.vote_count}</td>
-                <td className="px-3 py-3 text-center text-muted-foreground">{entry.comment_count}</td>
-                <td className="px-4 py-3 text-right font-display font-bold text-foreground">
+                <td className="px-2 sm:px-3 py-3 text-center text-muted-foreground">{entry.vote_count}</td>
+                <td className="px-2 sm:px-3 py-3 text-center text-muted-foreground hidden sm:table-cell">{entry.comment_count}</td>
+                <td className="px-3 sm:px-4 py-3 text-right font-display font-bold text-foreground">
                   {entry.total_points}
                 </td>
               </tr>

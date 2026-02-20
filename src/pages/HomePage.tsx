@@ -27,7 +27,7 @@ export default function HomePage() {
   return (
     <div className="animate-fade-in">
       {/* Hero */}
-      <section className="px-6 py-16 md:py-24 max-w-4xl mx-auto text-center">
+      <section className="px-4 sm:px-6 py-10 md:py-24 max-w-4xl mx-auto text-center">
         <img src={logoJovem} alt="Jovem do Vinho" className="h-16 w-16 mx-auto mb-6" />
         <h1 className="text-3xl md:text-5xl font-display text-foreground mb-4">
           Bem-vindo ao Radar do Jovem
@@ -39,7 +39,7 @@ export default function HomePage() {
       </section>
 
       {/* Shortcuts */}
-      <section className="px-6 pb-16 max-w-5xl mx-auto">
+      <section className="px-4 sm:px-6 pb-12 sm:pb-16 max-w-5xl mx-auto">
         <div className="grid gap-6 sm:grid-cols-3">
           {shortcuts.map((s) => (
             <Link
@@ -56,7 +56,7 @@ export default function HomePage() {
       </section>
 
       {/* About */}
-      <section className="px-6 pb-16 max-w-3xl mx-auto">
+      <section className="px-4 sm:px-6 pb-12 sm:pb-16 max-w-3xl mx-auto">
         <div className="rounded-xl bg-card border border-border p-8">
           <h2 className="font-display text-2xl text-foreground mb-4">Como usar o Radar</h2>
           <div className="space-y-3 text-muted-foreground">
