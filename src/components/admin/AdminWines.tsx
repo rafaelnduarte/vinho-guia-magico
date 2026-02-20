@@ -32,12 +32,14 @@ interface WineForm {
   description: string;
   rating: string;
   status: string;
+  drink_or_cellar: string;
 }
 
 const emptyForm: WineForm = {
   name: "", producer: "", vintage: "", grape: "", type: "Tinto",
   country: "", region: "", importer: "", price_range: "", image_url: "",
   tasting_notes: "", description: "", rating: "", status: "curadoria",
+  drink_or_cellar: "",
 };
 
 function wineToForm(w: WineRow): WineForm {
@@ -48,6 +50,7 @@ function wineToForm(w: WineRow): WineForm {
     image_url: w.image_url ?? "", tasting_notes: w.tasting_notes ?? "",
     description: w.description ?? "", rating: w.rating?.toString() ?? "",
     status: (w as any).status ?? (w.is_published ? "curadoria" : "rascunho"),
+    drink_or_cellar: (w as any).drink_or_cellar ?? "",
   };
 }
 
@@ -124,7 +127,8 @@ export default function AdminWines() {
           price_range: row.preco || null,
           image_url: row.url || null,
           tasting_notes: row.comentario || null,
-          description: [row.guardar_ou_beber, row.para_quem, row.categoria_vinho].filter(Boolean).join(" · ") || null,
+          description: [row.para_quem, row.categoria_vinho].filter(Boolean).join(" · ") || null,
+          drink_or_cellar: row.guardar_ou_beber || null,
           status,
           is_published: status !== "rascunho",
           rating: null as number | null,
@@ -192,6 +196,7 @@ export default function AdminWines() {
         rating: form.rating ? parseFloat(form.rating) : null,
         status: form.status,
         is_published: form.status !== "rascunho",
+        drink_or_cellar: form.drink_or_cellar.trim() || null,
       };
       if (editing) {
         const { error } = await supabase.from("wines").update(payload).eq("id", editing);
@@ -407,7 +412,19 @@ export default function AdminWines() {
                 <Label>Descrição</Label>
                 <Textarea value={form.description} onChange={(e) => setField("description", e.target.value)} rows={2} />
               </div>
-              <div className="col-span-2 space-y-1">
+              <div className="space-y-1">
+                <Label>Beber ou Guardar?</Label>
+                <Select value={form.drink_or_cellar || "none"} onValueChange={(v) => setField("drink_or_cellar", v === "none" ? "" : v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">—</SelectItem>
+                    <SelectItem value="Beber">Beber</SelectItem>
+                    <SelectItem value="Guardar">Guardar</SelectItem>
+                    <SelectItem value="Beber ou Guardar">Beber ou Guardar</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
                 <Label>Status</Label>
                 <Select value={form.status} onValueChange={(v) => setField("status", v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>

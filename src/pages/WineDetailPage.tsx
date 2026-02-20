@@ -130,6 +130,7 @@ export default function WineDetailPage() {
               { label: "Importadora", value: wine.importer },
               { label: "Preço", value: wine.price_range },
               { label: "Nota", value: wine.rating ? `${wine.rating}/100` : null },
+              { label: "Beber ou Guardar?", value: (wine as any).drink_or_cellar },
             ]
               .filter((d) => d.value)
               .map((d) => (
