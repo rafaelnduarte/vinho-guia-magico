@@ -751,6 +751,17 @@ export type Database = {
       }
     }
     Functions: {
+      get_rankings: {
+        Args: { period?: string }
+        Returns: {
+          avatar_url: string
+          comment_count: number
+          full_name: string
+          total_points: number
+          user_id: string
+          vote_count: number
+        }[]
+      }
       has_active_access: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {

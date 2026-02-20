@@ -16,6 +16,7 @@ import SelosPage from "@/pages/SelosPage";
 import SommelierPage from "@/pages/SommelierPage";
 import AdminPage from "@/pages/AdminPage";
 import MyAccountPage from "@/pages/MyAccountPage";
+import RankingPage from "@/pages/RankingPage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -44,6 +45,7 @@ const App = () => (
               <Route path="/parceiros" element={<ParceirosPage />} />
               <Route path="/selos" element={<SelosPage />} />
               <Route path="/minha-conta" element={<MyAccountPage />} />
+              <Route path="/ranking" element={<RankingPage />} />
               <Route
                 path="/admin"
                 element={
