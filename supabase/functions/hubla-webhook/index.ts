@@ -126,6 +126,10 @@ Deno.serve(async (req) => {
     const fullName = event.userName;
     const externalId = event.subscriptionId ?? event.invoiceId ?? eventId;
 
+    // Detect product to determine membership_type
+    const productName = (event.productName ?? event.product_name ?? event.planName ?? event.plan_name ?? "").toLowerCase();
+    const membershipType = productName.includes("radar") ? "radar" : "comunidade";
+
     if (!email) {
       await logWebhook(supabase, eventId, "no_email_found", "warn", {
         event_type: eventType,
@@ -134,7 +138,7 @@ Deno.serve(async (req) => {
     }
 
     if (isActivationEvent(eventType)) {
-      await handleActivation(supabase, eventId, email, fullName, externalId);
+      await handleActivation(supabase, eventId, email, fullName, externalId, membershipType);
     } else if (isCancellationEvent(eventType)) {
       await handleCancellation(supabase, eventId, email, externalId);
     } else {
@@ -204,7 +208,8 @@ async function handleActivation(
   eventId: string,
   email: string,
   fullName: string | null,
-  externalId: string
+  externalId: string,
+  membershipType: string
 ) {
   let userId: string;
   const { data: existingUsers } = await supabase.auth.admin.listUsers();
@@ -237,7 +242,7 @@ async function handleActivation(
   if (existingMembership) {
     await supabase
       .from("memberships")
-      .update({ status: "active", ended_at: null, external_id: externalId })
+      .update({ status: "active", ended_at: null, external_id: externalId, membership_type: membershipType })
       .eq("id", existingMembership.id);
   } else {
     await supabase.from("memberships").insert({
@@ -245,6 +250,7 @@ async function handleActivation(
       status: "active",
       source: "hubla",
       external_id: externalId,
+      membership_type: membershipType,
     });
   }
 
