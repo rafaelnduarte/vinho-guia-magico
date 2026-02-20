@@ -36,7 +36,7 @@ export default function WineCard({ wine, likeCount = 0, isArchive = false }: Win
     >
       {/* Image area with floating seals */}
       <div className="relative">
-        <div className="aspect-[3/4] flex items-center justify-center overflow-hidden">
+        <div className="aspect-[3/4] flex items-center justify-center overflow-hidden relative">
           {wine.image_url ? (
             <img
               src={wine.image_url}
@@ -47,6 +47,8 @@ export default function WineCard({ wine, likeCount = 0, isArchive = false }: Win
           ) : (
             <Wine className="h-16 w-16 text-muted-foreground/30" />
           )}
+          {/* Cover top-right symbols from source images */}
+          <div className="absolute top-0 right-0 w-12 h-12 bg-background" />
         </div>
 
         {/* Seals floating outside top-right */}
