@@ -88,9 +88,14 @@ export default function AdminWines() {
   // Convert Google Drive view URLs to direct image URLs
   const convertDriveUrl = (url: string | null): string | null => {
     if (!url) return null;
-    const match = url.match(/\/file\/d\/([^/]+)\//);
+    const trimmed = url.trim();
+    // Match /file/d/FILE_ID with or without trailing slash
+    const match = trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
     if (match) return `https://lh3.googleusercontent.com/d/${match[1]}`;
-    return url;
+    // Also handle ?id=FILE_ID format
+    const match2 = trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    if (match2) return `https://lh3.googleusercontent.com/d/${match2[1]}`;
+    return trimmed;
   };
 
   // Lookup seal by name (case-insensitive)
