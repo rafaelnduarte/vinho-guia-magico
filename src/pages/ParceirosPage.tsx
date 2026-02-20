@@ -47,7 +47,7 @@ export default function ParceirosPage() {
   }, {} as Record<string, Partner[]>);
 
   return (
-    <div className="animate-fade-in px-6 py-10 max-w-4xl mx-auto">
+    <div className="animate-fade-in px-4 sm:px-6 py-6 sm:py-10 max-w-4xl mx-auto">
       {/* Header */}
       <div className="text-center mb-8">
         <h1 className="text-3xl md:text-4xl font-display text-foreground mb-4">

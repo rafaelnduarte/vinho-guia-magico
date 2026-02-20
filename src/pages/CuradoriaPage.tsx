@@ -187,12 +187,12 @@ export default function CuradoriaPage() {
   };
 
   return (
-    <div className="animate-fade-in px-6 py-10 max-w-7xl mx-auto">
+    <div className="animate-fade-in px-4 sm:px-6 py-6 sm:py-10 max-w-7xl mx-auto">
       <div className="flex items-center gap-3 mb-2">
-        <WineIcon className="h-7 w-7 text-primary" />
-        <h1 className="text-3xl font-sans font-bold text-foreground">Curadoria</h1>
+        <WineIcon className="h-6 w-6 sm:h-7 sm:w-7 text-primary" />
+        <h1 className="text-2xl sm:text-3xl font-sans font-bold text-foreground">Curadoria</h1>
       </div>
-      <p className="text-muted-foreground mb-4">
+      <p className="text-sm sm:text-base text-muted-foreground mb-4">
         Explore os vinhos selecionados pelo Radar do Jovem.
       </p>
 
@@ -206,18 +206,18 @@ export default function CuradoriaPage() {
 
       {/* Filters */}
       <div className="flex flex-col gap-3 mb-2">
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar vinho, produtor ou uva..."
-              value={search}
-              onChange={(e) => set({ q: e.target.value })}
-              className="pl-9"
-            />
-          </div>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar vinho, produtor ou uva..."
+            value={search}
+            onChange={(e) => set({ q: e.target.value })}
+            className="pl-9"
+          />
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
           <Select value={typeFilter} onValueChange={(v) => set({ tipo: v })}>
-            <SelectTrigger className="w-full sm:w-40">
+            <SelectTrigger className="w-full">
               <SelectValue placeholder="Tipo" />
             </SelectTrigger>
             <SelectContent>
@@ -230,7 +230,7 @@ export default function CuradoriaPage() {
             </SelectContent>
           </Select>
           <Select value={countryFilter} onValueChange={(v) => set({ pais: v })}>
-            <SelectTrigger className="w-full sm:w-44">
+            <SelectTrigger className="w-full">
               <SelectValue placeholder="País" />
             </SelectTrigger>
             <SelectContent>
@@ -243,7 +243,7 @@ export default function CuradoriaPage() {
             </SelectContent>
           </Select>
           <Select value={importerFilter} onValueChange={(v) => set({ importadora: v })}>
-            <SelectTrigger className="w-full sm:w-48">
+            <SelectTrigger className="w-full">
               <SelectValue placeholder="Importadora" />
             </SelectTrigger>
             <SelectContent>
@@ -256,7 +256,7 @@ export default function CuradoriaPage() {
             </SelectContent>
           </Select>
           <Select value={regionFilter} onValueChange={(v) => set({ regiao: v })}>
-            <SelectTrigger className="w-full sm:w-44">
+            <SelectTrigger className="w-full">
               <SelectValue placeholder="Região" />
             </SelectTrigger>
             <SelectContent>
@@ -269,7 +269,7 @@ export default function CuradoriaPage() {
             </SelectContent>
           </Select>
           <Select value={sealFilter} onValueChange={(v) => set({ selo: v })}>
-            <SelectTrigger className="w-full sm:w-44">
+            <SelectTrigger className="w-full">
               <SelectValue placeholder="Selo" />
             </SelectTrigger>
             <SelectContent>
@@ -282,7 +282,7 @@ export default function CuradoriaPage() {
             </SelectContent>
           </Select>
           <Select value={sort} onValueChange={(v) => set({ ordem: v })}>
-            <SelectTrigger className="w-full sm:w-48">
+            <SelectTrigger className="w-full">
               <ArrowUpDown className="h-4 w-4 mr-2 text-muted-foreground" />
               <SelectValue />
             </SelectTrigger>
