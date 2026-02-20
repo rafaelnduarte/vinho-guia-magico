@@ -353,33 +353,41 @@ export default function CuradoriaPage() {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-2 mt-8">
+            <div className="flex items-center justify-center gap-1.5 mt-8">
               <Button
                 variant="outline"
                 size="sm"
                 disabled={safePage <= 1}
                 onClick={() => set({ page: safePage - 1 })}
+                className="h-9 px-3"
               >
                 Anterior
               </Button>
-              <div className="flex items-center gap-1">
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                  <Button
-                    key={p}
-                    variant={p === safePage ? "default" : "ghost"}
-                    size="sm"
-                    className="w-9 h-9"
-                    onClick={() => set({ page: p })}
-                  >
-                    {p}
-                  </Button>
-                ))}
+              <div className="flex items-center gap-0.5">
+                {getPaginationRange(safePage, totalPages).map((item, idx) =>
+                  item === "..." ? (
+                    <span key={`dots-${idx}`} className="w-9 h-9 flex items-center justify-center text-muted-foreground text-sm">
+                      …
+                    </span>
+                  ) : (
+                    <Button
+                      key={item}
+                      variant={item === safePage ? "default" : "ghost"}
+                      size="sm"
+                      className="w-9 h-9"
+                      onClick={() => set({ page: item as number })}
+                    >
+                      {item}
+                    </Button>
+                  )
+                )}
               </div>
               <Button
                 variant="outline"
                 size="sm"
                 disabled={safePage >= totalPages}
                 onClick={() => set({ page: safePage + 1 })}
+                className="h-9 px-3"
               >
                 Próxima
               </Button>
@@ -399,4 +407,17 @@ function parsePrice(price: string | null): number {
   if (!price) return 0;
   const cleaned = price.replace(/[^\d,]/g, "").replace(",", ".");
   return parseFloat(cleaned) || 0;
+}
+
+function getPaginationRange(current: number, total: number): (number | "...")[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const range: (number | "...")[] = [];
+  range.push(1);
+  if (current > 3) range.push("...");
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+  for (let i = start; i <= end; i++) range.push(i);
+  if (current < total - 2) range.push("...");
+  range.push(total);
+  return range;
 }
