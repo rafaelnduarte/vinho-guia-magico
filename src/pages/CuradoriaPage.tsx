@@ -38,6 +38,7 @@ export default function CuradoriaPage() {
   const countryFilter = get("pais", "all");
   const importerFilter = get("importadora", "all");
   const regionFilter = get("regiao", "all");
+  const sealFilter = get("selo", "all");
   const sort = get("ordem", "newest");
   const page = getNum("page", 1);
 
@@ -112,6 +113,19 @@ export default function CuradoriaPage() {
     [wines]
   );
 
+  // Build seal options from wineSealsData
+  const allSeals = useMemo(() => {
+    if (!wineSealsData) return [];
+    const map = new Map<string, string>();
+    wineSealsData.forEach((ws) => {
+      const seal = ws.seals as any;
+      if (seal?.name && seal?.icon) {
+        map.set(seal.icon, seal.name);
+      }
+    });
+    return Array.from(map.entries()).map(([icon, name]) => ({ icon, name })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [wineSealsData]);
+
   const curadoriaCount = useMemo(() => (wines ?? []).filter(w => (w as any).status === "curadoria").length, [wines]);
   const acervoCount = useMemo(() => (wines ?? []).filter(w => (w as any).status === "acervo").length, [wines]);
 
@@ -128,7 +142,11 @@ export default function CuradoriaPage() {
       const matchCountry = countryFilter === "all" || w.country === countryFilter;
       const matchImporter = importerFilter === "all" || w.importer === importerFilter;
       const matchRegion = regionFilter === "all" || w.region === regionFilter;
-      return matchTab && matchSearch && matchType && matchCountry && matchImporter && matchRegion;
+      const matchSeal = sealFilter === "all" || (() => {
+        const entries = wineSealsData?.filter((ws) => ws.wine_id === w.id) ?? [];
+        return entries.some((e) => (e.seals as any)?.icon === sealFilter);
+      })();
+      return matchTab && matchSearch && matchType && matchCountry && matchImporter && matchRegion && matchSeal;
     });
 
     // Sort
@@ -150,13 +168,13 @@ export default function CuradoriaPage() {
     });
 
     return result;
-  }, [wines, search, typeFilter, countryFilter, importerFilter, regionFilter, sort]);
+  }, [wines, search, typeFilter, countryFilter, importerFilter, regionFilter, sealFilter, sort, wineSealsData]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
-  const hasActiveFilters = search || typeFilter !== "all" || countryFilter !== "all" || importerFilter !== "all" || regionFilter !== "all";
+  const hasActiveFilters = search || typeFilter !== "all" || countryFilter !== "all" || importerFilter !== "all" || regionFilter !== "all" || sealFilter !== "all";
 
   const getSealsForWine = (wineId: string) => {
     const entries = wineSealsData?.filter((ws) => ws.wine_id === wineId) ?? [];
@@ -250,6 +268,19 @@ export default function CuradoriaPage() {
               ))}
             </SelectContent>
           </Select>
+          <Select value={sealFilter} onValueChange={(v) => set({ selo: v })}>
+            <SelectTrigger className="w-full sm:w-44">
+              <SelectValue placeholder="Selo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os selos</SelectItem>
+              {allSeals.map((s) => (
+                <SelectItem key={s.icon} value={s.icon}>
+                  {s.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Select value={sort} onValueChange={(v) => set({ ordem: v })}>
             <SelectTrigger className="w-full sm:w-48">
               <ArrowUpDown className="h-4 w-4 mr-2 text-muted-foreground" />
@@ -276,7 +307,7 @@ export default function CuradoriaPage() {
                 variant="ghost"
                 size="sm"
                 className="h-7 text-xs gap-1"
-                onClick={() => set({ q: null, tipo: null, pais: null, importadora: null, regiao: null })}
+                onClick={() => set({ q: null, tipo: null, pais: null, importadora: null, regiao: null, selo: null })}
               >
                 <X className="h-3 w-3" /> Limpar filtros
               </Button>

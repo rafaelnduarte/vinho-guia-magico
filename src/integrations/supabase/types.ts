@@ -636,6 +636,7 @@ export type Database = {
           country: string | null
           created_at: string
           description: string | null
+          drink_or_cellar: string | null
           grape: string | null
           id: string
           image_url: string | null
@@ -656,6 +657,7 @@ export type Database = {
           country?: string | null
           created_at?: string
           description?: string | null
+          drink_or_cellar?: string | null
           grape?: string | null
           id?: string
           image_url?: string | null
@@ -676,6 +678,7 @@ export type Database = {
           country?: string | null
           created_at?: string
           description?: string | null
+          drink_or_cellar?: string | null
           grape?: string | null
           id?: string
           image_url?: string | null
