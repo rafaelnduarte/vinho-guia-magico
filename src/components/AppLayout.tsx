@@ -13,6 +13,7 @@ import {
   X,
   Sparkles,
   User,
+  Trophy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -22,6 +23,7 @@ import logoJovem from "@/assets/logo-jovem-do-vinho.png";
 const memberLinks = [
   { to: "/", label: "Home", icon: Home },
   { to: "/curadoria", label: "Curadoria", icon: Wine },
+  { to: "/ranking", label: "Ranking", icon: Trophy },
   { to: "/sommelier", label: "Jovem AI", icon: Sparkles },
   { to: "/parceiros", label: "Parceiros", icon: Handshake },
   { to: "/selos", label: "Selos", icon: Award },
