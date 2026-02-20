@@ -80,7 +80,9 @@ export default function AdminWines() {
     { key: "importadora", label: "IMPORTADORA" },
     { key: "pais", label: "PAÍS" },
     { key: "regiao", label: "REGIÃO" },
-    { key: "status", label: "Status", validate: (v) => v && !["curadoria", "acervo", "rascunho"].includes(v) ? "Status inválido (curadoria/acervo/rascunho)" : null },
+    { key: "status", label: "STATUS", validate: (v) => v && !["curadoria", "acervo", "rascunho"].includes(v.toLowerCase()) ? "Status inválido (curadoria/acervo/rascunho)" : null },
+    { key: "imagem", label: "IMAGEM" },
+    { key: "id_col", label: "ID" },
   ];
 
   const handleCsvImport = async (rows: Record<string, any>[]): Promise<CsvImportResult> => {
@@ -113,7 +115,7 @@ export default function AdminWines() {
         else if (/sobremesa|doce/i.test(rawType)) type = "Sobremesa";
         else if (rawType) type = rawType;
 
-        const status = row.status || "curadoria";
+        const status = (row.status || "curadoria").toLowerCase();
 
         const payload = {
           name: wineName,
@@ -125,7 +127,7 @@ export default function AdminWines() {
           region: row.regiao || null,
           importer: row.importadora || null,
           price_range: row.preco || null,
-          image_url: row.url || null,
+          image_url: row.imagem || row.url || null,
           tasting_notes: row.comentario || null,
           description: [row.para_quem, row.categoria_vinho].filter(Boolean).join(" · ") || null,
           drink_or_cellar: row.guardar_ou_beber || null,
