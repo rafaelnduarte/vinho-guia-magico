@@ -67,7 +67,7 @@ export default function AdminWines() {
     { key: "vinho", label: "VINHO", required: true },
     { key: "vinicola", label: "VINÍCOLA" },
     { key: "uva", label: "Uva" },
-    { key: "safra", label: "SAFRA", validate: (v) => v && isNaN(Number(v)) ? "Deve ser um número" : null, transform: (v) => v ? parseInt(v) : null },
+    { key: "safra", label: "SAFRA", transform: (v) => { if (!v || String(v).trim() === "" || String(v).trim().toUpperCase() === "NV") return null; const n = parseInt(String(v).trim()); return isNaN(n) ? null : n; } },
     { key: "tipo", label: "TIPO" },
     { key: "preco", label: "PREÇO" },
     { key: "radar", label: "RADAR" },
