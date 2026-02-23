@@ -38,16 +38,25 @@ Deno.serve(async (req) => {
 
     switch (action) {
       case "list_members": {
-        // Get memberships with profile info
+        // Get memberships
         const { data: memberships } = await adminClient
           .from("memberships")
-          .select("*, profiles!memberships_user_id_fkey(full_name, avatar_url, last_seen_at)")
+          .select("*")
           .order("created_at", { ascending: false });
 
-        // Get emails from auth for all member user_ids
+        // Get all user_ids
         const userIds = [...new Set((memberships ?? []).map((m: any) => m.user_id))];
-        const emailMap: Record<string, string> = {};
 
+        // Get profiles for all members
+        const { data: profiles } = await adminClient
+          .from("profiles")
+          .select("user_id, full_name, avatar_url, last_seen_at")
+          .in("user_id", userIds);
+        const profileMap: Record<string, any> = {};
+        for (const p of profiles ?? []) profileMap[p.user_id] = p;
+
+        // Get emails from auth for all member user_ids
+        const emailMap: Record<string, string> = {};
         for (const uid of userIds) {
           const { data: { user: authUser } } = await adminClient.auth.admin.getUserById(uid);
           if (authUser?.email) emailMap[uid] = authUser.email;
@@ -60,6 +69,7 @@ Deno.serve(async (req) => {
 
         const enriched = (memberships ?? []).map((m: any) => ({
           ...m,
+          profiles: profileMap[m.user_id] ?? null,
           email: emailMap[m.user_id] ?? "—",
           role: roleMap[m.user_id] ?? "member",
         }));
