@@ -224,6 +224,27 @@ Deno.serve(async (req) => {
         });
       }
 
+      case "delete_user": {
+        const { userId } = params;
+        await adminClient.from("user_roles").delete().eq("user_id", userId);
+        await adminClient.from("profiles").delete().eq("user_id", userId);
+        await adminClient.from("memberships").delete().eq("user_id", userId);
+        const { error: delErr } = await adminClient.auth.admin.deleteUser(userId);
+        if (delErr) throw delErr;
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      case "set_password": {
+        const { userId, password } = params;
+        const { error: pwErr } = await adminClient.auth.admin.updateUserById(userId, { password });
+        if (pwErr) throw pwErr;
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       default:
         throw new Error(`Unknown action: ${action}`);
     }
