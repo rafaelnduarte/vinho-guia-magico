@@ -66,19 +66,11 @@ export default function HomePage() {
           {/* Subtle gold accent line */}
           <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-accent to-transparent" />
           <div className="flex flex-col gap-0.5">
-            <span className="text-secondary-foreground/60 text-xs uppercase tracking-widest font-medium">
-              Ranking
+            <span className="text-accent text-[10px] uppercase tracking-[0.2em] font-semibold">
+              {badgeLabel}
             </span>
             <span className="text-secondary-foreground font-display text-lg sm:text-xl">
-              {firstName} {rankPosition ? `· #${rankPosition}` : ""}
-            </span>
-          </div>
-          <div className="flex flex-col items-end gap-0.5">
-            <span className="text-accent text-[10px] uppercase tracking-[0.2em] font-semibold">
-              Membro
-            </span>
-            <span className="font-display text-accent text-base sm:text-lg">
-              {badgeLabel}
+              {firstName}
             </span>
           </div>
         </div>
