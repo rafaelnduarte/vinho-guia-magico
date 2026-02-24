@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Wine, Loader2 } from "lucide-react";
+import { ArrowLeft, Wine, Loader2, ExternalLink, Volume2 } from "lucide-react";
 import { getSealIcon } from "@/lib/sealIcons";
 import WineVoting from "@/components/curadoria/WineVoting";
 import WineComments from "@/components/curadoria/WineComments";
@@ -155,6 +155,34 @@ export default function WineDetailPage() {
               <h3 className="text-sm font-medium text-primary mb-2">Comentário do Thomas</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">{wine.tasting_notes}</p>
             </div>
+          )}
+
+          {/* Audio player */}
+          {(wine as any).audio_url && (
+            <div className="rounded-lg bg-muted/50 border border-border p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Volume2 className="h-4 w-4 text-primary" />
+                <h3 className="text-sm font-medium text-foreground">Comentário em Áudio</h3>
+              </div>
+              <audio controls className="w-full" preload="metadata">
+                <source src={(wine as any).audio_url} />
+                Seu navegador não suporta o player de áudio.
+              </audio>
+            </div>
+          )}
+
+          {/* Seller button */}
+          {(wine as any).website_url && (
+            <a
+              href={`${(wine as any).website_url}${(wine as any).website_url.includes('?') ? '&' : '?'}utm_source=radar-do-jovem`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Button className="w-full gap-2">
+                <ExternalLink className="h-4 w-4" />
+                Visitar o vendedor
+              </Button>
+            </a>
           )}
 
           {/* Seal descriptions */}

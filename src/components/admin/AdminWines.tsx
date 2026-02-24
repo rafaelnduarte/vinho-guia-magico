@@ -33,13 +33,15 @@ interface WineForm {
   rating: string;
   status: string;
   drink_or_cellar: string;
+  website_url: string;
+  audio_url: string;
 }
 
 const emptyForm: WineForm = {
   name: "", producer: "", vintage: "", grape: "", type: "Tinto",
   country: "", region: "", importer: "", price_range: "", image_url: "",
   tasting_notes: "", description: "", rating: "", status: "curadoria",
-  drink_or_cellar: "",
+  drink_or_cellar: "", website_url: "", audio_url: "",
 };
 
 function wineToForm(w: WineRow): WineForm {
@@ -51,6 +53,8 @@ function wineToForm(w: WineRow): WineForm {
     description: w.description ?? "", rating: w.rating?.toString() ?? "",
     status: (w as any).status ?? (w.is_published ? "curadoria" : "rascunho"),
     drink_or_cellar: (w as any).drink_or_cellar ?? "",
+    website_url: (w as any).website_url ?? "",
+    audio_url: (w as any).audio_url ?? "",
   };
 }
 
@@ -82,6 +86,7 @@ export default function AdminWines() {
     { key: "regiao", label: "REGIÃO" },
     { key: "status", label: "STATUS", validate: (v) => v && !["curadoria", "acervo", "rascunho"].includes(v.toLowerCase()) ? "Status inválido (curadoria/acervo/rascunho)" : null },
     { key: "imagem", label: "IMAGEM" },
+    { key: "audio", label: "AUDIO" },
     { key: "id_col", label: "ID" },
   ];
 
@@ -143,7 +148,9 @@ export default function AdminWines() {
 
         // COMENTÁRIO → description (Comentário do Jovem)
         // para_quem / categoria_vinho → selos (wine_seals association)
-        const imageUrl = convertDriveUrl(row.imagem) || row.url || null;
+        const imageUrl = convertDriveUrl(row.imagem) || null;
+        const websiteUrl = row.url || null;
+        const audioUrl = convertDriveUrl(row.audio) || null;
 
         const payload = {
           name: wineName,
@@ -162,6 +169,8 @@ export default function AdminWines() {
           status,
           is_published: status !== "rascunho",
           rating: null as number | null,
+          website_url: websiteUrl,
+          audio_url: audioUrl,
         };
 
         let wineId: string;
@@ -247,6 +256,8 @@ export default function AdminWines() {
         status: form.status,
         is_published: form.status !== "rascunho",
         drink_or_cellar: form.drink_or_cellar.trim() || null,
+        website_url: form.website_url.trim() || null,
+        audio_url: form.audio_url.trim() || null,
       };
       if (editing) {
         const { error } = await supabase.from("wines").update(payload).eq("id", editing);
@@ -453,6 +464,14 @@ export default function AdminWines() {
                 {form.image_url && (
                   <img src={form.image_url} alt="Preview" className="mt-2 h-32 w-auto rounded object-cover border border-border" />
                 )}
+              </div>
+              <div className="col-span-2 space-y-1">
+                <Label>URL do Vendedor</Label>
+                <Input value={form.website_url} onChange={(e) => setField("website_url", e.target.value)} placeholder="https://loja.com/vinho" />
+              </div>
+              <div className="col-span-2 space-y-1">
+                <Label>URL do Áudio</Label>
+                <Input value={form.audio_url} onChange={(e) => setField("audio_url", e.target.value)} placeholder="https://..." />
               </div>
               <div className="col-span-2 space-y-1">
                 <Label>Comentário do Thomas</Label>

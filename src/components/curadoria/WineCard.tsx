@@ -1,4 +1,4 @@
-import { Wine, ThumbsUp } from "lucide-react";
+import { Wine, ThumbsUp, MessageCircle, Grape } from "lucide-react";
 import { Link } from "react-router-dom";
 import { getSealIcon } from "@/lib/sealIcons";
 import { Badge } from "@/components/ui/badge";
@@ -22,10 +22,11 @@ export interface MockWine {
 interface WineCardProps {
   wine: MockWine;
   likeCount?: number;
+  commentCount?: number;
   isArchive?: boolean;
 }
 
-export default function WineCard({ wine, likeCount = 0, isArchive = false }: WineCardProps) {
+export default function WineCard({ wine, likeCount = 0, commentCount = 0, isArchive = false }: WineCardProps) {
   const wineIcon = getSealIcon(wine.seal_wine_type);
   const drinkerIcon = getSealIcon(wine.seal_drinker_type);
 
@@ -81,12 +82,22 @@ export default function WineCard({ wine, likeCount = 0, isArchive = false }: Win
         <p className="text-[11px] sm:text-xs text-muted-foreground mb-1 sm:mb-2 truncate">
           {wine.producer} {wine.vintage ? `· ${wine.vintage}` : ""}
         </p>
+        {wine.grape && (
+          <p className="text-[10px] sm:text-xs text-muted-foreground/70 mb-1 truncate flex items-center gap-1">
+            <Grape className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" /> {wine.grape}
+          </p>
+        )}
         <div className="flex items-center justify-between mt-auto pt-1.5 sm:pt-2 border-t border-border/50 gap-1">
           <span className="text-[10px] sm:text-xs text-muted-foreground truncate">{wine.type} · {wine.country}</span>
           <div className="flex items-center gap-1.5 shrink-0">
             {likeCount > 0 && (
               <span className="flex items-center gap-0.5 text-[10px] sm:text-xs text-muted-foreground">
                 <ThumbsUp className="h-2.5 w-2.5 sm:h-3 sm:w-3" /> {likeCount}
+              </span>
+            )}
+            {commentCount > 0 && (
+              <span className="flex items-center gap-0.5 text-[10px] sm:text-xs text-muted-foreground">
+                <MessageCircle className="h-2.5 w-2.5 sm:h-3 sm:w-3" /> {commentCount}
               </span>
             )}
             {wine.price && <span className="text-xs sm:text-sm font-medium text-foreground">R${wine.price.replace('.', ',')}</span>}

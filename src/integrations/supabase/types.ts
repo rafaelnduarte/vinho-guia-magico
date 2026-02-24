@@ -633,6 +633,7 @@ export type Database = {
       }
       wines: {
         Row: {
+          audio_url: string | null
           country: string | null
           created_at: string
           description: string | null
@@ -652,8 +653,10 @@ export type Database = {
           type: string | null
           updated_at: string
           vintage: number | null
+          website_url: string | null
         }
         Insert: {
+          audio_url?: string | null
           country?: string | null
           created_at?: string
           description?: string | null
@@ -673,8 +676,10 @@ export type Database = {
           type?: string | null
           updated_at?: string
           vintage?: number | null
+          website_url?: string | null
         }
         Update: {
+          audio_url?: string | null
           country?: string | null
           created_at?: string
           description?: string | null
@@ -694,6 +699,7 @@ export type Database = {
           type?: string | null
           updated_at?: string
           vintage?: number | null
+          website_url?: string | null
         }
         Relationships: []
       }
