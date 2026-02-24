@@ -95,7 +95,8 @@ export default function ParceirosPage() {
 
 function PartnerCard({ partner }: { partner: Partner }) {
   const [copied, setCopied] = useState(false);
-  const logo = getPartnerLogo(partner.logo_url);
+  const isUrl = partner.logo_url?.startsWith("http");
+  const logo = isUrl ? partner.logo_url : getPartnerLogo(partner.logo_url);
 
   const handleCopy = () => {
     if (partner.coupon_code) {
