@@ -62,13 +62,25 @@ export default function HomePage() {
     <div className="animate-fade-in">
       {/* Greeting Banner */}
       <section className="px-4 sm:px-6 pt-6 pb-2 max-w-5xl mx-auto">
-        <div className="rounded-xl bg-gradient-to-r from-accent to-accent/70 px-5 py-3 flex items-center gap-3">
-          <span className="text-accent-foreground font-medium text-base sm:text-lg">
-            {getGreeting()}, <strong>{firstName}</strong>
-          </span>
-          <span className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-accent-foreground/10 border border-accent-foreground/20 px-3 py-1 text-xs font-bold text-accent-foreground uppercase tracking-wide">
-            {badgeLabel}
-          </span>
+        <div className="relative overflow-hidden rounded-xl bg-secondary px-6 py-4 flex items-center justify-between shadow-lg">
+          {/* Subtle gold accent line */}
+          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-accent to-transparent" />
+          <div className="flex flex-col gap-0.5">
+            <span className="text-secondary-foreground/60 text-xs uppercase tracking-widest font-medium">
+              {getGreeting()}
+            </span>
+            <span className="text-secondary-foreground font-display text-lg sm:text-xl">
+              {firstName}
+            </span>
+          </div>
+          <div className="flex flex-col items-end gap-0.5">
+            <span className="text-accent text-[10px] uppercase tracking-[0.2em] font-semibold">
+              Membro
+            </span>
+            <span className="font-display text-accent text-base sm:text-lg">
+              {badgeLabel}
+            </span>
+          </div>
         </div>
       </section>
 
