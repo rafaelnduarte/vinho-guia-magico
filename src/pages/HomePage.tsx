@@ -78,12 +78,9 @@ export default function HomePage() {
 
       {/* Hero */}
       <section className="px-4 sm:px-6 py-10 md:py-20 max-w-4xl mx-auto text-center">
-        <div className="flex items-center justify-center gap-3 mb-6">
-          <img src={logoJovem} alt="Jovem do Vinho" className="h-14 w-14 sm:h-16 sm:w-16" />
-          <h1 className="text-3xl md:text-5xl font-display text-foreground">
-            Radar do Jovem
-          </h1>
-        </div>
+        <h1 className="text-3xl md:text-5xl font-display text-foreground mb-6">
+          Radar do Jovem
+        </h1>
         <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed font-bold">
           Bem-vindo ao Radar: sua curadoria de vinhos para beber melhor, com menos dúvida. Você tem seleções criteriosas, vantagens com parceiros e selos que resumem o estilo e o momento ideal de cada garrafa.
         </p>
