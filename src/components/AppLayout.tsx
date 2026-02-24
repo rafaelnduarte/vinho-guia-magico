@@ -66,7 +66,9 @@ export default function AppLayout() {
       {/* Sidebar - desktop */}
       <aside className="hidden md:flex md:w-64 flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
         <div className="flex items-center gap-3 px-6 py-5 border-b border-sidebar-border">
-          <img src={logoJovem} alt="Jovem do Vinho" className="h-12 w-12" />
+          <div className="h-12 w-12 rounded-full bg-white/90 p-1.5 flex items-center justify-center shrink-0">
+            <img src={logoJovem} alt="Jovem do Vinho" className="h-full w-full object-contain" />
+          </div>
           <span className="font-display text-lg">Radar do Jovem</span>
         </div>
 
