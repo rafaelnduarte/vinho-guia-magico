@@ -1,6 +1,9 @@
 import { Wine, Handshake, Award } from "lucide-react";
 import logoJovem from "@/assets/logo-jovem-do-vinho.png";
 import { Link } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 const shortcuts = [
   {
@@ -23,18 +26,62 @@ const shortcuts = [
   },
 ];
 
+function getGreeting() {
+  const h = new Date().getHours();
+  if (h < 12) return "Bom dia";
+  if (h < 18) return "Boa tarde";
+  return "Boa noite";
+}
+
 export default function HomePage() {
+  const { user } = useAuth();
+  const [profileName, setProfileName] = useState<string | null>(null);
+  const [membershipType, setMembershipType] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const fetchData = async () => {
+      const [profileRes, membershipRes] = await Promise.all([
+        supabase.from("profiles").select("full_name").eq("user_id", user.id).maybeSingle(),
+        supabase.from("memberships").select("membership_type").eq("user_id", user.id).eq("status", "active").maybeSingle(),
+      ]);
+      setProfileName(profileRes.data?.full_name ?? null);
+      setMembershipType(membershipRes.data?.membership_type ?? "comunidade");
+    };
+    fetchData();
+  }, [user?.id]);
+
+  const firstName = profileName?.split(" ")[0] || user?.email?.split("@")[0] || "";
+
+  const badgeLabel =
+    membershipType === "radar" ? "Radar" :
+    membershipType === "admin" ? "Admin" :
+    "Comunidade";
+
   return (
     <div className="animate-fade-in">
+      {/* Greeting Banner */}
+      <section className="px-4 sm:px-6 pt-6 pb-2 max-w-5xl mx-auto">
+        <div className="rounded-xl bg-gradient-to-r from-accent to-accent/70 px-5 py-3 flex items-center gap-3">
+          <span className="text-accent-foreground font-medium text-base sm:text-lg">
+            {getGreeting()}, <strong>{firstName}</strong>
+          </span>
+          <span className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-accent-foreground/10 border border-accent-foreground/20 px-3 py-1 text-xs font-bold text-accent-foreground uppercase tracking-wide">
+            {badgeLabel}
+          </span>
+        </div>
+      </section>
+
       {/* Hero */}
-      <section className="px-4 sm:px-6 py-10 md:py-24 max-w-4xl mx-auto text-center">
-        <img src={logoJovem} alt="Jovem do Vinho" className="h-16 w-16 mx-auto mb-6" />
-        <h1 className="text-3xl md:text-5xl font-display text-foreground mb-4">
-          Bem-vindo ao Radar do Jovem
-        </h1>
+      <section className="px-4 sm:px-6 py-10 md:py-20 max-w-4xl mx-auto text-center">
+        <div className="flex items-center justify-center gap-3 mb-6">
+          <img src={logoJovem} alt="Jovem do Vinho" className="h-14 w-14 sm:h-16 sm:w-16" />
+          <h1 className="text-3xl md:text-5xl font-display text-foreground">
+            Radar do Jovem
+          </h1>
+        </div>
         <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed font-bold">
-          O Radar é a sua curadoria exclusiva de vinhos. Aqui você encontra seleções criteriosas,
-          condições especiais com parceiros e um sistema de selos que facilita sua escolha.
+          Bem-vindo ao Radar: sua curadoria de vinhos para beber melhor, com menos dúvida. Você tem seleções criteriosas, vantagens com parceiros e selos que resumem o estilo e o momento ideal de cada garrafa.
         </p>
       </section>
 
