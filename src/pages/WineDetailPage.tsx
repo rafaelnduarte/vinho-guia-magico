@@ -4,7 +4,8 @@ import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Wine, Loader2, ExternalLink, Volume2 } from "lucide-react";
+import { ArrowLeft, Wine, Loader2, ExternalLink } from "lucide-react";
+import AudioPlayer from "@/components/curadoria/AudioPlayer";
 import { getSealIcon } from "@/lib/sealIcons";
 import WineVoting from "@/components/curadoria/WineVoting";
 import WineComments from "@/components/curadoria/WineComments";
@@ -157,19 +158,8 @@ export default function WineDetailPage() {
             </div>
           )}
 
-          {/* Audio player */}
-          {(wine as any).audio_url && (
-            <div className="rounded-lg bg-muted/50 border border-border p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Volume2 className="h-4 w-4 text-primary" />
-                <h3 className="text-sm font-medium text-foreground">Comentário em Áudio</h3>
-              </div>
-              <audio controls className="w-full" preload="metadata">
-                <source src={(wine as any).audio_url} />
-                Seu navegador não suporta o player de áudio.
-              </audio>
-            </div>
-          )}
+          {/* Audio player - always visible */}
+          <AudioPlayer src={(wine as any).audio_url} />
 
           {/* Seller button */}
           {(wine as any).website_url && (
