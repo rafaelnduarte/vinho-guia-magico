@@ -26,27 +26,27 @@ const shortcuts = [
   },
 ];
 
-function getGreeting() {
-  const h = new Date().getHours();
-  if (h < 12) return "Bom dia";
-  if (h < 18) return "Boa tarde";
-  return "Boa noite";
-}
 
 export default function HomePage() {
   const { user } = useAuth();
   const [profileName, setProfileName] = useState<string | null>(null);
   const [membershipType, setMembershipType] = useState<string | null>(null);
+  const [rankPosition, setRankPosition] = useState<number | null>(null);
 
   useEffect(() => {
     if (!user?.id) return;
     const fetchData = async () => {
-      const [profileRes, membershipRes] = await Promise.all([
+      const [profileRes, membershipRes, rankingRes] = await Promise.all([
         supabase.from("profiles").select("full_name").eq("user_id", user.id).maybeSingle(),
         supabase.from("memberships").select("membership_type").eq("user_id", user.id).eq("status", "active").maybeSingle(),
+        supabase.rpc("get_rankings", { period: "all" }),
       ]);
       setProfileName(profileRes.data?.full_name ?? null);
       setMembershipType(membershipRes.data?.membership_type ?? "comunidade");
+      if (rankingRes.data) {
+        const idx = rankingRes.data.findIndex((r: any) => r.user_id === user.id);
+        setRankPosition(idx >= 0 ? idx + 1 : null);
+      }
     };
     fetchData();
   }, [user?.id]);
@@ -67,10 +67,10 @@ export default function HomePage() {
           <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-accent to-transparent" />
           <div className="flex flex-col gap-0.5">
             <span className="text-secondary-foreground/60 text-xs uppercase tracking-widest font-medium">
-              {getGreeting()}
+              Ranking
             </span>
             <span className="text-secondary-foreground font-display text-lg sm:text-xl">
-              {firstName}
+              {firstName} {rankPosition ? `· #${rankPosition}` : ""}
             </span>
           </div>
           <div className="flex flex-col items-end gap-0.5">
