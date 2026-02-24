@@ -96,6 +96,21 @@ export default function CuradoriaPage() {
     },
   });
 
+  // Fetch comment counts for all wines
+  const { data: commentCounts } = useQuery({
+    queryKey: ["curadoria-comment-counts"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("wine_comments")
+        .select("wine_id");
+      const counts: Record<string, number> = {};
+      (data ?? []).forEach((c) => {
+        counts[c.wine_id] = (counts[c.wine_id] ?? 0) + 1;
+      });
+      return counts;
+    },
+  });
+
   const allTypes = useMemo(
     () => [...new Set(wines?.map((w) => w.type).filter(Boolean) ?? [])].sort(),
     [wines]
@@ -345,6 +360,7 @@ export default function CuradoriaPage() {
                     seal_drinker_type: seals.seal_drinker_type,
                   }}
                   likeCount={voteCounts?.[wine.id] ?? 0}
+                  commentCount={commentCounts?.[wine.id] ?? 0}
                   isArchive={tab === "acervo"}
                 />
               );
