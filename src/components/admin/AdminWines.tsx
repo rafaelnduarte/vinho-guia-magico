@@ -97,26 +97,48 @@ export default function AdminWines() {
     if (match) return match[1];
     const match2 = trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/);
     if (match2) return match2[1];
-    // Already a direct lh3 link — extract ID
     const match3 = trimmed.match(/lh3\.googleusercontent\.com\/d\/([a-zA-Z0-9_-]+)/);
     if (match3) return match3[1];
     return null;
   };
 
-  // Convert Google Drive URLs for images (lh3 with size param)
-  const convertDriveImageUrl = (url: string | null): string | null => {
+  // Rehost a Google Drive file to Supabase Storage via edge function
+  const rehostDriveFile = async (url: string | null, bucket: string, type: "image" | "audio"): Promise<string | null> => {
     if (!url) return null;
-    const id = extractDriveFileId(url);
-    if (id) return `https://lh3.googleusercontent.com/d/${id}=s1000`;
-    return url.trim();
-  };
+    const fileId = extractDriveFileId(url);
+    if (!fileId) return url.trim(); // Not a Drive URL, keep as-is
 
-  // Convert Google Drive URLs for audio (download endpoint)
-  const convertDriveAudioUrl = (url: string | null): string | null => {
-    if (!url) return null;
-    const id = extractDriveFileId(url);
-    if (id) return `https://drive.google.com/uc?export=download&id=${id}`;
-    return url.trim();
+    // Check if already a Supabase storage URL
+    if (url.includes("supabase.co/storage")) return url.trim();
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("No session");
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/rehost-drive-file`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ fileId, bucket, type }),
+        }
+      );
+
+      if (!response.ok) {
+        const err = await response.json();
+        console.error(`Rehost failed for ${fileId}:`, err);
+        return null;
+      }
+
+      const { url: publicUrl } = await response.json();
+      return publicUrl;
+    } catch (err) {
+      console.error(`Rehost error for ${fileId}:`, err);
+      return null;
+    }
   };
 
   // Lookup seal by name (case-insensitive)
@@ -164,9 +186,10 @@ export default function AdminWines() {
 
         // COMENTÁRIO → description (Comentário do Jovem)
         // para_quem / categoria_vinho → selos (wine_seals association)
-        const imageUrl = convertDriveImageUrl(row.imagem) || null;
+        // Rehost Drive files to Supabase Storage
+        const imageUrl = await rehostDriveFile(row.imagem, "wine-images", "image");
         const websiteUrl = row.url || null;
-        const audioUrl = convertDriveAudioUrl(row.audio) || null;
+        const audioUrl = await rehostDriveFile(row.audio, "wine-audio", "audio");
 
         const payload = {
           name: wineName,
