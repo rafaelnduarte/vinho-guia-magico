@@ -90,17 +90,33 @@ export default function AdminWines() {
     { key: "id_col", label: "ID" },
   ];
 
-  // Convert Google Drive view URLs to direct image URLs
-  const convertDriveUrl = (url: string | null): string | null => {
-    if (!url) return null;
+  // Extract Google Drive file ID from any Drive URL format
+  const extractDriveFileId = (url: string): string | null => {
     const trimmed = url.trim();
-    // Match /file/d/FILE_ID with or without trailing slash
     const match = trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-    if (match) return `https://lh3.googleusercontent.com/d/${match[1]}`;
-    // Also handle ?id=FILE_ID format
+    if (match) return match[1];
     const match2 = trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-    if (match2) return `https://lh3.googleusercontent.com/d/${match2[1]}`;
-    return trimmed;
+    if (match2) return match2[1];
+    // Already a direct lh3 link — extract ID
+    const match3 = trimmed.match(/lh3\.googleusercontent\.com\/d\/([a-zA-Z0-9_-]+)/);
+    if (match3) return match3[1];
+    return null;
+  };
+
+  // Convert Google Drive URLs for images (thumbnail endpoint)
+  const convertDriveImageUrl = (url: string | null): string | null => {
+    if (!url) return null;
+    const id = extractDriveFileId(url);
+    if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w1000`;
+    return url.trim();
+  };
+
+  // Convert Google Drive URLs for audio (download endpoint)
+  const convertDriveAudioUrl = (url: string | null): string | null => {
+    if (!url) return null;
+    const id = extractDriveFileId(url);
+    if (id) return `https://drive.google.com/uc?export=download&id=${id}`;
+    return url.trim();
   };
 
   // Lookup seal by name (case-insensitive)
@@ -148,9 +164,9 @@ export default function AdminWines() {
 
         // COMENTÁRIO → description (Comentário do Jovem)
         // para_quem / categoria_vinho → selos (wine_seals association)
-        const imageUrl = convertDriveUrl(row.imagem) || null;
+        const imageUrl = convertDriveImageUrl(row.imagem) || null;
         const websiteUrl = row.url || null;
-        const audioUrl = convertDriveUrl(row.audio) || null;
+        const audioUrl = convertDriveAudioUrl(row.audio) || null;
 
         const payload = {
           name: wineName,

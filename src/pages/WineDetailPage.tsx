@@ -11,6 +11,13 @@ import WineVoting from "@/components/curadoria/WineVoting";
 import WineComments from "@/components/curadoria/WineComments";
 import { useAnalytics } from "@/hooks/useAnalytics";
 
+function formatWinePrice(raw: string): string {
+  const cleaned = raw.replace(/^R\$\s*/i, "").trim();
+  const num = parseFloat(cleaned.replace(",", "."));
+  if (!isNaN(num)) return `R$${num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return cleaned.startsWith("R$") ? cleaned : `R$${cleaned}`;
+}
+
 export default function WineDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { trackWineOpened } = useAnalytics();
@@ -129,7 +136,7 @@ export default function WineDetailPage() {
               { label: "País", value: wine.country },
               { label: "Região", value: wine.region },
               { label: "Importadora", value: wine.importer },
-              { label: "Preço", value: wine.price_range ? `R$${wine.price_range.replace('.', ',')}` : null },
+              { label: "Preço", value: wine.price_range ? formatWinePrice(wine.price_range) : null },
               { label: "Nota", value: wine.rating ? `${wine.rating}/100` : null },
               { label: "Beber ou Guardar?", value: (wine as any).drink_or_cellar },
             ]
