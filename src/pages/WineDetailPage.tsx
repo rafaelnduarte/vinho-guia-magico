@@ -99,19 +99,6 @@ export default function WineDetailPage() {
               <Wine className="h-20 w-20 text-muted-foreground/20" />
             </div>
           )}
-          {/* Seal badges */}
-          <div className="absolute top-3 right-3 flex flex-col gap-2">
-            {[...wineSeals, ...drinkerSeals].map((entry) => {
-              const iconSrc = getSealIcon((entry.seals as any)?.icon);
-              return iconSrc ? (
-                <img key={entry.seal_id} src={iconSrc} alt={(entry.seals as any)?.name} className="h-12 w-12 drop-shadow-md" />
-              ) : (
-                <Badge key={entry.seal_id} className="text-xs px-2 py-1 bg-primary/90 text-primary-foreground shadow-md">
-                  {(entry.seals as any)?.name}
-                </Badge>
-              );
-            })}
-          </div>
         </div>
 
         {/* Info */}
