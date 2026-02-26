@@ -39,7 +39,7 @@ export default function CuradoriaPage() {
   const importerFilter = get("importadora", "all");
   const regionFilter = get("regiao", "all");
   const sealFilter = get("selo", "all");
-  const sort = get("ordem", "newest");
+  const sort = get("ordem", "price_asc");
   const page = getNum("page", 1);
 
   // Track filter usage
