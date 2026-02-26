@@ -1,4 +1,14 @@
 import { Wine, ThumbsUp, MessageCircle, Grape } from "lucide-react";
+
+function formatPrice(raw: string): string {
+  // Strip any existing R$ / RS / r$ prefix and whitespace
+  const cleaned = raw.replace(/^R\$\s*/i, "").trim();
+  // If it looks like a plain number (e.g. "535.0"), format it
+  const num = parseFloat(cleaned.replace(",", "."));
+  if (!isNaN(num)) return `R$${num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  // Already formatted — just ensure single R$ prefix
+  return cleaned.startsWith("R$") ? cleaned : `R$${cleaned}`;
+}
 import { Link } from "react-router-dom";
 import { getSealIcon } from "@/lib/sealIcons";
 import { Badge } from "@/components/ui/badge";
@@ -100,7 +110,7 @@ export default function WineCard({ wine, likeCount = 0, commentCount = 0, isArch
                 <MessageCircle className="h-2.5 w-2.5 sm:h-3 sm:w-3" /> {commentCount}
               </span>
             )}
-            {wine.price && <span className="text-xs sm:text-sm font-medium text-foreground">R${wine.price.replace('.', ',')}</span>}
+            {wine.price && <span className="text-xs sm:text-sm font-medium text-foreground">{formatPrice(wine.price)}</span>}
           </div>
         </div>
       </div>
