@@ -103,11 +103,11 @@ export default function AdminWines() {
     return null;
   };
 
-  // Convert Google Drive URLs for images (thumbnail endpoint)
+  // Convert Google Drive URLs for images (lh3 with size param)
   const convertDriveImageUrl = (url: string | null): string | null => {
     if (!url) return null;
     const id = extractDriveFileId(url);
-    if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w1000`;
+    if (id) return `https://lh3.googleusercontent.com/d/${id}=s1000`;
     return url.trim();
   };
 
