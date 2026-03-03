@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Trophy, ThumbsUp, MessageSquare, Medal, Users, Wine } from "lucide-react";
+import { Loader2, Trophy, ThumbsUp, MessageSquare, Medal, Users, Wine, Target } from "lucide-react";
 import { cn } from "@/lib/utils";
 import MemberBadge from "@/components/MemberBadge";
 
@@ -40,14 +40,14 @@ interface WineRankingEntry {
   total_points: number;
 }
 
-function getInitials(name: string | null): string {
-  if (!name) return "?";
-  return name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
-}
-
 function getBadgeType(role: string, membershipType: string): "admin" | "radar" | "comunidade" {
   if (role === "admin") return "admin";
   return membershipType === "radar" ? "radar" : "comunidade";
+}
+
+function StatusFallbackIcon({ membershipType }: { membershipType: string }) {
+  const Icon = membershipType === "radar" ? Target : Wine;
+  return <Icon className="h-4 w-4 text-accent" />;
 }
 
 export default function RankingPage() {
@@ -185,8 +185,8 @@ function MembersRanking({
                 </div>
                 <Avatar className={cn("mb-2", isFirst ? "h-14 w-14" : "h-11 w-11")}>
                   <AvatarImage src={entry.avatar_url || undefined} />
-                  <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                    {getInitials(entry.full_name)}
+                  <AvatarFallback className="bg-accent/20 border border-accent/40">
+                    <StatusFallbackIcon membershipType={entry.membership_type} />
                   </AvatarFallback>
                 </Avatar>
                 <p className="text-sm font-medium text-foreground text-center truncate w-full">
@@ -249,8 +249,8 @@ function MembersRanking({
                     <div className="flex items-center gap-2 min-w-0">
                       <Avatar className="h-7 w-7 shrink-0">
                         <AvatarImage src={entry.avatar_url || undefined} />
-                        <AvatarFallback className="bg-primary text-primary-foreground text-[10px]">
-                          {getInitials(entry.full_name)}
+                        <AvatarFallback className="bg-accent/20 border border-accent/40">
+                          <StatusFallbackIcon membershipType={entry.membership_type} />
                         </AvatarFallback>
                       </Avatar>
                       <span className={cn("truncate text-xs sm:text-sm", isMe && "text-primary")}>
