@@ -1,7 +1,9 @@
 project_id = "hrpnufesbjmaaiqgjwtn"
 
-[functions.hubla-webhook]
-verify_jwt = false
-
-[functions.sommelier-chat]
-verify_jwt = false
+[functions]
+  [functions.auth-email-hook]
+    verify_jwt = false
+  [functions.hubla-webhook]
+    verify_jwt = false
+  [functions.sommelier-chat]
+    verify_jwt = false
