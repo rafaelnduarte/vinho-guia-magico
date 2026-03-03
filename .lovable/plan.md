@@ -1,38 +1,35 @@
 
 
-## Plano: Garantir contas admin com senha "Teste123"
+## Plano: Reestruturar Header e Sidebar
 
-### Problema
-Três contas admin não conseguem logar. Preciso garantir que existam no sistema de autenticação com a senha correta e tenham role `admin` + membership ativa.
+### Resumo
 
-### Abordagem
+Três mudanças principais:
 
-Vou criar uma **edge function temporária** (`ensure-admins`) que, usando o service role:
+1. **Header global (todas as páginas):** Fundo azul primário (`bg-primary`) com logo + "Radar do Jovem" — visível em desktop e mobile.
 
-1. Para cada um dos 3 emails (`dominique.biniou@`, `gabriel.duarte@`, `thomas@`):
-   - Busca o usuário na autenticação
-   - Se não existir, cria com email confirmado
-   - Define a senha como `Teste123`
-   - Garante que existe um registro em `profiles` com o nome correto
-   - Garante que existe `user_roles` com role `admin`
-   - Garante que existe `memberships` com status `active`
+2. **Sidebar (topo):** Substituir o bloco atual de logo/título pelo widget do usuário (avatar ou ícone de status, nome, badge, ranking mensal) — o banner que hoje está na HomePage vai para o topo da sidebar (desktop) e para o header no mobile (como avatar clicável ou compacto).
 
-2. Retorna um relatório de quais contas foram criadas vs atualizadas
+3. **Rankings e fallback de avatar:** Quando o usuário não tem foto (`avatar_url`), usar o ícone de status (Target para Radar, Wine para outros) como fallback no Avatar, tanto na sidebar quanto na página de ranking.
 
-### Contas a garantir
+### Detalhes das mudanças
 
-| Email | Nome | Role | Senha |
-|-------|------|------|-------|
-| dominique.biniou@jovemdovinho.com.br | Dominique Biniou | admin | Teste123 |
-| gabriel.duarte@jovemdovinho.com.br | Gabriel Duarte | admin | Teste123 |
-| thomas@jovemdovinho.com.br | Thomas | admin | Teste123 |
+#### `src/components/AppLayout.tsx`
+- **Header (desktop + mobile):** Adicionar uma barra fixa no topo com `bg-primary text-white`, contendo logo + "Radar do Jovem". No mobile, manter o botão de menu hambúrguer nesse header.
+- **Sidebar (topo, desktop):** Remover o bloco logo/título. No lugar, colocar um mini-card do usuário com: avatar (foto ou ícone de status como fallback), nome, badge de membership e ranking mensal. Buscar esses dados via `profiles`, `memberships` e `get_rankings` RPC (mesmo padrão da HomePage).
+- **Mobile:** No header, ao lado do logo, colocar o avatar compacto do usuário (foto ou ícone de status).
 
-### Detalhes técnicos
+#### `src/pages/HomePage.tsx`
+- Remover o banner de saudação (seção "Greeting Banner"), já que essas informações estarão permanentemente na sidebar/header.
 
-- A edge function `admin-members` já tem a action `set_password`, mas requer autenticação de admin. Vou criar uma função dedicada que roda com service role diretamente.
-- Após execução e confirmação, a função temporária pode ser removida.
-- Usa `adminClient.auth.admin.listUsers()` para encontrar usuários existentes e `updateUserById` para redefinir senhas.
+#### `src/pages/RankingPage.tsx`
+- No `AvatarFallback` do pódio e da tabela, ao invés de mostrar iniciais em texto, mostrar o ícone de status (Target/Wine) baseado no `membership_type` do entry.
 
-### Arquivo modificado/criado
-- `supabase/functions/ensure-admins/index.ts` (nova, temporária)
+#### `src/components/MemberBadge.tsx`
+- Sem alterações, será reutilizado.
+
+### Arquivos modificados
+- `src/components/AppLayout.tsx` — header global + sidebar com user widget
+- `src/pages/HomePage.tsx` — remover greeting banner
+- `src/pages/RankingPage.tsx` — avatar fallback com ícone de status
 
