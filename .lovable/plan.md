@@ -1,35 +1,76 @@
 
 
-## Plano: Reestruturar Header e Sidebar
+## Plano: Nova Página Inicial com Dois Carrosséis
 
 ### Resumo
 
-Três mudanças principais:
+Substituir todo o conteúdo da HomePage por duas seções de carrossel:
+1. **Banners gerenciáveis** — imagens promocionais administráveis pelo painel admin
+2. **Vinhos recentes** — os 10 vinhos mais novos, exibidos 3 por vez
 
-1. **Header global (todas as páginas):** Fundo azul primário (`bg-primary`) com logo + "Radar do Jovem" — visível em desktop e mobile.
+---
 
-2. **Sidebar (topo):** Substituir o bloco atual de logo/título pelo widget do usuário (avatar ou ícone de status, nome, badge, ranking mensal) — o banner que hoje está na HomePage vai para o topo da sidebar (desktop) e para o header no mobile (como avatar clicável ou compacto).
+### Dimensão recomendada das imagens (Linha 1)
 
-3. **Rankings e fallback de avatar:** Quando o usuário não tem foto (`avatar_url`), usar o ícone de status (Target para Radar, Wine para outros) como fallback no Avatar, tanto na sidebar quanto na página de ranking.
+As imagens dos banners devem ser enviadas em **1200 × 500 px** (proporção 12:5). Isso garante boa resolução em desktop e boa proporção em mobile. Formato: JPG ou WebP.
 
-### Detalhes das mudanças
+---
 
-#### `src/components/AppLayout.tsx`
-- **Header (desktop + mobile):** Adicionar uma barra fixa no topo com `bg-primary text-white`, contendo logo + "Radar do Jovem". No mobile, manter o botão de menu hambúrguer nesse header.
-- **Sidebar (topo, desktop):** Remover o bloco logo/título. No lugar, colocar um mini-card do usuário com: avatar (foto ou ícone de status como fallback), nome, badge de membership e ranking mensal. Buscar esses dados via `profiles`, `memberships` e `get_rankings` RPC (mesmo padrão da HomePage).
-- **Mobile:** No header, ao lado do logo, colocar o avatar compacto do usuário (foto ou ícone de status).
+### Mudanças necessárias
 
-#### `src/pages/HomePage.tsx`
-- Remover o banner de saudação (seção "Greeting Banner"), já que essas informações estarão permanentemente na sidebar/header.
+#### 1. Nova tabela `home_banners` (migration)
 
-#### `src/pages/RankingPage.tsx`
-- No `AvatarFallback` do pódio e da tabela, ao invés de mostrar iniciais em texto, mostrar o ícone de status (Target/Wine) baseado no `membership_type` do entry.
+```sql
+CREATE TABLE public.home_banners (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  image_url text NOT NULL,
+  link_url text,
+  sort_order integer NOT NULL DEFAULT 0,
+  is_active boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
 
-#### `src/components/MemberBadge.tsx`
-- Sem alterações, será reutilizado.
+ALTER TABLE public.home_banners ENABLE ROW LEVEL SECURITY;
 
-### Arquivos modificados
-- `src/components/AppLayout.tsx` — header global + sidebar com user widget
-- `src/pages/HomePage.tsx` — remover greeting banner
-- `src/pages/RankingPage.tsx` — avatar fallback com ícone de status
+CREATE POLICY "Active members can view active banners"
+  ON public.home_banners FOR SELECT
+  TO authenticated
+  USING (is_active = true AND has_active_access(auth.uid()));
+
+CREATE POLICY "Admins can manage banners"
+  ON public.home_banners FOR ALL
+  TO authenticated
+  USING (has_role(auth.uid(), 'admin'::app_role));
+```
+
+#### 2. Nova aba "Banners" no Admin (`AdminPage.tsx`)
+
+- Criar componente `AdminBanners.tsx` com CRUD simples: listar banners, upload de imagem (bucket `wine-images` ou novo bucket), definir link opcional, reordenar, ativar/desativar.
+- Adicionar aba no `AdminPage.tsx`.
+
+#### 3. Reescrever `HomePage.tsx`
+
+**Linha 1 — Carrossel de Banners:**
+- Usar `embla-carousel-react` (já instalado).
+- Buscar `home_banners` ordenados por `sort_order`.
+- Desktop/tablet: mostrar 3 slides visíveis por vez.
+- Mobile: mostrar 1 slide por vez.
+- Dots ou setas de navegação.
+- Cada imagem pode ter link opcional (clicável).
+
+**Linha 2 — Carrossel de Vinhos Recentes:**
+- Query: 10 vinhos mais recentes (`status = 'curadoria'`, ordenados por `created_at DESC`, `LIMIT 10`).
+- Reutilizar o componente `WineCard` existente.
+- Desktop/tablet: 3 cards visíveis por vez, com scroll lateral.
+- Mobile: 1 card por vez.
+- Setas de navegação.
+
+#### 4. Arquivos envolvidos
+
+| Arquivo | Ação |
+|---------|------|
+| `src/pages/HomePage.tsx` | Reescrever completamente |
+| `src/components/admin/AdminBanners.tsx` | Criar (CRUD de banners) |
+| `src/pages/AdminPage.tsx` | Adicionar aba "Banners" |
+| Migration SQL | Criar tabela `home_banners` |
 
