@@ -137,7 +137,7 @@ export default function AppLayout() {
           </div>
           <span className="font-display text-xl tracking-wide">Radar do Jovem</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="absolute right-4 flex items-center gap-2">
           {/* Mobile: compact user avatar */}
           <div className="md:hidden">
             <UserWidget compact />
