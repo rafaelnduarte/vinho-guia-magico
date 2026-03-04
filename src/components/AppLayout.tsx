@@ -142,6 +142,10 @@ export default function AppLayout() {
     <div className="flex flex-col min-h-[100dvh] bg-background">
       {/* Global header */}
       <header className="sticky top-0 z-40 flex items-center justify-center px-4 h-16 bg-primary text-primary-foreground shrink-0 relative">
+        {/* Mobile: compact user avatar — left side */}
+        <div className="absolute left-4 md:hidden">
+          <UserWidget compact />
+        </div>
         <div className="flex items-center gap-3">
           <div className="h-9 w-9 rounded-full bg-white/90 p-0.5 flex items-center justify-center shrink-0">
             <img src={logoJovem} alt="Jovem do Vinho" className="h-full w-full object-contain" />
@@ -149,10 +153,6 @@ export default function AppLayout() {
           <span className="font-display text-xl tracking-wide">Radar do Jovem</span>
         </div>
         <div className="absolute right-4 flex items-center gap-2">
-          {/* Mobile: compact user avatar */}
-          <div className="md:hidden">
-            <UserWidget compact />
-          </div>
           <Button
             variant="ghost"
             size="icon"
