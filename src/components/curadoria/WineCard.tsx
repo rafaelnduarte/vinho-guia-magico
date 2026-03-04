@@ -43,7 +43,7 @@ export default function WineCard({ wine, likeCount = 0, commentCount = 0, isArch
       className="group flex flex-col h-full"
     >
       {/* Image — tall bottle format, no box */}
-      <div className="relative flex items-end justify-center h-48 sm:h-64 mb-2">
+      <div className="relative flex items-end justify-center h-48 sm:h-64 mb-2 bg-card rounded-xl overflow-hidden">
         {wine.image_url ? (
           <img
             src={wine.image_url}
@@ -59,7 +59,7 @@ export default function WineCard({ wine, likeCount = 0, commentCount = 0, isArch
 
         {/* Seals floating */}
         {(drinkerIcon || wineIcon) && (
-          <div className="absolute top-0 right-0 flex flex-col gap-0.5">
+          <div className="absolute top-1.5 right-1.5 flex flex-col gap-1">
             {drinkerIcon && (
               <img
                 src={drinkerIcon}
