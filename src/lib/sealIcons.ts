@@ -20,5 +20,6 @@ export const sealIcons: Record<string, string> = {
 
 export function getSealIcon(iconKey: string | null): string | undefined {
   if (!iconKey) return undefined;
-  return sealIcons[iconKey.toLowerCase()];
+  const normalized = iconKey.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return sealIcons[normalized];
 }
