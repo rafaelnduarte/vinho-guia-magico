@@ -43,12 +43,12 @@ export default function WineCard({ wine, likeCount = 0, commentCount = 0, isArch
       className="group flex flex-col h-full"
     >
       {/* Image — tall bottle format, no box */}
-      <div className="relative flex items-end justify-center h-48 sm:h-64 mb-2 bg-card rounded-xl overflow-hidden">
+      <div className="relative flex items-end justify-center h-48 sm:h-64 mb-2">
         {wine.image_url ? (
           <img
             src={wine.image_url}
             alt={wine.name}
-            className="h-full w-auto object-contain drop-shadow-[0_4px_12px_rgba(0,0,0,0.15)] group-hover:scale-105 transition-transform duration-300"
+            className="h-full w-auto object-contain rounded-xl drop-shadow-[0_4px_12px_rgba(0,0,0,0.15)] group-hover:scale-105 transition-transform duration-300"
             loading="lazy"
           />
         ) : (

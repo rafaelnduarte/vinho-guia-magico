@@ -160,8 +160,8 @@ export default function HomePage() {
         const sealMap: Record<string, { wine_type: string; drinker_type: string }> = {};
         wineSeals?.forEach((ws: any) => {
           if (!sealMap[ws.wine_id]) sealMap[ws.wine_id] = { wine_type: "", drinker_type: "" };
-          if (ws.seals?.category === "tipo_vinho") sealMap[ws.wine_id].wine_type = ws.seals.name;
-          if (ws.seals?.category === "tipo_bebedor") sealMap[ws.wine_id].drinker_type = ws.seals.name;
+          if (ws.seals?.category === "perfil_vinho") sealMap[ws.wine_id].wine_type = ws.seals.name;
+          if (ws.seals?.category === "perfil_cliente") sealMap[ws.wine_id].drinker_type = ws.seals.name;
         });
 
         const { data: votes } = await supabase.from("wine_votes").select("wine_id").in("wine_id", ids);
