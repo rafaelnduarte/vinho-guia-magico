@@ -148,7 +148,7 @@ export default function AdminBanners() {
             <img
               src={b.image_url}
               alt="Banner"
-              className="w-full sm:w-40 aspect-[12/5] object-cover rounded-lg"
+              className="w-full sm:w-40 aspect-[4/5] object-cover rounded-lg"
             />
             <div className="flex-1 min-w-0 space-y-1.5 w-full">
               <Input

@@ -98,7 +98,7 @@ function useCarouselNav(emblaApi: ReturnType<typeof useEmblaCarousel>[1]) {
 
 function BannerPlaceholder() {
   return (
-    <div className="rounded-lg bg-muted border border-border aspect-[12/5] flex items-center justify-center">
+    <div className="rounded-lg bg-muted border border-border aspect-[4/5] flex items-center justify-center">
       <ImageIcon className="h-8 w-8 text-muted-foreground/40" />
     </div>
   );
@@ -215,7 +215,7 @@ export default function HomePage() {
                       <img
                         src={b.image_url}
                         alt="Banner"
-                        className="rounded-lg object-cover w-full aspect-[12/5]"
+                        className="rounded-lg object-cover w-full aspect-[4/5]"
                         loading="lazy"
                       />
                     </a>
@@ -223,7 +223,7 @@ export default function HomePage() {
                     <img
                       src={b.image_url}
                       alt="Banner"
-                      className="rounded-lg object-cover w-full aspect-[12/5]"
+                      className="rounded-lg object-cover w-full aspect-[4/5]"
                       loading="lazy"
                     />
                   )
