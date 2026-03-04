@@ -8,6 +8,7 @@ import AdminMembers from "@/components/admin/AdminMembers";
 import AdminAnalytics from "@/components/admin/AdminAnalytics";
 import AdminTutorials from "@/components/admin/AdminTutorials";
 import AdminChat from "@/components/admin/AdminChat";
+import AdminBanners from "@/components/admin/AdminBanners";
 
 export default function AdminPage() {
   return (
@@ -21,6 +22,7 @@ export default function AdminPage() {
         <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
           <TabsList className="inline-flex w-auto min-w-full sm:min-w-0 h-auto p-1 gap-0.5">
             <TabsTrigger value="analytics" className="text-xs sm:text-sm px-3 py-2">Analytics</TabsTrigger>
+            <TabsTrigger value="banners" className="text-xs sm:text-sm px-3 py-2">Banners</TabsTrigger>
             <TabsTrigger value="wines" className="text-xs sm:text-sm px-3 py-2">Vinhos</TabsTrigger>
             <TabsTrigger value="members" className="text-xs sm:text-sm px-3 py-2">Membros</TabsTrigger>
             <TabsTrigger value="partners" className="text-xs sm:text-sm px-3 py-2">Parceiros</TabsTrigger>
@@ -32,6 +34,9 @@ export default function AdminPage() {
 
         <TabsContent value="analytics">
           <AdminAnalytics />
+        </TabsContent>
+        <TabsContent value="banners">
+          <AdminBanners />
         </TabsContent>
         <TabsContent value="wines">
           <AdminWines />
