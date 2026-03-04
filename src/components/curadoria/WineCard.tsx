@@ -1,17 +1,14 @@
 import { Wine, ThumbsUp, MessageCircle, Grape } from "lucide-react";
-
-function formatPrice(raw: string): string {
-  // Strip any existing R$ / RS / r$ prefix and whitespace
-  const cleaned = raw.replace(/^R\$\s*/i, "").trim();
-  // If it looks like a plain number (e.g. "535.0"), format it
-  const num = parseFloat(cleaned.replace(",", "."));
-  if (!isNaN(num)) return `R$${num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  // Already formatted — just ensure single R$ prefix
-  return cleaned.startsWith("R$") ? cleaned : `R$${cleaned}`;
-}
 import { Link } from "react-router-dom";
 import { getSealIcon } from "@/lib/sealIcons";
 import { Badge } from "@/components/ui/badge";
+
+function formatPrice(raw: string): string {
+  const cleaned = raw.replace(/^R\$\s*/i, "").trim();
+  const num = parseFloat(cleaned.replace(",", "."));
+  if (!isNaN(num)) return `R$${num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return cleaned.startsWith("R$") ? cleaned : `R$${cleaned}`;
+}
 
 export interface MockWine {
   id: string;
@@ -43,48 +40,48 @@ export default function WineCard({ wine, likeCount = 0, commentCount = 0, isArch
   return (
     <Link
       to={`/curadoria/${wine.id}`}
-      className="group flex flex-col h-full hover:opacity-90 transition-opacity"
+      className="group flex flex-col h-full"
     >
-      {/* Image area — fixed height, centered, uniform bg */}
-      <div className="relative bg-muted/30 rounded-lg overflow-hidden">
-        <div className="h-40 sm:h-52 flex items-center justify-center p-2">
-          {wine.image_url ? (
-            <img
-              src={wine.image_url}
-              alt={wine.name}
-              className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-300"
-              loading="lazy"
-            />
-          ) : (
-            <Wine className="h-12 w-12 text-muted-foreground/30" />
-          )}
-        </div>
+      {/* Image — tall bottle format, no box */}
+      <div className="relative flex items-end justify-center h-48 sm:h-64 mb-2">
+        {wine.image_url ? (
+          <img
+            src={wine.image_url}
+            alt={wine.name}
+            className="h-full w-auto object-contain drop-shadow-[0_4px_12px_rgba(0,0,0,0.15)] group-hover:scale-105 transition-transform duration-300"
+            loading="lazy"
+          />
+        ) : (
+          <div className="h-full flex items-center justify-center">
+            <Wine className="h-14 w-14 text-muted-foreground/20" />
+          </div>
+        )}
 
-        {/* Seals floating top-right */}
+        {/* Seals floating */}
         {(drinkerIcon || wineIcon) && (
-          <div className="absolute top-1 right-1 flex flex-col gap-0.5">
+          <div className="absolute top-0 right-0 flex flex-col gap-0.5">
             {drinkerIcon && (
               <img
                 src={drinkerIcon}
                 alt={wine.seal_drinker_type}
-                className="h-8 w-8 sm:h-10 sm:w-10 drop-shadow-md"
+                className="h-7 w-7 sm:h-9 sm:w-9 drop-shadow-md"
               />
             )}
             {wineIcon && (
               <img
                 src={wineIcon}
                 alt={wine.seal_wine_type}
-                className="h-8 w-8 sm:h-10 sm:w-10 drop-shadow-md"
+                className="h-7 w-7 sm:h-9 sm:w-9 drop-shadow-md"
               />
             )}
           </div>
         )}
       </div>
 
-      {/* Content — compact */}
-      <div className="flex-1 pt-1.5 sm:pt-2 flex flex-col min-w-0">
+      {/* Info — clean, minimal */}
+      <div className="flex-1 flex flex-col min-w-0 px-0.5">
         <div className="flex items-center gap-1 mb-0.5">
-          <h3 className="font-sans font-semibold text-xs sm:text-sm text-foreground leading-tight group-hover:text-primary transition-colors truncate">
+          <h3 className="font-sans font-semibold text-xs sm:text-sm text-foreground leading-tight group-hover:text-primary transition-colors line-clamp-2">
             {wine.name}
           </h3>
           {isArchive && <Badge variant="secondary" className="text-[9px] px-1 py-0 shrink-0">Acervo</Badge>}
@@ -93,11 +90,11 @@ export default function WineCard({ wine, likeCount = 0, commentCount = 0, isArch
           {wine.producer} {wine.vintage ? `· ${wine.vintage}` : ""}
         </p>
         {wine.grape && (
-          <p className="text-[10px] sm:text-xs text-muted-foreground/70 mb-0.5 truncate flex items-center gap-1">
+          <p className="text-[10px] sm:text-xs text-muted-foreground/70 mb-1 truncate flex items-center gap-1">
             <Grape className="h-2.5 w-2.5 shrink-0" /> {wine.grape}
           </p>
         )}
-        <div className="flex items-center justify-between mt-auto pt-1 sm:pt-1.5 border-t border-border/50 gap-1">
+        <div className="flex items-center justify-between mt-auto pt-1.5 border-t border-border/40 gap-1">
           <span className="text-[10px] sm:text-xs text-muted-foreground truncate">{wine.type} · {wine.country}</span>
           <div className="flex items-center gap-1.5 shrink-0">
             {likeCount > 0 && (
@@ -110,7 +107,7 @@ export default function WineCard({ wine, likeCount = 0, commentCount = 0, isArch
                 <MessageCircle className="h-2.5 w-2.5" /> {commentCount}
               </span>
             )}
-            {wine.price && <span className="text-[11px] sm:text-xs font-medium text-foreground">{formatPrice(wine.price)}</span>}
+            {wine.price && <span className="text-[11px] sm:text-xs font-semibold text-foreground">{formatPrice(wine.price)}</span>}
           </div>
         </div>
       </div>
