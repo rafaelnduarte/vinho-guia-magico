@@ -247,7 +247,7 @@ export default function HomePage() {
       {/* Linha 2 — Vinhos Recentes */}
       <section className="px-3 sm:px-4 relative">
         <h2 className="font-display text-lg sm:text-xl text-foreground mb-3 sm:mb-4">
-          Últimas adições
+          Novidades no Radar
         </h2>
         <div className="overflow-hidden" ref={wineRef}>
           <div className="flex gap-3">
