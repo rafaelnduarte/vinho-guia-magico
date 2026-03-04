@@ -130,12 +130,12 @@ export default function AppLayout() {
   return (
     <div className="flex flex-col min-h-[100dvh] bg-background">
       {/* Global header */}
-      <header className="sticky top-0 z-40 flex items-center justify-between px-4 h-12 bg-primary text-primary-foreground shrink-0">
-        <div className="flex items-center gap-2.5">
-          <div className="h-7 w-7 rounded-full bg-white/90 p-0.5 flex items-center justify-center shrink-0">
+      <header className="sticky top-0 z-40 flex items-center justify-center px-4 h-16 bg-primary text-primary-foreground shrink-0 relative">
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 rounded-full bg-white/90 p-0.5 flex items-center justify-center shrink-0">
             <img src={logoJovem} alt="Jovem do Vinho" className="h-full w-full object-contain" />
           </div>
-          <span className="font-display text-base">Radar do Jovem</span>
+          <span className="font-display text-xl tracking-wide">Radar do Jovem</span>
         </div>
         <div className="flex items-center gap-2">
           {/* Mobile: compact user avatar */}
