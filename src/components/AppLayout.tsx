@@ -124,7 +124,7 @@ export default function AppLayout() {
           <div className="flex flex-col min-w-0 flex-1">
             <span className="font-display text-sm text-white truncate">{firstName}</span>
             <div className="flex items-center gap-2 mt-1">
-              <MemberBadge type={badgeType} className="text-[10px] px-1.5 py-0" />
+              <MemberBadge type={badgeType} variant="light" className="text-[10px] px-1.5 py-0" />
             </div>
           </div>
           {rankPosition != null && (
