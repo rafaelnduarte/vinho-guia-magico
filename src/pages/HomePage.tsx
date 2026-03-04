@@ -1,6 +1,6 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import useEmblaCarousel from "embla-carousel-react";
-import { ChevronLeft, ChevronRight, Wine } from "lucide-react";
+import { ChevronLeft, ChevronRight, Wine, ImageIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import WineCard from "@/components/curadoria/WineCard";
 import type { MockWine } from "@/components/curadoria/WineCard";
@@ -12,24 +12,56 @@ interface Banner {
   sort_order: number;
 }
 
-function CarouselArrows({ onPrev, onNext, canPrev, canNext }: { onPrev: () => void; onNext: () => void; canPrev: boolean; canNext: boolean }) {
+const PLACEHOLDER_BANNERS: Banner[] = [
+  { id: "p1", image_url: "", link_url: null, sort_order: 0 },
+  { id: "p2", image_url: "", link_url: null, sort_order: 1 },
+  { id: "p3", image_url: "", link_url: null, sort_order: 2 },
+];
+
+const PLACEHOLDER_WINES: MockWine[] = Array.from({ length: 6 }, (_, i) => ({
+  id: `placeholder-${i}`,
+  name: `Vinho Exemplo ${i + 1}`,
+  producer: "Produtor",
+  vintage: 2023,
+  grape: "Uva",
+  type: "Tinto",
+  country: "Portugal",
+  importer: "",
+  price: "R$120,00",
+  image_url: "",
+  tasting_notes: "",
+  seal_wine_type: "",
+  seal_drinker_type: "",
+}));
+
+function CarouselArrows({
+  onPrev,
+  onNext,
+  canPrev,
+  canNext,
+}: {
+  onPrev: () => void;
+  onNext: () => void;
+  canPrev: boolean;
+  canNext: boolean;
+}) {
   return (
     <>
       <button
         onClick={onPrev}
         disabled={!canPrev}
-        className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-background/80 backdrop-blur rounded-full p-1.5 shadow-md border border-border disabled:opacity-30 transition-opacity"
+        className="absolute left-1 top-1/2 -translate-y-1/2 z-10 bg-background/80 backdrop-blur rounded-full p-1 shadow border border-border disabled:opacity-20 transition-opacity"
         aria-label="Anterior"
       >
-        <ChevronLeft className="h-5 w-5 text-foreground" />
+        <ChevronLeft className="h-4 w-4 text-foreground" />
       </button>
       <button
         onClick={onNext}
         disabled={!canNext}
-        className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-background/80 backdrop-blur rounded-full p-1.5 shadow-md border border-border disabled:opacity-30 transition-opacity"
+        className="absolute right-1 top-1/2 -translate-y-1/2 z-10 bg-background/80 backdrop-blur rounded-full p-1 shadow border border-border disabled:opacity-20 transition-opacity"
         aria-label="Próximo"
       >
-        <ChevronRight className="h-5 w-5 text-foreground" />
+        <ChevronRight className="h-4 w-4 text-foreground" />
       </button>
     </>
   );
@@ -64,11 +96,20 @@ function useCarouselNav(emblaApi: ReturnType<typeof useEmblaCarousel>[1]) {
   };
 }
 
+function BannerPlaceholder() {
+  return (
+    <div className="rounded-lg bg-muted border border-border aspect-[12/5] flex items-center justify-center">
+      <ImageIcon className="h-8 w-8 text-muted-foreground/40" />
+    </div>
+  );
+}
+
 export default function HomePage() {
   const [banners, setBanners] = useState<Banner[]>([]);
   const [wines, setWines] = useState<MockWine[]>([]);
   const [voteCounts, setVoteCounts] = useState<Record<string, number>>({});
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
+  const [loaded, setLoaded] = useState(false);
 
   const [bannerRef, bannerApi] = useEmblaCarousel({
     align: "start",
@@ -107,10 +148,9 @@ export default function HomePage() {
 
       if (bannersRes.data) setBanners(bannersRes.data);
 
-      if (winesRes.data) {
+      if (winesRes.data && winesRes.data.length > 0) {
         const ids = winesRes.data.map((w) => w.id);
 
-        // Fetch seals for these wines
         const { data: wineSeals } = await supabase
           .from("wine_seals")
           .select("wine_id, seal_id, seals(name, category)")
@@ -123,7 +163,6 @@ export default function HomePage() {
           if (ws.seals?.category === "tipo_bebedor") sealMap[ws.wine_id].drinker_type = ws.seals.name;
         });
 
-        // Fetch vote/comment counts
         const { data: votes } = await supabase.from("wine_votes").select("wine_id").in("wine_id", ids);
         const { data: comments } = await supabase.from("wine_comments").select("wine_id").in("wine_id", ids);
 
@@ -153,81 +192,94 @@ export default function HomePage() {
           }))
         );
       }
+      setLoaded(true);
     }
     load();
   }, []);
 
+  const displayBanners = banners.length > 0 ? banners : PLACEHOLDER_BANNERS;
+  const displayWines = wines.length > 0 ? wines : PLACEHOLDER_WINES;
+  const isPlaceholderWines = wines.length === 0;
+
   return (
-    <div className="animate-fade-in py-6 sm:py-10 space-y-8 sm:space-y-12 max-w-7xl mx-auto">
+    <div className="animate-fade-in py-4 sm:py-6 space-y-6 sm:space-y-8 max-w-5xl mx-auto">
       {/* Linha 1 — Banners */}
-      {banners.length > 0 && (
-        <section className="px-4 sm:px-6 relative">
-          <div className="overflow-hidden" ref={bannerRef}>
-            <div className="flex gap-4">
-              {banners.map((b) => {
-                const img = (
-                  <img
-                    key={b.id}
-                    src={b.image_url}
-                    alt="Banner"
-                    className="rounded-xl object-cover w-full aspect-[12/5]"
-                    loading="lazy"
-                  />
-                );
-                return (
-                  <div key={b.id} className="flex-[0_0_100%] md:flex-[0_0_calc(33.333%-11px)]">
-                    {b.link_url ? (
-                      <a href={b.link_url} target="_blank" rel="noopener noreferrer">
-                        {img}
-                      </a>
-                    ) : (
-                      img
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+      <section className="px-3 sm:px-4 relative">
+        <div className="overflow-hidden" ref={bannerRef}>
+          <div className="flex gap-3">
+            {displayBanners.map((b) => (
+              <div key={b.id} className="flex-[0_0_100%] md:flex-[0_0_calc(33.333%-8px)]">
+                {b.image_url ? (
+                  b.link_url ? (
+                    <a href={b.link_url} target="_blank" rel="noopener noreferrer">
+                      <img
+                        src={b.image_url}
+                        alt="Banner"
+                        className="rounded-lg object-cover w-full aspect-[12/5]"
+                        loading="lazy"
+                      />
+                    </a>
+                  ) : (
+                    <img
+                      src={b.image_url}
+                      alt="Banner"
+                      className="rounded-lg object-cover w-full aspect-[12/5]"
+                      loading="lazy"
+                    />
+                  )
+                ) : (
+                  <BannerPlaceholder />
+                )}
+              </div>
+            ))}
           </div>
-          {banners.length > 3 && (
-            <CarouselArrows
-              onPrev={() => bannerNav.scrollPrev()}
-              onNext={() => bannerNav.scrollNext()}
-              canPrev={bannerNav.canPrev}
-              canNext={bannerNav.canNext}
-            />
-          )}
-        </section>
-      )}
+        </div>
+        {displayBanners.length > 3 && (
+          <CarouselArrows
+            onPrev={() => bannerNav.scrollPrev()}
+            onNext={() => bannerNav.scrollNext()}
+            canPrev={bannerNav.canPrev}
+            canNext={bannerNav.canNext}
+          />
+        )}
+      </section>
 
       {/* Linha 2 — Vinhos Recentes */}
-      {wines.length > 0 && (
-        <section className="px-4 sm:px-6 relative">
-          <h2 className="font-display text-xl sm:text-2xl text-foreground mb-4 sm:mb-6">
-            Últimas adições
-          </h2>
-          <div className="overflow-hidden" ref={wineRef}>
-            <div className="flex gap-4">
-              {wines.map((w) => (
-                <div key={w.id} className="flex-[0_0_100%] md:flex-[0_0_calc(33.333%-11px)]">
-                  <WineCard
-                    wine={w}
-                    likeCount={voteCounts[w.id] || 0}
-                    commentCount={commentCounts[w.id] || 0}
-                  />
+      <section className="px-3 sm:px-4 relative">
+        <h2 className="font-display text-lg sm:text-xl text-foreground mb-3 sm:mb-4">
+          Últimas adições
+        </h2>
+        <div className="overflow-hidden" ref={wineRef}>
+          <div className="flex gap-3">
+            {displayWines.map((w) => (
+              <div key={w.id} className="flex-[0_0_100%] md:flex-[0_0_calc(33.333%-8px)]">
+                <div className="h-full">
+                  {isPlaceholderWines ? (
+                    <div className="rounded-lg border border-border bg-muted p-4 flex flex-col items-center justify-center aspect-[3/4]">
+                      <Wine className="h-10 w-10 text-muted-foreground/30 mb-2" />
+                      <span className="text-xs text-muted-foreground">{w.name}</span>
+                    </div>
+                  ) : (
+                    <WineCard
+                      wine={w}
+                      likeCount={voteCounts[w.id] || 0}
+                      commentCount={commentCounts[w.id] || 0}
+                    />
+                  )}
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
-          {wines.length > 3 && (
-            <CarouselArrows
-              onPrev={() => wineNav.scrollPrev()}
-              onNext={() => wineNav.scrollNext()}
-              canPrev={wineNav.canPrev}
-              canNext={wineNav.canNext}
-            />
-          )}
-        </section>
-      )}
+        </div>
+        {displayWines.length > 3 && (
+          <CarouselArrows
+            onPrev={() => wineNav.scrollPrev()}
+            onNext={() => wineNav.scrollNext()}
+            canPrev={wineNav.canPrev}
+            canNext={wineNav.canNext}
+          />
+        )}
+      </section>
     </div>
   );
 }
