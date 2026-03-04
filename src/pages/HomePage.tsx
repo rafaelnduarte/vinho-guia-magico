@@ -142,6 +142,7 @@ export default function HomePage() {
           .from("wines")
           .select("id, name, producer, vintage, grape, type, country, importer, price_range, image_url, tasting_notes, status")
           .eq("status", "curadoria")
+          .not("image_url", "is", null)
           .order("created_at", { ascending: false })
           .limit(10),
       ]);
