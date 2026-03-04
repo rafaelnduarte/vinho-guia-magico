@@ -43,74 +43,74 @@ export default function WineCard({ wine, likeCount = 0, commentCount = 0, isArch
   return (
     <Link
       to={`/curadoria/${wine.id}`}
-      className="group flex flex-col hover:opacity-90 transition-opacity"
+      className="group flex flex-col h-full hover:opacity-90 transition-opacity"
     >
-      {/* Image area with floating seals */}
-      <div className="relative">
-        <div className="aspect-[3/4] flex items-center justify-center overflow-hidden relative">
+      {/* Image area — fixed height, centered, uniform bg */}
+      <div className="relative bg-muted/30 rounded-lg overflow-hidden">
+        <div className="h-40 sm:h-52 flex items-center justify-center p-2">
           {wine.image_url ? (
             <img
               src={wine.image_url}
               alt={wine.name}
-              className="h-full w-full object-contain group-hover:scale-105 transition-transform duration-300"
+              className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-300"
               loading="lazy"
             />
           ) : (
-            <Wine className="h-16 w-16 text-muted-foreground/30" />
+            <Wine className="h-12 w-12 text-muted-foreground/30" />
           )}
         </div>
 
         {/* Seals floating top-right */}
         {(drinkerIcon || wineIcon) && (
-          <div className="absolute top-0 right-0 flex flex-col gap-1">
+          <div className="absolute top-1 right-1 flex flex-col gap-0.5">
             {drinkerIcon && (
               <img
                 src={drinkerIcon}
                 alt={wine.seal_drinker_type}
-                className="h-10 w-10 sm:h-14 sm:w-14 drop-shadow-md"
+                className="h-8 w-8 sm:h-10 sm:w-10 drop-shadow-md"
               />
             )}
             {wineIcon && (
               <img
                 src={wineIcon}
                 alt={wine.seal_wine_type}
-                className="h-10 w-10 sm:h-14 sm:w-14 drop-shadow-md"
+                className="h-8 w-8 sm:h-10 sm:w-10 drop-shadow-md"
               />
             )}
           </div>
         )}
       </div>
 
-      {/* Content */}
-      <div className="flex-1 pt-2 sm:pt-3 flex flex-col min-w-0">
-        <div className="flex items-center gap-1.5 mb-0.5 sm:mb-1">
-          <h3 className="font-sans font-semibold text-sm sm:text-base text-foreground leading-tight group-hover:text-primary transition-colors truncate">
+      {/* Content — compact */}
+      <div className="flex-1 pt-1.5 sm:pt-2 flex flex-col min-w-0">
+        <div className="flex items-center gap-1 mb-0.5">
+          <h3 className="font-sans font-semibold text-xs sm:text-sm text-foreground leading-tight group-hover:text-primary transition-colors truncate">
             {wine.name}
           </h3>
-          {isArchive && <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Acervo</Badge>}
+          {isArchive && <Badge variant="secondary" className="text-[9px] px-1 py-0 shrink-0">Acervo</Badge>}
         </div>
-        <p className="text-[11px] sm:text-xs text-muted-foreground mb-1 sm:mb-2 truncate">
+        <p className="text-[10px] sm:text-xs text-muted-foreground mb-0.5 truncate">
           {wine.producer} {wine.vintage ? `· ${wine.vintage}` : ""}
         </p>
         {wine.grape && (
-          <p className="text-[10px] sm:text-xs text-muted-foreground/70 mb-1 truncate flex items-center gap-1">
-            <Grape className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" /> {wine.grape}
+          <p className="text-[10px] sm:text-xs text-muted-foreground/70 mb-0.5 truncate flex items-center gap-1">
+            <Grape className="h-2.5 w-2.5 shrink-0" /> {wine.grape}
           </p>
         )}
-        <div className="flex items-center justify-between mt-auto pt-1.5 sm:pt-2 border-t border-border/50 gap-1">
+        <div className="flex items-center justify-between mt-auto pt-1 sm:pt-1.5 border-t border-border/50 gap-1">
           <span className="text-[10px] sm:text-xs text-muted-foreground truncate">{wine.type} · {wine.country}</span>
           <div className="flex items-center gap-1.5 shrink-0">
             {likeCount > 0 && (
-              <span className="flex items-center gap-0.5 text-[10px] sm:text-xs text-muted-foreground">
-                <ThumbsUp className="h-2.5 w-2.5 sm:h-3 sm:w-3" /> {likeCount}
+              <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
+                <ThumbsUp className="h-2.5 w-2.5" /> {likeCount}
               </span>
             )}
             {commentCount > 0 && (
-              <span className="flex items-center gap-0.5 text-[10px] sm:text-xs text-muted-foreground">
-                <MessageCircle className="h-2.5 w-2.5 sm:h-3 sm:w-3" /> {commentCount}
+              <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
+                <MessageCircle className="h-2.5 w-2.5" /> {commentCount}
               </span>
             )}
-            {wine.price && <span className="text-xs sm:text-sm font-medium text-foreground">{formatPrice(wine.price)}</span>}
+            {wine.price && <span className="text-[11px] sm:text-xs font-medium text-foreground">{formatPrice(wine.price)}</span>}
           </div>
         </div>
       </div>
