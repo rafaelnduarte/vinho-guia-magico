@@ -103,28 +103,39 @@ export default function AppLayout() {
 
   // ─── User widget (sidebar top + mobile header) ───
   const UserWidget = ({ compact = false }: { compact?: boolean }) => (
-    <div className={cn("flex items-center gap-3", compact ? "" : "px-4 py-4")}>
-      <Avatar className={cn(compact ? "h-8 w-8" : "h-11 w-11")}>
-        <AvatarImage src={avatarUrl || undefined} />
-        <AvatarFallback className="bg-accent/20 border border-accent/40">
-          <StatusIcon membershipType={membershipType} />
-        </AvatarFallback>
-      </Avatar>
-      {!compact && (
-        <div className="flex flex-col min-w-0 flex-1">
-          <span className="font-display text-sm truncate">{firstName}</span>
-          <div className="flex items-center gap-2 mt-0.5">
-            <MemberBadge type={badgeType} className="text-[10px] px-1.5 py-0" />
-            {rankPosition != null && (
-              <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
-                <Trophy className="h-3 w-3 text-accent" />
-                #{rankPosition}
-              </span>
-            )}
+    compact ? (
+      <div className="flex items-center gap-3">
+        <Avatar className="h-8 w-8">
+          <AvatarImage src={avatarUrl || undefined} />
+          <AvatarFallback className="bg-accent/20 border border-accent/40">
+            <StatusIcon membershipType={membershipType} />
+          </AvatarFallback>
+        </Avatar>
+      </div>
+    ) : (
+      <div className="mx-3 my-4 rounded-xl bg-secondary p-4 shadow-lg border border-white/5">
+        <div className="flex items-center gap-3">
+          <Avatar className="h-12 w-12 ring-2 ring-accent/40 ring-offset-2 ring-offset-secondary">
+            <AvatarImage src={avatarUrl || undefined} />
+            <AvatarFallback className="bg-accent/20 border border-accent/40">
+              <StatusIcon membershipType={membershipType} />
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex flex-col min-w-0 flex-1">
+            <span className="font-display text-sm text-white truncate">{firstName}</span>
+            <div className="flex items-center gap-2 mt-1">
+              <MemberBadge type={badgeType} className="text-[10px] px-1.5 py-0" />
+            </div>
           </div>
+          {rankPosition != null && (
+            <div className="flex flex-col items-center justify-center bg-accent/15 rounded-lg px-3 py-1.5 border border-accent/30">
+              <Trophy className="h-4 w-4 text-accent mb-0.5" />
+              <span className="text-xs font-bold text-accent">#{rankPosition}</span>
+            </div>
+          )}
         </div>
-      )}
-    </div>
+      </div>
+    )
   );
 
   return (
