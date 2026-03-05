@@ -273,18 +273,17 @@ export default function AdminAnalytics() {
         </div>
       </div>
       <div className="flex gap-1 flex-wrap">
-          {(Object.keys(PERIOD_LABELS) as Period[]).map((p) => (
-            <Button
-              key={p}
-              variant={period === p ? "default" : "outline"}
-              size="sm"
-              onClick={() => setPeriod(p)}
-              className="text-xs"
-            >
-              {PERIOD_LABELS[p]}
-            </Button>
-          ))}
-        </div>
+        {(Object.keys(PERIOD_LABELS) as Period[]).map((p) => (
+          <Button
+            key={p}
+            variant={period === p ? "default" : "outline"}
+            size="sm"
+            onClick={() => setPeriod(p)}
+            className="text-xs"
+          >
+            {PERIOD_LABELS[p]}
+          </Button>
+        ))}
       </div>
 
       {/* Filters bar */}
