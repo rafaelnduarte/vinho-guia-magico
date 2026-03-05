@@ -5,7 +5,8 @@ import { Badge } from "@/components/ui/badge";
 
 function formatPrice(raw: string): string {
   const cleaned = raw.replace(/^R\$\s*/i, "").trim();
-  const num = parseFloat(cleaned.replace(",", "."));
+  // Remove thousands separator (.) then swap decimal comma for dot
+  const num = parseFloat(cleaned.replace(/\./g, "").replace(",", "."));
   if (!isNaN(num)) return `R$${num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   return cleaned.startsWith("R$") ? cleaned : `R$${cleaned}`;
 }
