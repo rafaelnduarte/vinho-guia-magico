@@ -229,6 +229,20 @@ export default function AdminPartners() {
               <Input value={form.name} onChange={(e) => setField("name", e.target.value)} required />
             </div>
 
+            <div className="space-y-1">
+              <Label>Categoria *</Label>
+              <Select value={form.category} onValueChange={(v) => setField("category", v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CATEGORY_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Logo upload area */}
             <div className="space-y-2">
               <Label>Logo</Label>
