@@ -14,8 +14,9 @@ import {
 } from "@/components/ui/select";
 import {
   BarChart3, Eye, Filter, Wine, Users, Clock, Loader2,
-  Search, ThumbsUp, ThumbsDown, MessageSquare, User,
+  Search, ThumbsUp, ThumbsDown, MessageSquare, User, Download,
 } from "lucide-react";
+import { exportToCsv } from "@/lib/exportCsv";
 
 type Period = "7d" | "30d" | "90d" | "mtd" | "all";
 
@@ -255,19 +256,34 @@ export default function AdminAnalytics() {
           <BarChart3 className="h-5 w-5" />
           Analytics
         </h2>
-        <div className="flex gap-1 flex-wrap">
-          {(Object.keys(PERIOD_LABELS) as Period[]).map((p) => (
-            <Button
-              key={p}
-              variant={period === p ? "default" : "outline"}
-              size="sm"
-              onClick={() => setPeriod(p)}
-              className="text-xs"
-            >
-              {PERIOD_LABELS[p]}
-            </Button>
-          ))}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="outline" size="sm" className="gap-2" onClick={() => {
+            const headers = ["Tipo de Evento", "Página", "User ID", "Data", "Metadata"];
+            const rows = filteredEvents.map((e) => [
+              formatEventType(e.event_type),
+              e.page || "",
+              e.user_id ? (profileMap[e.user_id] || e.user_id.slice(0, 8)) : "",
+              new Date(e.created_at).toLocaleString("pt-BR"),
+              e.metadata ? JSON.stringify(e.metadata) : "",
+            ]);
+            exportToCsv(`analytics-${period}-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+          }}>
+            <Download className="h-4 w-4" /> Exportar
+          </Button>
         </div>
+      </div>
+      <div className="flex gap-1 flex-wrap">
+        {(Object.keys(PERIOD_LABELS) as Period[]).map((p) => (
+          <Button
+            key={p}
+            variant={period === p ? "default" : "outline"}
+            size="sm"
+            onClick={() => setPeriod(p)}
+            className="text-xs"
+          >
+            {PERIOD_LABELS[p]}
+          </Button>
+        ))}
       </div>
 
       {/* Filters bar */}

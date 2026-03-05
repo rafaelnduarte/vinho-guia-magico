@@ -10,10 +10,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Wine, Loader2, Link2, Upload } from "lucide-react";
+import { Plus, Pencil, Trash2, Wine, Loader2, Link2, Upload, Download, Search } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import CsvImportDialog, { type CsvColumn, type CsvImportResult } from "./CsvImportDialog";
 import { supabase as supabaseClient } from "@/integrations/supabase/client";
+import { exportToCsv } from "@/lib/exportCsv";
 
 type WineRow = Tables<"wines">;
 
@@ -66,6 +67,10 @@ export default function AdminWines() {
   const [form, setForm] = useState<WineForm>(emptyForm);
   const [sealDialogWineId, setSealDialogWineId] = useState<string | null>(null);
   const [csvOpen, setCsvOpen] = useState(false);
+  const [wineSearch, setWineSearch] = useState("");
+  const [wineTypeFilter, setWineTypeFilter] = useState("all");
+  const [wineCountryFilter, setWineCountryFilter] = useState("all");
+  const [wineStatusFilter, setWineStatusFilter] = useState("all");
 
   const wineColumns: CsvColumn[] = [
     { key: "vinho", label: "VINHO", required: true },
@@ -358,16 +363,75 @@ export default function AdminWines() {
   const sealsForWine = (wineId: string) =>
     wineSeals?.filter((ws) => ws.wine_id === wineId).map((ws) => ws.seal_id) ?? [];
 
+  // Unique values for filters
+  const allWineTypes = [...new Set(wines?.map((w) => w.type).filter(Boolean) ?? [])].sort();
+  const allCountries = [...new Set(wines?.map((w) => w.country).filter(Boolean) ?? [])].sort();
+
+  const filteredWines = (wines ?? []).filter((w) => {
+    if (wineStatusFilter !== "all" && (w as any).status !== wineStatusFilter) return false;
+    if (wineTypeFilter !== "all" && w.type !== wineTypeFilter) return false;
+    if (wineCountryFilter !== "all" && w.country !== wineCountryFilter) return false;
+    if (wineSearch) {
+      const q = wineSearch.toLowerCase();
+      if (!w.name.toLowerCase().includes(q) && !w.producer?.toLowerCase().includes(q) && !w.grape?.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+
+  const handleExportWines = () => {
+    const headers = ["Nome", "Produtor", "Safra", "Uva", "Tipo", "País", "Região", "Importadora", "Preço", "Status"];
+    const rows = filteredWines.map((w) => [
+      w.name, w.producer || "", w.vintage?.toString() || "", w.grape || "",
+      w.type || "", w.country || "", w.region || "", w.importer || "",
+      w.price_range || "", (w as any).status || "",
+    ]);
+    exportToCsv(`vinhos-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold text-foreground">Vinhos ({wines?.length ?? 0})</h2>
+        <h2 className="text-lg font-semibold text-foreground">Vinhos ({filteredWines.length}{filteredWines.length !== (wines?.length ?? 0) ? ` / ${wines?.length}` : ""})</h2>
         <div className="flex gap-2">
+          <Button onClick={handleExportWines} variant="outline" size="sm" className="gap-2 text-xs sm:text-sm">
+            <Download className="h-4 w-4" /> Exportar
+          </Button>
           <Button onClick={() => setCsvOpen(true)} variant="outline" size="sm" className="gap-2 text-xs sm:text-sm">
             <Upload className="h-4 w-4" /> Importar CSV
           </Button>
           <Button onClick={openNew} size="sm" className="gap-2 text-xs sm:text-sm"><Plus className="h-4 w-4" /> Novo Vinho</Button>
         </div>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Buscar por nome, produtor, uva..." value={wineSearch} onChange={(e) => setWineSearch(e.target.value)} className="pl-9" />
+        </div>
+        <Select value={wineTypeFilter} onValueChange={setWineTypeFilter}>
+          <SelectTrigger className="w-full sm:w-40"><SelectValue placeholder="Tipo" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os tipos</SelectItem>
+            {allWineTypes.map((t) => <SelectItem key={t!} value={t!}>{t}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={wineCountryFilter} onValueChange={setWineCountryFilter}>
+          <SelectTrigger className="w-full sm:w-40"><SelectValue placeholder="País" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os países</SelectItem>
+            {allCountries.map((c) => <SelectItem key={c!} value={c!}>{c}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={wineStatusFilter} onValueChange={setWineStatusFilter}>
+          <SelectTrigger className="w-full sm:w-40"><SelectValue placeholder="Status" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os status</SelectItem>
+            <SelectItem value="curadoria">Curadoria</SelectItem>
+            <SelectItem value="acervo">Acervo</SelectItem>
+            <SelectItem value="rascunho">Rascunho</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {isLoading ? (
@@ -387,7 +451,7 @@ export default function AdminWines() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {wines?.map((w) => (
+                {filteredWines.map((w) => (
                   <tr key={w.id} className="hover:bg-muted/30">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
@@ -431,8 +495,8 @@ export default function AdminWines() {
                     </td>
                   </tr>
                 ))}
-                {wines?.length === 0 && (
-                  <tr><td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">Nenhum vinho cadastrado.</td></tr>
+                {filteredWines.length === 0 && (
+                  <tr><td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">Nenhum vinho encontrado.</td></tr>
                 )}
               </tbody>
             </table>

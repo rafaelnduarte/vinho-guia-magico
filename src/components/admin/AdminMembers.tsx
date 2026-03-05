@@ -8,9 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, Loader2, Users, Plus, Search, ArrowLeft, BarChart3, KeyRound, Pencil, Clock, ThumbsUp, MessageSquare, Eye } from "lucide-react";
+import { Upload, Loader2, Users, Plus, Search, ArrowLeft, BarChart3, KeyRound, Pencil, Clock, ThumbsUp, MessageSquare, Eye, Download } from "lucide-react";
 import CsvImportDialog, { type CsvColumn, type CsvImportResult } from "./CsvImportDialog";
 import MemberBadge from "@/components/MemberBadge";
+import { exportToCsv } from "@/lib/exportCsv";
 
 const memberColumns: CsvColumn[] = [
   { key: "email", label: "Email", required: true, validate: (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? null : "Email inválido" },
@@ -37,6 +38,9 @@ export default function AdminMembers() {
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [roleFilter, setRoleFilter] = useState("all");
   const [createForm, setCreateForm] = useState({ email: "", full_name: "", status: "active", membership_type: "comunidade", role: "member" as "member" | "admin" });
 
   const { data: members, isLoading } = useQuery({
@@ -93,13 +97,29 @@ export default function AdminMembers() {
   };
 
   const filteredMembers = (members ?? []).filter((m: any) => {
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      m.email?.toLowerCase().includes(q) ||
-      m.profiles?.full_name?.toLowerCase().includes(q)
-    );
+    if (statusFilter !== "all" && m.status !== statusFilter) return false;
+    if (typeFilter !== "all" && m.membership_type !== typeFilter) return false;
+    if (roleFilter !== "all" && m.role !== roleFilter) return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      if (!m.email?.toLowerCase().includes(q) && !m.profiles?.full_name?.toLowerCase().includes(q)) return false;
+    }
+    return true;
   });
+
+  const handleExport = () => {
+    const headers = ["Nome", "Email", "Status", "Tipo", "Role", "Origem", "Membro desde"];
+    const rows = filteredMembers.map((m: any) => [
+      m.profiles?.full_name || "",
+      m.email || "",
+      m.status === "active" ? "Ativo" : "Inativo",
+      m.membership_type || "comunidade",
+      m.role || "member",
+      m.source || "",
+      m.started_at ? new Date(m.started_at).toLocaleDateString("pt-BR") : "",
+    ]);
+    exportToCsv(`membros-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+  };
 
   // If a member is selected, show detail view
   if (selectedUserId) {
@@ -111,6 +131,9 @@ export default function AdminMembers() {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-lg font-semibold text-foreground">Membros ({members?.length ?? 0})</h2>
         <div className="flex gap-2">
+          <Button onClick={handleExport} variant="outline" className="gap-2">
+            <Download className="h-4 w-4" /> Exportar
+          </Button>
           <Button onClick={() => setCsvOpen(true)} variant="outline" className="gap-2">
             <Upload className="h-4 w-4" /> Importar CSV
           </Button>
@@ -120,15 +143,41 @@ export default function AdminMembers() {
         </div>
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Buscar por nome ou email..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-9"
-        />
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nome ou email..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-full sm:w-40"><SelectValue placeholder="Status" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os status</SelectItem>
+            <SelectItem value="active">Ativo</SelectItem>
+            <SelectItem value="inactive">Inativo</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={typeFilter} onValueChange={setTypeFilter}>
+          <SelectTrigger className="w-full sm:w-40"><SelectValue placeholder="Tipo" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os tipos</SelectItem>
+            <SelectItem value="radar">Radar</SelectItem>
+            <SelectItem value="comunidade">Comunidade</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={roleFilter} onValueChange={setRoleFilter}>
+          <SelectTrigger className="w-full sm:w-40"><SelectValue placeholder="Role" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas as roles</SelectItem>
+            <SelectItem value="admin">Admin</SelectItem>
+            <SelectItem value="member">Membro</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {isLoading ? (
