@@ -169,11 +169,17 @@ export default function AdminWines() {
       }
 
       try {
-        const { data: existing } = await supabase
-          .from("wines")
-          .select("id")
-          .eq("name", wineName)
-          .maybeSingle();
+        // Check for duplicate by website_url (not name — same wine can appear with different links/prices)
+        const rawWebsiteUrl = (row.url || "").trim();
+        let existing: { id: string } | null = null;
+        if (rawWebsiteUrl) {
+          const { data } = await supabase
+            .from("wines")
+            .select("id")
+            .eq("website_url", rawWebsiteUrl)
+            .maybeSingle();
+          existing = data;
+        }
 
         // Normalize type from CSV — DB constraint requires lowercase
         const rawType = (row.tipo || "").trim();
