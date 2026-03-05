@@ -193,7 +193,10 @@ export default function AdminPartners() {
                   )}
                   <div className="min-w-0">
                     <p className="font-medium text-foreground truncate">{p.name}</p>
-                    {p.coupon_code && <Badge variant="secondary" className="mt-1 text-xs">{p.coupon_code}</Badge>}
+                    <div className="flex items-center gap-1 mt-1 flex-wrap">
+                      <Badge variant="outline" className="text-[10px]">{CATEGORY_OPTIONS.find(c => c.value === p.category)?.label ?? p.category}</Badge>
+                      {p.coupon_code && <Badge variant="secondary" className="text-[10px]">{p.coupon_code}</Badge>}
+                    </div>
                   </div>
                 </div>
                 <Badge variant={p.is_active ? "default" : "outline"} className="flex-shrink-0">{p.is_active ? "Ativo" : "Inativo"}</Badge>
