@@ -25,7 +25,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   acessorios: "Acessórios",
 };
 
-const CATEGORY_ORDER = ["importadoras", "lojas", "produtores", "restaurantes", "acessorios"];
+const CATEGORY_ORDER = ["importadoras", "produtores", "lojas", "restaurantes", "acessorios"];
 
 export default function ParceirosPage() {
   const { data: partners, isLoading } = useQuery({
@@ -41,10 +41,16 @@ export default function ParceirosPage() {
     },
   });
 
-  const grouped = CATEGORY_ORDER.reduce((acc, cat) => {
-    acc[cat] = partners?.filter((p) => p.category === cat) ?? [];
-    return acc;
-  }, {} as Record<string, Partner[]>);
+  // Group by category, include any category from DB even if not in CATEGORY_ORDER
+  const grouped: Record<string, Partner[]> = {};
+  partners?.forEach((p) => {
+    if (!grouped[p.category]) grouped[p.category] = [];
+    grouped[p.category].push(p);
+  });
+  const categoryKeys = [
+    ...CATEGORY_ORDER.filter((c) => grouped[c]?.length),
+    ...Object.keys(grouped).filter((c) => !CATEGORY_ORDER.includes(c)),
+  ];
 
   return (
     <div className="animate-fade-in px-4 sm:px-6 py-6 sm:py-10 max-w-4xl mx-auto">
@@ -71,13 +77,13 @@ export default function ParceirosPage() {
         <div className="text-center text-muted-foreground py-12">Carregando parceiros...</div>
       ) : (
         <div className="space-y-12">
-          {CATEGORY_ORDER.map((cat) => {
+          {categoryKeys.map((cat) => {
             const items = grouped[cat];
             if (!items || items.length === 0) return null;
             return (
               <section key={cat}>
                 <h2 className="font-display text-2xl text-foreground mb-6 pb-2 border-b border-border">
-                  {CATEGORY_LABELS[cat]}
+                  {CATEGORY_LABELS[cat] ?? cat.charAt(0).toUpperCase() + cat.slice(1)}
                 </h2>
                 <div className="grid gap-4 sm:grid-cols-2">
                   {items.map((partner) => (
@@ -108,10 +114,10 @@ function PartnerCard({ partner }: { partner: Partner }) {
 
   return (
     <div className="rounded-xl border border-border bg-card p-5 flex gap-4 items-start">
-      {/* Logo */}
-      <div className="h-14 w-14 flex-shrink-0 rounded-lg bg-muted/50 flex items-center justify-center overflow-hidden">
+      {/* Logo — square with rounded corners */}
+      <div className="h-16 w-16 flex-shrink-0 rounded-xl bg-muted/50 flex items-center justify-center overflow-hidden">
         {logo ? (
-          <img src={logo} alt={partner.name} className="h-full w-full object-contain p-1" />
+          <img src={logo} alt={partner.name} className="h-full w-full object-contain p-1.5" />
         ) : (
           <span className="text-xs font-medium text-muted-foreground text-center leading-tight px-1">
             {partner.name.slice(0, 2).toUpperCase()}

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -14,6 +15,14 @@ import type { Tables } from "@/integrations/supabase/types";
 
 type PartnerRow = Tables<"partners">;
 
+const CATEGORY_OPTIONS = [
+  { value: "importadoras", label: "Importadoras" },
+  { value: "lojas", label: "Lojas de Vinho" },
+  { value: "produtores", label: "Produtores" },
+  { value: "restaurantes", label: "Restaurantes" },
+  { value: "acessorios", label: "Acessórios" },
+];
+
 interface PartnerForm {
   name: string;
   logo_url: string;
@@ -21,10 +30,11 @@ interface PartnerForm {
   coupon_code: string;
   conditions: string;
   is_active: boolean;
+  category: string;
 }
 
 const emptyForm: PartnerForm = {
-  name: "", logo_url: "", website_url: "", coupon_code: "", conditions: "", is_active: true,
+  name: "", logo_url: "", website_url: "", coupon_code: "", conditions: "", is_active: true, category: "importadoras",
 };
 
 export default function AdminPartners() {
@@ -101,6 +111,7 @@ export default function AdminPartners() {
         coupon_code: form.coupon_code.trim() || null,
         conditions: form.conditions.trim() || null,
         is_active: form.is_active,
+        category: form.category,
       };
       if (editing) {
         const { error } = await supabase.from("partners").update(payload).eq("id", editing);
@@ -137,6 +148,7 @@ export default function AdminPartners() {
     setForm({
       name: p.name, logo_url: p.logo_url ?? "", website_url: p.website_url ?? "",
       coupon_code: p.coupon_code ?? "", conditions: p.conditions ?? "", is_active: p.is_active,
+      category: p.category ?? "importadoras",
     });
     setEditing(p.id);
     setPreviewUrl(p.logo_url || null);
@@ -181,7 +193,10 @@ export default function AdminPartners() {
                   )}
                   <div className="min-w-0">
                     <p className="font-medium text-foreground truncate">{p.name}</p>
-                    {p.coupon_code && <Badge variant="secondary" className="mt-1 text-xs">{p.coupon_code}</Badge>}
+                    <div className="flex items-center gap-1 mt-1 flex-wrap">
+                      <Badge variant="outline" className="text-[10px]">{CATEGORY_OPTIONS.find(c => c.value === p.category)?.label ?? p.category}</Badge>
+                      {p.coupon_code && <Badge variant="secondary" className="text-[10px]">{p.coupon_code}</Badge>}
+                    </div>
                   </div>
                 </div>
                 <Badge variant={p.is_active ? "default" : "outline"} className="flex-shrink-0">{p.is_active ? "Ativo" : "Inativo"}</Badge>
@@ -212,6 +227,20 @@ export default function AdminPartners() {
             <div className="space-y-1">
               <Label>Nome *</Label>
               <Input value={form.name} onChange={(e) => setField("name", e.target.value)} required />
+            </div>
+
+            <div className="space-y-1">
+              <Label>Categoria *</Label>
+              <Select value={form.category} onValueChange={(v) => setField("category", v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CATEGORY_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Logo upload area */}
