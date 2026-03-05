@@ -37,7 +37,7 @@ export default function AdminMembers() {
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [createForm, setCreateForm] = useState({ email: "", full_name: "", status: "active", membership_type: "comunidade" });
+  const [createForm, setCreateForm] = useState({ email: "", full_name: "", status: "active", membership_type: "comunidade", role: "member" as "member" | "admin" });
 
   const { data: members, isLoading } = useQuery({
     queryKey: ["admin-members-enriched"],
@@ -52,13 +52,14 @@ export default function AdminMembers() {
         full_name: createForm.full_name.trim(),
         status: createForm.status,
         membership_type: createForm.membership_type,
+        role: createForm.role,
         source: "manual",
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-members-enriched"] });
       setCreateOpen(false);
-      setCreateForm({ email: "", full_name: "", status: "active", membership_type: "comunidade" });
+      setCreateForm({ email: "", full_name: "", status: "active", membership_type: "comunidade", role: "member" });
       toast({ title: "Membro criado com sucesso" });
     },
     onError: (e) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
@@ -220,6 +221,16 @@ export default function AdminMembers() {
                 <SelectContent>
                   <SelectItem value="radar">Radar</SelectItem>
                   <SelectItem value="comunidade">Comunidade</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Role</Label>
+              <Select value={createForm.role} onValueChange={(v) => setCreateForm(f => ({ ...f, role: v as "member" | "admin" }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="member">Membro</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
                 </SelectContent>
               </Select>
             </div>

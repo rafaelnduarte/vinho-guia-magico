@@ -139,7 +139,7 @@ Deno.serve(async (req) => {
       }
 
       case "create_member": {
-        const { email, full_name, status = "active", source = "manual", membership_type = "comunidade" } = params;
+        const { email, full_name, status = "active", source = "manual", membership_type = "comunidade", role = "member", password } = params;
 
         // Create or find user
         let userId: string;
@@ -151,10 +151,10 @@ Deno.serve(async (req) => {
         if (existing) {
           userId = existing.id;
         } else {
-          const tempPassword = crypto.randomUUID() + "Aa1!";
+          const userPassword = password || (crypto.randomUUID() + "Aa1!");
           const { data: newUser, error: createErr } = await adminClient.auth.admin.createUser({
             email,
-            password: tempPassword,
+            password: userPassword,
             email_confirm: true,
             user_metadata: { full_name },
           });
@@ -180,14 +180,19 @@ Deno.serve(async (req) => {
           await adminClient.from("profiles").update({ full_name }).eq("user_id", userId);
         }
 
-        // Ensure role
+        // Upsert role (allow setting admin)
+        const targetRole = role === "admin" ? "admin" : "member";
         const { data: existingRole } = await adminClient
           .from("user_roles")
-          .select("id")
+          .select("id, role")
           .eq("user_id", userId)
           .maybeSingle();
-        if (!existingRole) {
-          await adminClient.from("user_roles").insert({ user_id: userId, role: "member" });
+        if (existingRole) {
+          if (existingRole.role !== targetRole) {
+            await adminClient.from("user_roles").update({ role: targetRole }).eq("id", existingRole.id);
+          }
+        } else {
+          await adminClient.from("user_roles").insert({ user_id: userId, role: targetRole });
         }
 
         return new Response(JSON.stringify({ success: true, userId }), {
