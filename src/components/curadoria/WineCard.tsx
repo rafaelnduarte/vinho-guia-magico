@@ -5,8 +5,14 @@ import { Badge } from "@/components/ui/badge";
 
 function formatPrice(raw: string): string {
   const cleaned = raw.replace(/^R\$\s*/i, "").trim();
-  // Remove thousands separator (.) then swap decimal comma for dot
-  const num = parseFloat(cleaned.replace(/\./g, "").replace(",", "."));
+  let num: number;
+  if (cleaned.includes(",")) {
+    // Brazilian format: dots are thousands separators, comma is decimal
+    num = parseFloat(cleaned.replace(/\./g, "").replace(",", "."));
+  } else {
+    // Plain number with optional dot as decimal (e.g. "2999.90" or "150")
+    num = parseFloat(cleaned);
+  }
   if (!isNaN(num)) return `R$${num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   return cleaned.startsWith("R$") ? cleaned : `R$${cleaned}`;
 }
