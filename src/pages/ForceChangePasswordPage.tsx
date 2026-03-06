@@ -42,6 +42,7 @@ export default function ForceChangePasswordPage() {
       .eq("user_id", user!.id);
 
     toast({ title: "Senha criada com sucesso!" });
+    await refreshProfile();
     setSaving(false);
     navigate("/", { replace: true });
   };
