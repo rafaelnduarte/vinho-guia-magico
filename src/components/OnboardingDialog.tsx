@@ -116,7 +116,7 @@ export default function OnboardingDialog({
       .eq("user_id", user.id);
     setTimeout(() => {
       onComplete();
-      navigate("/", { replace: true });
+      navigate("/home", { replace: true });
     }, 1200);
   };
 
