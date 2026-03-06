@@ -35,7 +35,7 @@ interface PartnerForm {
 }
 
 const emptyForm: PartnerForm = {
-  name: "", logo_url: "", website_url: "", coupon_code: "", conditions: "", is_active: true, category: "importadoras",
+  name: "", logo_url: "", website_url: "", coupon_code: "", discount: "", conditions: "", is_active: true, category: "importadoras",
 };
 
 export default function AdminPartners() {
@@ -110,6 +110,7 @@ export default function AdminPartners() {
         logo_url: form.logo_url.trim() || null,
         website_url: form.website_url.trim() || null,
         coupon_code: form.coupon_code.trim() || null,
+        discount: form.discount.trim() || null,
         conditions: form.conditions.trim() || null,
         is_active: form.is_active,
         category: form.category,
@@ -148,7 +149,7 @@ export default function AdminPartners() {
   const openEdit = (p: PartnerRow) => {
     setForm({
       name: p.name, logo_url: p.logo_url ?? "", website_url: p.website_url ?? "",
-      coupon_code: p.coupon_code ?? "", conditions: p.conditions ?? "", is_active: p.is_active,
+      coupon_code: p.coupon_code ?? "", discount: p.discount ?? "", conditions: p.conditions ?? "", is_active: p.is_active,
       category: p.category ?? "importadoras",
     });
     setEditing(p.id);
