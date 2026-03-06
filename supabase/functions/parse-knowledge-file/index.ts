@@ -1,10 +1,13 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { encode as base64Encode } from "https://deno.land/std@0.224.0/encoding/base64.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
+
+const MAX_PDF_SIZE_MB = 20; // AI gateway limit for base64 PDFs
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS")
@@ -58,18 +61,19 @@ Deno.serve(async (req) => {
     const ext = (file_name || file_path).split(".").pop()?.toLowerCase() ?? "";
     let extractedText = "";
 
-    if (["txt", "md", "csv", "tsv"].includes(ext)) {
-      // Text files: download and read directly
-      const { data: fileData, error: downloadErr } = await adminClient.storage
-        .from("knowledge-files")
-        .download(file_path);
+    // Download file from storage
+    const { data: fileData, error: downloadErr } = await adminClient.storage
+      .from("knowledge-files")
+      .download(file_path);
 
-      if (downloadErr || !fileData) {
-        return new Response(
-          JSON.stringify({ error: `Failed to download: ${downloadErr?.message}` }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
+    if (downloadErr || !fileData) {
+      return new Response(
+        JSON.stringify({ error: `Failed to download: ${downloadErr?.message}` }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (["txt", "md", "csv", "tsv"].includes(ext)) {
       extractedText = await fileData.text();
     } else if (ext === "pdf") {
       if (!lovableApiKey) {
@@ -79,19 +83,21 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Generate a signed URL instead of downloading + base64 (avoids CPU limit)
-      const { data: signedUrlData, error: signedUrlErr } = await adminClient.storage
-        .from("knowledge-files")
-        .createSignedUrl(file_path, 600); // 10 min expiry
+      const arrayBuffer = await fileData.arrayBuffer();
+      const fileSizeMB = arrayBuffer.byteLength / (1024 * 1024);
+      console.log(`Processing PDF: ${file_name}, size: ${fileSizeMB.toFixed(1)}MB`);
 
-      if (signedUrlErr || !signedUrlData?.signedUrl) {
+      if (fileSizeMB > MAX_PDF_SIZE_MB) {
         return new Response(
-          JSON.stringify({ error: `Failed to create signed URL: ${signedUrlErr?.message}` }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          JSON.stringify({
+            error: `PDF muito grande (${fileSizeMB.toFixed(0)}MB). O limite é ${MAX_PDF_SIZE_MB}MB. Reduza o tamanho do arquivo ou converta para .txt antes de importar.`,
+          }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      console.log(`Processing PDF via signed URL: ${file_name}`);
+      // Use Deno's standard base64 encoder (efficient, no stack overflow)
+      const base64 = base64Encode(new Uint8Array(arrayBuffer));
 
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 5 * 60 * 1000);
@@ -122,7 +128,7 @@ Deno.serve(async (req) => {
                   {
                     type: "image_url",
                     image_url: {
-                      url: signedUrlData.signedUrl,
+                      url: `data:application/pdf;base64,${base64}`,
                     },
                   },
                 ],
@@ -136,7 +142,7 @@ Deno.serve(async (req) => {
           const errText = await aiResponse.text();
           console.error("AI extraction error:", aiResponse.status, errText);
           return new Response(
-            JSON.stringify({ error: "Falha ao extrair texto do PDF via IA" }),
+            JSON.stringify({ error: `Falha ao extrair texto do PDF via IA: ${aiResponse.status}` }),
             { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
