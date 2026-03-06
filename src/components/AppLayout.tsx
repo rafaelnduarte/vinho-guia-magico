@@ -177,7 +177,7 @@ export default function AppLayout() {
               <NavLink
                 key={link.to}
                 to={link.to}
-                end={link.to === "/"}
+                end
                 className={({ isActive }) =>
                   cn(
                     "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
@@ -246,7 +246,7 @@ export default function AppLayout() {
                 <NavLink
                   key={link.to}
                   to={link.to}
-                  end={link.to === "/"}
+                  end
                   onClick={() => setMobileOpen(false)}
                   className={({ isActive }) =>
                     cn(
