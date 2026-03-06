@@ -24,7 +24,7 @@ import logoJovem from "@/assets/logo-jovem-do-vinho.png";
 import { supabase } from "@/integrations/supabase/client";
 
 const memberLinks = [
-  { to: "/", label: "Home", icon: Home },
+  { to: "/home", label: "Home", icon: Home },
   { to: "/curadoria", label: "Curadoria", icon: Wine },
   { to: "/ranking", label: "Ranking", icon: Trophy },
   { to: "/sommelier", label: "Jovem AI", icon: Sparkles },
