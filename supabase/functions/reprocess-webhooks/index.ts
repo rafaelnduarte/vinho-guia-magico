@@ -157,10 +157,14 @@ Deno.serve(async (req) => {
     if (u.email) usersByEmail.set(u.email.toLowerCase(), u);
   }
 
-  // Process activations
+  // Process activations (limited to batchLimit unique emails per call)
   const results: any[] = [];
+  let processed = 0;
+  const totalAvailable = activationsByEmail.size;
 
   for (const [email, evt] of activationsByEmail) {
+    if (processed >= batchLimit) break;
+    
     const event = evt.payload?.event ?? evt.payload ?? {};
     const firstName = event.user?.firstName ?? event.user?.first_name ?? "";
     const lastName = event.user?.lastName ?? event.user?.last_name ?? "";
@@ -176,16 +180,16 @@ Deno.serve(async (req) => {
       const msg = err instanceof Error ? err.message : String(err);
       results.push({ event_id: evt.event_id, status: "error", email, error: msg });
     }
+    processed++;
   }
 
   const activated = results.filter((r) => r.status === "activated").length;
-  const cancelled = results.filter((r) => r.status === "cancelled").length;
-  const skipped = results.filter((r) => r.status === "skipped").length;
   const errors = results.filter((r) => r.status === "error").length;
+  const remaining = totalAvailable - processed;
 
   return json(200, {
     status: "processed",
-    summary: { total: results.length, activated, cancelled, skipped, errors },
+    summary: { total: results.length, activated, errors, remaining },
     results,
   });
 });
