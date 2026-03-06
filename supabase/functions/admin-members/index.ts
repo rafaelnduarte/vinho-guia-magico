@@ -250,6 +250,19 @@ Deno.serve(async (req) => {
         });
       }
 
+      case "reset_onboarding": {
+        const { userId } = params;
+        // Reset password to email and set must_change_password
+        const { data: userData } = await adminClient.auth.admin.getUserById(userId);
+        if (!userData?.user?.email) throw new Error("User not found");
+        const email = userData.user.email.toLowerCase();
+        await adminClient.auth.admin.updateUserById(userId, { password: email });
+        await adminClient.from("profiles").update({ must_change_password: true, onboarding_completed: true }).eq("user_id", userId);
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       default:
         throw new Error(`Unknown action: ${action}`);
     }
