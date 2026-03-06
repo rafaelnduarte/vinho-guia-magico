@@ -122,49 +122,46 @@ Deno.serve(async (req) => {
     return json(200, { status: "dry_run", count: preview.length, results: preview });
   }
 
-  // Actually reprocess
-  const results: any[] = [];
+  // Deduplicate: only process the LAST activation event per email
+  // This avoids creating the same user multiple times
+  const activationsByEmail = new Map<string, any>();
+  const cancellationsByEmail = new Map<string, any>();
 
   for (const evt of (events ?? [])) {
     const event = evt.payload?.event ?? evt.payload ?? {};
-    const email =
+    const email = (
       event.user?.email ??
       event.subscription?.payer?.email ??
       event.invoice?.payer?.email ??
       event.userEmail ??
       event.email ??
-      null;
+      ""
+    ).toLowerCase();
 
-    if (!email) {
-      results.push({ event_id: evt.event_id, status: "skipped", reason: "no_email" });
-      continue;
+    if (!email) continue;
+
+    if (isActivationEvent(evt.event_type)) {
+      activationsByEmail.set(email, evt);
+    } else if (isCancellationEvent(evt.event_type)) {
+      cancellationsByEmail.set(email, evt);
     }
+  }
 
-    if (!isActivationEvent(evt.event_type) && !isCancellationEvent(evt.event_type)) {
-      results.push({ event_id: evt.event_id, status: "skipped", reason: "irrelevant_event_type", event_type: evt.event_type });
-      continue;
-    }
+  // Process activations (skip if there's a later cancellation for same email)
+  const results: any[] = [];
 
+  for (const [email, evt] of activationsByEmail) {
+    const event = evt.payload?.event ?? evt.payload ?? {};
     const firstName = event.user?.firstName ?? event.user?.first_name ?? "";
     const lastName = event.user?.lastName ?? event.user?.last_name ?? "";
     const fullName = [firstName, lastName].filter(Boolean).join(" ") || (event.user?.name ?? event.userName ?? null);
-
-    const externalId =
-      event.subscription?.id ?? event.invoice?.id ?? event.subscriptionId ?? evt.event_id;
-
-    const productName = (
-      event.product?.name ?? event.products?.[0]?.name ?? event.productName ?? ""
-    ).toLowerCase();
+    const externalId = event.subscription?.id ?? event.invoice?.id ?? evt.event_id;
+    const productName = (event.product?.name ?? event.products?.[0]?.name ?? "").toLowerCase();
     const membershipType = productName.includes("radar") ? "radar" : "comunidade";
 
     try {
-      if (isActivationEvent(evt.event_type)) {
-        await handleActivation(supabaseAdmin, evt.event_id, email, fullName, externalId, membershipType);
-        results.push({ event_id: evt.event_id, status: "activated", email });
-      } else {
-        await handleCancellation(supabaseAdmin, evt.event_id, email, externalId);
-        results.push({ event_id: evt.event_id, status: "cancelled", email });
-      }
+      await handleActivation(supabaseAdmin, evt.event_id, email, fullName, externalId, membershipType);
+      results.push({ event_id: evt.event_id, status: "activated", email });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       results.push({ event_id: evt.event_id, status: "error", email, error: msg });
