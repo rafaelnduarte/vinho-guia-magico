@@ -196,8 +196,12 @@ function jsonResponse(status: number, body: Record<string, any>) {
 function isActivationEvent(type: string): boolean {
   const activations = [
     "NewUser",
+    "NewSale",
     "subscription.activated",
     "subscription.renewed",
+    "subscription.created",
+    "customer.member_added",
+    "invoice.payment_succeeded",
     "purchase.approved",
     "purchase.completed",
     "payment.approved",
@@ -211,9 +215,14 @@ function isCancellationEvent(type: string): boolean {
     "subscription.cancelled",
     "subscription.canceled",
     "subscription.expired",
+    "subscription.deactivated",
+    "customer.member_removed",
+    "CanceledSale",
+    "CanceledSubscription",
     "purchase.refunded",
     "purchase.chargeback",
     "payment.refunded",
+    "invoice.refunded",
   ];
   return cancellations.includes(type);
 }
