@@ -37,6 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<AppRole | null>(null);
+  const [membershipLoading, setMembershipLoading] = useState(true);
   const [membershipActive, setMembershipActive] = useState(false);
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const [onboardingCompleted, setOnboardingCompleted] = useState(true);
