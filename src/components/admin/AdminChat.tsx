@@ -589,9 +589,9 @@ function KnowledgeBase() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const maxSize = 10 * 1024 * 1024; // 10MB
+    const maxSize = 100 * 1024 * 1024; // 100MB
     if (file.size > maxSize) {
-      toast({ title: "Arquivo muito grande", description: "Máximo 10MB", variant: "destructive" });
+      toast({ title: "Arquivo muito grande", description: "Máximo 100MB", variant: "destructive" });
       return;
     }
 
