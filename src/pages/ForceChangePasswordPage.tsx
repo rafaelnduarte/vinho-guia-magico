@@ -9,7 +9,7 @@ import { toast } from "@/hooks/use-toast";
 import { Loader2, Lock, ShieldCheck } from "lucide-react";
 
 export default function ForceChangePasswordPage() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -42,6 +42,7 @@ export default function ForceChangePasswordPage() {
       .eq("user_id", user!.id);
 
     toast({ title: "Senha criada com sucesso!" });
+    await refreshProfile();
     setSaving(false);
     navigate("/", { replace: true });
   };
