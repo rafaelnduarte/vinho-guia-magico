@@ -19,7 +19,7 @@ const CATEGORY_OPTIONS = [
   { value: "importadoras", label: "Importadoras" },
   { value: "lojas", label: "Lojas de Vinho" },
   { value: "produtores", label: "Produtores" },
-  { value: "restaurantes", label: "Restaurantes" },
+  { value: "restaurantes", label: "Experiências" },
   { value: "acessorios", label: "Acessórios" },
 ];
 
@@ -28,6 +28,7 @@ interface PartnerForm {
   logo_url: string;
   website_url: string;
   coupon_code: string;
+  discount: string;
   conditions: string;
   is_active: boolean;
   category: string;
