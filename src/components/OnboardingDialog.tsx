@@ -1,4 +1,5 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
+import confetti from "canvas-confetti";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -80,14 +81,43 @@ export default function OnboardingDialog({
     setStep(3);
   };
 
+  const fireConfetti = useCallback(() => {
+    const duration = 1500;
+    const end = Date.now() + duration;
+    const colors = ["#1a5c6b", "#d4a574", "#f5c542", "#e8917a", "#7bc67e"];
+
+    (function frame() {
+      confetti({
+        particleCount: 3,
+        angle: 60,
+        spread: 55,
+        origin: { x: 0, y: 0.7 },
+        colors,
+        zIndex: 9999,
+      });
+      confetti({
+        particleCount: 3,
+        angle: 120,
+        spread: 55,
+        origin: { x: 1, y: 0.7 },
+        colors,
+        zIndex: 9999,
+      });
+      if (Date.now() < end) requestAnimationFrame(frame);
+    })();
+  }, []);
+
   const handleFinish = async () => {
     if (!user) return;
+    fireConfetti();
     await supabase
       .from("profiles")
       .update({ onboarding_completed: true } as any)
       .eq("user_id", user.id);
-    onComplete();
-    navigate("/", { replace: true });
+    setTimeout(() => {
+      onComplete();
+      navigate("/", { replace: true });
+    }, 1200);
   };
 
   const initials = fullName
