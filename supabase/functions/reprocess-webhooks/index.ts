@@ -15,29 +15,33 @@ Deno.serve(async (req) => {
     return json(405, { error: "Method not allowed" });
   }
 
-  // Auth: require valid JWT
+  // Auth: accept service_role key OR admin JWT
   const authHeader = req.headers.get("authorization");
-  if (!authHeader) return json(401, { error: "Missing auth" });
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  
+  const isServiceRole = authHeader === `Bearer ${serviceRoleKey}`;
 
   const supabaseAdmin = createClient(
     Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    serviceRoleKey
   );
 
-  // Verify the caller is an admin
-  const supabaseUser = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_ANON_KEY")!,
-    { global: { headers: { Authorization: authHeader } } }
-  );
-  const { data: { user } } = await supabaseUser.auth.getUser();
-  if (!user) return json(401, { error: "Invalid token" });
-
-  const { data: isAdmin } = await supabaseAdmin.rpc("has_role", {
-    _user_id: user.id,
-    _role: "admin",
-  });
-  if (!isAdmin) return json(403, { error: "Admin only" });
+  if (!isServiceRole) {
+    // Verify the caller is an admin user
+    if (!authHeader) return json(401, { error: "Missing auth" });
+    const supabaseUser = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+    const { data: { user } } = await supabaseUser.auth.getUser();
+    if (!user) return json(401, { error: "Invalid token" });
+    const { data: isAdmin } = await supabaseAdmin.rpc("has_role", {
+      _user_id: user.id,
+      _role: "admin",
+    });
+    if (!isAdmin) return json(403, { error: "Admin only" });
+  }
 
   // Parse body: optional { dry_run: boolean, event_ids: string[] }
   let body: any = {};
