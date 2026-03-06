@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
   } catch { /* empty body is fine */ }
 
   const dryRun = body.dry_run === true;
-  const specificIds: string[] | null = body.event_ids ?? null;
+  const batchLimit = body.limit ?? 5; // Process max N unique emails per call
 
   // Only fetch activation events that previously failed
   const activationTypes = [
