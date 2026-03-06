@@ -21,6 +21,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   session: null,
   loading: true,
+  membershipLoading: true,
   role: null,
   membershipActive: false,
   mustChangePassword: false,
