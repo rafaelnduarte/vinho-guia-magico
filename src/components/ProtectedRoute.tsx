@@ -4,9 +4,9 @@ import { Loader2, ShieldX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading, membershipActive, mustChangePassword, signOut } = useAuth();
+  const { user, loading, membershipLoading, membershipActive, mustChangePassword, signOut } = useAuth();
 
-  if (loading) {
+  if (loading || membershipLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

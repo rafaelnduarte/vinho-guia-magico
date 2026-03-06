@@ -8,6 +8,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  membershipLoading: boolean;
   role: AppRole | null;
   membershipActive: boolean;
   mustChangePassword: boolean;
@@ -20,6 +21,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   session: null,
   loading: true,
+  membershipLoading: true,
   role: null,
   membershipActive: false,
   mustChangePassword: false,
@@ -35,11 +37,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<AppRole | null>(null);
+  const [membershipLoading, setMembershipLoading] = useState(true);
   const [membershipActive, setMembershipActive] = useState(false);
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const [onboardingCompleted, setOnboardingCompleted] = useState(true);
 
   const fetchUserData = async (userId: string) => {
+    setMembershipLoading(true);
     const [roleRes, membershipRes, profileRes] = await Promise.all([
       supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
       supabase.from("memberships").select("status").eq("user_id", userId).eq("status", "active").maybeSingle(),
@@ -50,6 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setMembershipActive(isAdmin || !!membershipRes.data);
     setMustChangePassword((profileRes.data as any)?.must_change_password ?? false);
     setOnboardingCompleted((profileRes.data as any)?.onboarding_completed ?? true);
+    setMembershipLoading(false);
   };
 
   const refreshProfile = async () => {
@@ -106,7 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, role, membershipActive, mustChangePassword, onboardingCompleted, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, session, loading, membershipLoading, role, membershipActive, mustChangePassword, onboardingCompleted, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );
