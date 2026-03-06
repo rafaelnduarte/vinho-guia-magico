@@ -6,18 +6,6 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-/** Convert ArrayBuffer to base64 in chunks to avoid call-stack overflow */
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-  const CHUNK = 8192;
-  let binary = "";
-  for (let i = 0; i < bytes.length; i += CHUNK) {
-    const slice = bytes.subarray(i, i + CHUNK);
-    binary += String.fromCharCode(...slice);
-  }
-  return btoa(binary);
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS")
     return new Response(null, { headers: corsHeaders });
@@ -67,27 +55,23 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Download file from storage
-    const { data: fileData, error: downloadErr } = await adminClient.storage
-      .from("knowledge-files")
-      .download(file_path);
-
-    if (downloadErr || !fileData) {
-      return new Response(
-        JSON.stringify({ error: `Failed to download: ${downloadErr?.message}` }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     const ext = (file_name || file_path).split(".").pop()?.toLowerCase() ?? "";
-
     let extractedText = "";
 
     if (["txt", "md", "csv", "tsv"].includes(ext)) {
-      // Text files: read directly
+      // Text files: download and read directly
+      const { data: fileData, error: downloadErr } = await adminClient.storage
+        .from("knowledge-files")
+        .download(file_path);
+
+      if (downloadErr || !fileData) {
+        return new Response(
+          JSON.stringify({ error: `Failed to download: ${downloadErr?.message}` }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
       extractedText = await fileData.text();
     } else if (ext === "pdf") {
-      // PDF: use AI to extract/summarize content
       if (!lovableApiKey) {
         return new Response(
           JSON.stringify({ error: "LOVABLE_API_KEY not configured for PDF parsing" }),
@@ -95,14 +79,20 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Convert PDF to base64 safely (chunked to avoid stack overflow)
-      const arrayBuffer = await fileData.arrayBuffer();
-      const fileSizeMB = arrayBuffer.byteLength / (1024 * 1024);
-      console.log(`Processing PDF: ${file_name}, size: ${fileSizeMB.toFixed(1)}MB`);
+      // Generate a signed URL instead of downloading + base64 (avoids CPU limit)
+      const { data: signedUrlData, error: signedUrlErr } = await adminClient.storage
+        .from("knowledge-files")
+        .createSignedUrl(file_path, 600); // 10 min expiry
 
-      const base64 = arrayBufferToBase64(arrayBuffer);
+      if (signedUrlErr || !signedUrlData?.signedUrl) {
+        return new Response(
+          JSON.stringify({ error: `Failed to create signed URL: ${signedUrlErr?.message}` }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
 
-      // Use longer timeout for AI call on large files (up to 5 minutes)
+      console.log(`Processing PDF via signed URL: ${file_name}`);
+
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 5 * 60 * 1000);
 
@@ -132,7 +122,7 @@ Deno.serve(async (req) => {
                   {
                     type: "image_url",
                     image_url: {
-                      url: `data:application/pdf;base64,${base64}`,
+                      url: signedUrlData.signedUrl,
                     },
                   },
                 ],
