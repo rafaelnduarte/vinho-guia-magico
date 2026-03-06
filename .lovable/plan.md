@@ -1,76 +1,65 @@
 
 
-## Plano: Nova Página Inicial com Dois Carrosséis
+## Plano: Fluxo de Onboarding Completo
 
 ### Resumo
 
-Substituir todo o conteúdo da HomePage por duas seções de carrossel:
-1. **Banners gerenciáveis** — imagens promocionais administráveis pelo painel admin
-2. **Vinhos recentes** — os 10 vinhos mais novos, exibidos 3 por vez
+Implementar um fluxo de onboarding em 4 etapas: (1) senha padrão = email, (2) troca obrigatória de senha no primeiro acesso, (3) popup de onboarding em 3 passos (boas-vindas/PWA, perfil, explicação curadoria vs acervo), (4) redirecionamento à Home.
 
 ---
 
-### Dimensão recomendada das imagens (Linha 1)
+### Detalhes Técnicos
 
-As imagens dos banners devem ser enviadas em **1200 × 500 px** (proporção 12:5). Isso garante boa resolução em desktop e boa proporção em mobile. Formato: JPG ou WebP.
+#### 1. Banco de dados
 
----
+Adicionar duas colunas à tabela `profiles`:
+- `must_change_password` (boolean, default `true`) — força troca de senha no primeiro login
+- `onboarding_completed` (boolean, default `false`) — controla exibição do popup de onboarding
 
-### Mudanças necessárias
+#### 2. Senha padrão = email
 
-#### 1. Nova tabela `home_banners` (migration)
+Alterar os dois pontos de criação de usuário:
+- **`hubla-webhook/index.ts`** (linha 263): trocar `crypto.randomUUID() + "Aa1!"` por `email.toLowerCase()`
+- **`admin-members/index.ts`** (linha 154): trocar `crypto.randomUUID() + "Aa1!"` por `email.toLowerCase()` (quando `password` não é fornecido)
 
-```sql
-CREATE TABLE public.home_banners (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  image_url text NOT NULL,
-  link_url text,
-  sort_order integer NOT NULL DEFAULT 0,
-  is_active boolean NOT NULL DEFAULT true,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
+#### 3. Tela de troca obrigatória de senha
 
-ALTER TABLE public.home_banners ENABLE ROW LEVEL SECURITY;
+Criar **`src/pages/ForceChangePasswordPage.tsx`**:
+- Tela simples: "Sua senha inicial é seu email. Crie uma nova senha para continuar."
+- Campos: nova senha + confirmação (mín. 6 chars)
+- Ao salvar: `supabase.auth.updateUser({ password })` + atualizar `profiles.must_change_password = false`
+- Redireciona para `/` (onde o onboarding popup será exibido)
 
-CREATE POLICY "Active members can view active banners"
-  ON public.home_banners FOR SELECT
-  TO authenticated
-  USING (is_active = true AND has_active_access(auth.uid()));
+Alterar **`ProtectedRoute.tsx`**:
+- Após verificar `user` e `membershipActive`, consultar `profiles.must_change_password`
+- Se `true`, redirecionar para `/trocar-senha` em vez de renderizar children
 
-CREATE POLICY "Admins can manage banners"
-  ON public.home_banners FOR ALL
-  TO authenticated
-  USING (has_role(auth.uid(), 'admin'::app_role));
-```
+Adicionar rota `/trocar-senha` no **`App.tsx`** (fora do `ProtectedRoute`, mas requer autenticação básica).
 
-#### 2. Nova aba "Banners" no Admin (`AdminPage.tsx`)
+#### 4. Popup de Onboarding (3 passos)
 
-- Criar componente `AdminBanners.tsx` com CRUD simples: listar banners, upload de imagem (bucket `wine-images` ou novo bucket), definir link opcional, reordenar, ativar/desativar.
-- Adicionar aba no `AdminPage.tsx`.
+Criar **`src/components/OnboardingDialog.tsx`**:
+- Dialog/modal com stepper (1/3, 2/3, 3/3)
+- **Passo 1 — Boas-vindas + PWA**: Texto de boas-vindas + instruções visuais para adicionar à tela inicial (iOS: Safari → Compartilhar → "Adicionar à Tela de Início"; Android: Chrome → menu → "Adicionar à tela inicial")
+- **Passo 2 — Perfil**: Upload de avatar, campo de nome, campo de bio (140 chars) — reutilizando a mesma lógica do `MyAccountPage`
+- **Passo 3 — Curadoria vs Acervo**: Explicação visual das duas seções. Curadoria = vinhos disponíveis para compra no Brasil hoje. Acervo = vinhos históricos, de viagens, safras antigas, não mais disponíveis.
+- Botão final "Ir para a Home" → atualiza `profiles.onboarding_completed = true` e fecha o dialog
 
-#### 3. Reescrever `HomePage.tsx`
+Integrar no **`HomePage.tsx`** (ou `AppLayout.tsx`):
+- Ao montar, verificar `profiles.onboarding_completed`
+- Se `false`, abrir `OnboardingDialog`
 
-**Linha 1 — Carrossel de Banners:**
-- Usar `embla-carousel-react` (já instalado).
-- Buscar `home_banners` ordenados por `sort_order`.
-- Desktop/tablet: mostrar 3 slides visíveis por vez.
-- Mobile: mostrar 1 slide por vez.
-- Dots ou setas de navegação.
-- Cada imagem pode ter link opcional (clicável).
-
-**Linha 2 — Carrossel de Vinhos Recentes:**
-- Query: 10 vinhos mais recentes (`status = 'curadoria'`, ordenados por `created_at DESC`, `LIMIT 10`).
-- Reutilizar o componente `WineCard` existente.
-- Desktop/tablet: 3 cards visíveis por vez, com scroll lateral.
-- Mobile: 1 card por vez.
-- Setas de navegação.
-
-#### 4. Arquivos envolvidos
+#### 5. Arquivos modificados/criados
 
 | Arquivo | Ação |
-|---------|------|
-| `src/pages/HomePage.tsx` | Reescrever completamente |
-| `src/components/admin/AdminBanners.tsx` | Criar (CRUD de banners) |
-| `src/pages/AdminPage.tsx` | Adicionar aba "Banners" |
-| Migration SQL | Criar tabela `home_banners` |
+|---|---|
+| Migration SQL | Adicionar `must_change_password` e `onboarding_completed` à `profiles` |
+| `hubla-webhook/index.ts` | Senha = email |
+| `admin-members/index.ts` | Senha = email (fallback) |
+| `src/pages/ForceChangePasswordPage.tsx` | Criar |
+| `src/components/OnboardingDialog.tsx` | Criar |
+| `src/components/ProtectedRoute.tsx` | Adicionar check `must_change_password` |
+| `src/contexts/AuthContext.tsx` | Adicionar `mustChangePassword` e `onboardingCompleted` ao contexto |
+| `src/App.tsx` | Adicionar rota `/trocar-senha` |
+| `src/pages/HomePage.tsx` ou `src/components/AppLayout.tsx` | Montar OnboardingDialog |
 
