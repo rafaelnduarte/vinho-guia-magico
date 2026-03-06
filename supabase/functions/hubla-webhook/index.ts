@@ -121,18 +121,51 @@ Deno.serve(async (req) => {
 
   // --- Process event (use original payload for data extraction) ---
   try {
-    const event = payload.event ?? {};
-    const email = event.userEmail;
-    const fullName = event.userName;
-    const externalId = event.subscriptionId ?? event.invoiceId ?? eventId;
+    const event = payload.event ?? payload;
+    
+    // Hubla v2: data is nested under event.user, event.subscription, event.product
+    const email =
+      event.user?.email ??
+      event.subscription?.payer?.email ??
+      event.invoice?.payer?.email ??
+      event.userEmail ??          // legacy fallback
+      event.email;
+
+    const firstName = event.user?.firstName ?? event.user?.first_name ?? "";
+    const lastName = event.user?.lastName ?? event.user?.last_name ?? "";
+    const fullName =
+      [firstName, lastName].filter(Boolean).join(" ") ||
+      event.user?.name ??
+      event.userName ??
+      null;
+
+    const externalId =
+      event.subscription?.id ??
+      event.invoice?.id ??
+      event.subscriptionId ??
+      event.invoiceId ??
+      eventId;
 
     // Detect product to determine membership_type
-    const productName = (event.productName ?? event.product_name ?? event.planName ?? event.plan_name ?? "").toLowerCase();
+    const productName = (
+      event.product?.name ??
+      event.products?.[0]?.name ??
+      event.productName ??
+      event.product_name ??
+      event.planName ??
+      event.plan_name ??
+      ""
+    ).toLowerCase();
     const membershipType = productName.includes("radar") ? "radar" : "comunidade";
 
     if (!email) {
+      // Log available paths for debugging
       await logWebhook(supabase, eventId, "no_email_found", "warn", {
         event_type: eventType,
+        available_keys: Object.keys(event),
+        has_user: !!event.user,
+        has_subscription: !!event.subscription,
+        has_invoice: !!event.invoice,
       });
       return jsonResponse(200, { status: "no_email" });
     }

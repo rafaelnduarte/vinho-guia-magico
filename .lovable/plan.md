@@ -1,38 +1,76 @@
 
 
-## Diagnóstico
+## Plano: Nova Página Inicial com Dois Carrosséis
 
-O problema está **100% identificado**. Todos os webhooks da Hubla estão falhando com `no_email_found` — visível nos logs do `webhook_logs`.
+### Resumo
 
-**Causa raiz:** O código extrai os dados do usuário usando campos que não existem no payload real da Hubla:
+Substituir todo o conteúdo da HomePage por duas seções de carrossel:
+1. **Banners gerenciáveis** — imagens promocionais administráveis pelo painel admin
+2. **Vinhos recentes** — os 10 vinhos mais novos, exibidos 3 por vez
 
-```text
-// O código atual espera:
-event.userEmail        → NÃO EXISTE
-event.userName         → NÃO EXISTE
-event.subscriptionId   → NÃO EXISTE
-event.productName      → NÃO EXISTE
+---
 
-// O payload real da Hubla tem:
-event.user.email                    → "dargham.lucas@gmail.com"
-event.user.firstName / lastName     → "Lucas" / "Simionato"
-event.subscription.id               → "2c935e8e-..."
-event.subscription.payer.email      → (fallback)
-event.product.name                  → "Comunidade do Jovem"
+### Dimensão recomendada das imagens (Linha 1)
+
+As imagens dos banners devem ser enviadas em **1200 × 500 px** (proporção 12:5). Isso garante boa resolução em desktop e boa proporção em mobile. Formato: JPG ou WebP.
+
+---
+
+### Mudanças necessárias
+
+#### 1. Nova tabela `home_banners` (migration)
+
+```sql
+CREATE TABLE public.home_banners (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  image_url text NOT NULL,
+  link_url text,
+  sort_order integer NOT NULL DEFAULT 0,
+  is_active boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.home_banners ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Active members can view active banners"
+  ON public.home_banners FOR SELECT
+  TO authenticated
+  USING (is_active = true AND has_active_access(auth.uid()));
+
+CREATE POLICY "Admins can manage banners"
+  ON public.home_banners FOR ALL
+  TO authenticated
+  USING (has_role(auth.uid(), 'admin'::app_role));
 ```
 
-Os campos estão aninhados um nível mais fundo do que o código espera. Por isso, `email` é sempre `undefined`, e o webhook retorna `no_email` sem criar nenhum usuário.
+#### 2. Nova aba "Banners" no Admin (`AdminPage.tsx`)
 
-## Correção
+- Criar componente `AdminBanners.tsx` com CRUD simples: listar banners, upload de imagem (bucket `wine-images` ou novo bucket), definir link opcional, reordenar, ativar/desativar.
+- Adicionar aba no `AdminPage.tsx`.
 
-Alterar a extração de dados na edge function `hubla-webhook/index.ts` (linhas 124-131) para acessar os caminhos corretos do payload Hubla v2:
+#### 3. Reescrever `HomePage.tsx`
 
-- **Email**: `event.user?.email ?? event.subscription?.payer?.email ?? event.invoice?.payer?.email`
-- **Nome**: `event.user?.firstName + " " + event.user?.lastName` (com fallbacks)
-- **External ID**: `event.subscription?.id ?? event.invoice?.id`
-- **Product name**: `event.product?.name ?? event.products?.[0]?.name`
+**Linha 1 — Carrossel de Banners:**
+- Usar `embla-carousel-react` (já instalado).
+- Buscar `home_banners` ordenados por `sort_order`.
+- Desktop/tablet: mostrar 3 slides visíveis por vez.
+- Mobile: mostrar 1 slide por vez.
+- Dots ou setas de navegação.
+- Cada imagem pode ter link opcional (clicável).
 
-Também vou adicionar um log de debug que registra os caminhos disponíveis no payload quando o email não é encontrado, para facilitar troubleshooting futuro.
+**Linha 2 — Carrossel de Vinhos Recentes:**
+- Query: 10 vinhos mais recentes (`status = 'curadoria'`, ordenados por `created_at DESC`, `LIMIT 10`).
+- Reutilizar o componente `WineCard` existente.
+- Desktop/tablet: 3 cards visíveis por vez, com scroll lateral.
+- Mobile: 1 card por vez.
+- Setas de navegação.
 
-Após a correção, os webhooks pendentes que já foram registrados como `no_email_found` precisarão ser reprocessados manualmente (ou novas compras serão processadas automaticamente).
+#### 4. Arquivos envolvidos
+
+| Arquivo | Ação |
+|---------|------|
+| `src/pages/HomePage.tsx` | Reescrever completamente |
+| `src/components/admin/AdminBanners.tsx` | Criar (CRUD de banners) |
+| `src/pages/AdminPage.tsx` | Adicionar aba "Banners" |
+| Migration SQL | Criar tabela `home_banners` |
 
