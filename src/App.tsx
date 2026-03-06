@@ -40,7 +40,8 @@ const App = () => (
                 </ProtectedRoute>
               }
             >
-              <Route path="/" element={<HomePage />} />
+              <Route index element={<HomePage />} />
+              <Route path="home" element={<HomePage />} />
               <Route path="/curadoria" element={<CuradoriaPage />} />
               <Route path="/curadoria/:id" element={<WineDetailPage />} />
               <Route path="/sommelier" element={<SommelierPage />} />

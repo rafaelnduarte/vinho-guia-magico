@@ -33,7 +33,7 @@ export default function LoginPage() {
         variant: "destructive",
       });
     } else {
-      navigate("/");
+      navigate("/home");
     }
     setLoading(false);
   };

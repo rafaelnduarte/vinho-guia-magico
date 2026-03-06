@@ -24,7 +24,7 @@ import logoJovem from "@/assets/logo-jovem-do-vinho.png";
 import { supabase } from "@/integrations/supabase/client";
 
 const memberLinks = [
-  { to: "/", label: "Home", icon: Home },
+  { to: "/home", label: "Home", icon: Home },
   { to: "/curadoria", label: "Curadoria", icon: Wine },
   { to: "/ranking", label: "Ranking", icon: Trophy },
   { to: "/sommelier", label: "Jovem AI", icon: Sparkles },
@@ -177,7 +177,7 @@ export default function AppLayout() {
               <NavLink
                 key={link.to}
                 to={link.to}
-                end={link.to === "/"}
+                end
                 className={({ isActive }) =>
                   cn(
                     "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
@@ -246,7 +246,7 @@ export default function AppLayout() {
                 <NavLink
                   key={link.to}
                   to={link.to}
-                  end={link.to === "/"}
+                  end
                   onClick={() => setMobileOpen(false)}
                   className={({ isActive }) =>
                     cn(

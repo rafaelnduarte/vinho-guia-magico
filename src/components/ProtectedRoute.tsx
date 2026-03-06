@@ -56,7 +56,7 @@ export function AdminRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (role !== "admin") {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/home" replace />;
   }
 
   return <>{children}</>;
