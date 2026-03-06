@@ -357,6 +357,8 @@ export type Database = {
           full_name: string | null
           id: string
           last_seen_at: string | null
+          must_change_password: boolean
+          onboarding_completed: boolean
           updated_at: string
           user_id: string
         }
@@ -367,6 +369,8 @@ export type Database = {
           full_name?: string | null
           id?: string
           last_seen_at?: string | null
+          must_change_password?: boolean
+          onboarding_completed?: boolean
           updated_at?: string
           user_id: string
         }
@@ -377,6 +381,8 @@ export type Database = {
           full_name?: string | null
           id?: string
           last_seen_at?: string | null
+          must_change_password?: boolean
+          onboarding_completed?: boolean
           updated_at?: string
           user_id?: string
         }
