@@ -414,7 +414,15 @@ function MemberDetail({ userId, onBack }: { userId: string; onBack: () => void }
             disabled={resetMutation.isPending}
             className="gap-2"
           >
-            <KeyRound className="h-4 w-4" /> Redefinir Senha
+           <KeyRound className="h-4 w-4" /> Redefinir Senha
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => { if (confirm("Resetar senha para o email do usuário? Ele será obrigado a criar uma nova senha no próximo login.")) resetOnboardingMutation.mutate(); }}
+            disabled={resetOnboardingMutation.isPending}
+            className="gap-2"
+          >
+            <RotateCcw className="h-4 w-4" /> Resetar Acesso
           </Button>
         </div>
       </div>
