@@ -135,9 +135,7 @@ Deno.serve(async (req) => {
     const lastName = event.user?.lastName ?? event.user?.last_name ?? "";
     const fullName =
       [firstName, lastName].filter(Boolean).join(" ") ||
-      event.user?.name ??
-      event.userName ??
-      null;
+      (event.user?.name ?? event.userName ?? null);
 
     const externalId =
       event.subscription?.id ??
