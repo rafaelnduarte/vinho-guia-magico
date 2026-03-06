@@ -4,7 +4,7 @@ import { Loader2, ShieldX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading, membershipActive, signOut } = useAuth();
+  const { user, loading, membershipActive, mustChangePassword, signOut } = useAuth();
 
   if (loading) {
     return (
@@ -31,6 +31,10 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
         </div>
       </div>
     );
+  }
+
+  if (mustChangePassword) {
+    return <Navigate to="/trocar-senha" replace />;
   }
 
   return <>{children}</>;

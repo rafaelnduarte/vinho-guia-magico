@@ -10,7 +10,10 @@ interface AuthContextType {
   loading: boolean;
   role: AppRole | null;
   membershipActive: boolean;
+  mustChangePassword: boolean;
+  onboardingCompleted: boolean;
   signOut: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -19,7 +22,10 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   role: null,
   membershipActive: false,
+  mustChangePassword: false,
+  onboardingCompleted: true,
   signOut: async () => {},
+  refreshProfile: async () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -30,16 +36,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<AppRole | null>(null);
   const [membershipActive, setMembershipActive] = useState(false);
+  const [mustChangePassword, setMustChangePassword] = useState(false);
+  const [onboardingCompleted, setOnboardingCompleted] = useState(true);
 
   const fetchUserData = async (userId: string) => {
-    const [roleRes, membershipRes] = await Promise.all([
+    const [roleRes, membershipRes, profileRes] = await Promise.all([
       supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
       supabase.from("memberships").select("status").eq("user_id", userId).eq("status", "active").maybeSingle(),
+      supabase.from("profiles").select("must_change_password, onboarding_completed").eq("user_id", userId).maybeSingle(),
     ]);
     setRole(roleRes.data?.role ?? "member");
-    // Admins always have access; members need active membership
     const isAdmin = roleRes.data?.role === "admin";
     setMembershipActive(isAdmin || !!membershipRes.data);
+    setMustChangePassword((profileRes.data as any)?.must_change_password ?? false);
+    setOnboardingCompleted((profileRes.data as any)?.onboarding_completed ?? true);
+  };
+
+  const refreshProfile = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from("profiles")
+      .select("must_change_password, onboarding_completed")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (data) {
+      setMustChangePassword((data as any).must_change_password ?? false);
+      setOnboardingCompleted((data as any).onboarding_completed ?? true);
+    }
   };
 
   useEffect(() => {
@@ -52,6 +75,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else {
           setRole(null);
           setMembershipActive(false);
+          setMustChangePassword(false);
+          setOnboardingCompleted(true);
           setLoading(false);
         }
       }
@@ -76,10 +101,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSession(null);
     setRole(null);
     setMembershipActive(false);
+    setMustChangePassword(false);
+    setOnboardingCompleted(true);
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, role, membershipActive, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, role, membershipActive, mustChangePassword, onboardingCompleted, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

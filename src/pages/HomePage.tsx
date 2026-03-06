@@ -2,7 +2,9 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import { ChevronLeft, ChevronRight, Wine, ImageIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import WineCard from "@/components/curadoria/WineCard";
+import OnboardingDialog from "@/components/OnboardingDialog";
 import type { MockWine } from "@/components/curadoria/WineCard";
 
 interface Banner {
@@ -105,6 +107,10 @@ function BannerPlaceholder() {
 }
 
 export default function HomePage() {
+  const { user, onboardingCompleted, refreshProfile } = useAuth();
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [profileData, setProfileData] = useState({ name: "", bio: "", avatar: null as string | null });
+
   const [banners, setBanners] = useState<Banner[]>([]);
   const [wines, setWines] = useState<MockWine[]>([]);
   const [voteCounts, setVoteCounts] = useState<Record<string, number>>({});
@@ -129,6 +135,24 @@ export default function HomePage() {
 
   const bannerNav = useCarouselNav(bannerApi);
   const wineNav = useCarouselNav(wineApi);
+
+  // Check onboarding
+  useEffect(() => {
+    if (!user || onboardingCompleted) return;
+    supabase
+      .from("profiles")
+      .select("full_name, bio, avatar_url")
+      .eq("user_id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        setProfileData({
+          name: data?.full_name || "",
+          bio: data?.bio || "",
+          avatar: data?.avatar_url || null,
+        });
+        setShowOnboarding(true);
+      });
+  }, [user, onboardingCompleted]);
 
   useEffect(() => {
     async function load() {
@@ -204,6 +228,20 @@ export default function HomePage() {
 
   return (
     <div className="animate-fade-in py-4 sm:py-6 space-y-6 sm:space-y-8 max-w-5xl mx-auto">
+      {/* Onboarding Dialog */}
+      {showOnboarding && (
+        <OnboardingDialog
+          open={showOnboarding}
+          onComplete={() => {
+            setShowOnboarding(false);
+            refreshProfile();
+          }}
+          initialName={profileData.name}
+          initialBio={profileData.bio}
+          initialAvatar={profileData.avatar}
+        />
+      )}
+
       {/* Linha 1 — Banners */}
       <section className="px-3 sm:px-4 relative">
         <div className="overflow-hidden" ref={bannerRef}>
