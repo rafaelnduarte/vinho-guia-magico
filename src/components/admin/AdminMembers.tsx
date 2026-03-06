@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, Loader2, Users, Plus, Search, ArrowLeft, BarChart3, KeyRound, Pencil, Clock, ThumbsUp, MessageSquare, Eye, Download } from "lucide-react";
+import { Upload, Loader2, Users, Plus, Search, ArrowLeft, BarChart3, KeyRound, Pencil, Clock, ThumbsUp, MessageSquare, Eye, Download, RotateCcw } from "lucide-react";
 import CsvImportDialog, { type CsvColumn, type CsvImportResult } from "./CsvImportDialog";
 import MemberBadge from "@/components/MemberBadge";
 import { exportToCsv } from "@/lib/exportCsv";
@@ -342,6 +342,15 @@ function MemberDetail({ userId, onBack }: { userId: string; onBack: () => void }
     onError: (e) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
   });
 
+  const resetOnboardingMutation = useMutation({
+    mutationFn: () => callAdminMembers("reset_onboarding", { userId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-member-detail", userId] });
+      toast({ title: "Senha redefinida", description: "A senha foi resetada para o email do usuário. No próximo login ele será obrigado a criar uma nova senha." });
+    },
+    onError: (e) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -405,7 +414,15 @@ function MemberDetail({ userId, onBack }: { userId: string; onBack: () => void }
             disabled={resetMutation.isPending}
             className="gap-2"
           >
-            <KeyRound className="h-4 w-4" /> Redefinir Senha
+           <KeyRound className="h-4 w-4" /> Redefinir Senha
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => { if (confirm("Resetar senha para o email do usuário? Ele será obrigado a criar uma nova senha no próximo login.")) resetOnboardingMutation.mutate(); }}
+            disabled={resetOnboardingMutation.isPending}
+            className="gap-2"
+          >
+            <RotateCcw className="h-4 w-4" /> Resetar Acesso
           </Button>
         </div>
       </div>
