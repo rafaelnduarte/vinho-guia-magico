@@ -147,7 +147,22 @@ Deno.serve(async (req) => {
     }
   }
 
-  // Process activations (skip if there's a later cancellation for same email)
+  // Pre-fetch all existing users ONCE to avoid repeated listUsers calls
+  const allUsers: any[] = [];
+  let page = 1;
+  while (true) {
+    const { data: batch } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 1000 });
+    if (!batch?.users?.length) break;
+    allUsers.push(...batch.users);
+    if (batch.users.length < 1000) break;
+    page++;
+  }
+  const usersByEmail = new Map<string, any>();
+  for (const u of allUsers) {
+    if (u.email) usersByEmail.set(u.email.toLowerCase(), u);
+  }
+
+  // Process activations
   const results: any[] = [];
 
   for (const [email, evt] of activationsByEmail) {
@@ -160,7 +175,7 @@ Deno.serve(async (req) => {
     const membershipType = productName.includes("radar") ? "radar" : "comunidade";
 
     try {
-      await handleActivation(supabaseAdmin, evt.event_id, email, fullName, externalId, membershipType);
+      await handleActivation(supabaseAdmin, evt.event_id, email, fullName, externalId, membershipType, usersByEmail);
       results.push({ event_id: evt.event_id, status: "activated", email });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
