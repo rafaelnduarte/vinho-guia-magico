@@ -43,6 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [onboardingCompleted, setOnboardingCompleted] = useState(true);
 
   const fetchUserData = async (userId: string) => {
+    setMembershipLoading(true);
     const [roleRes, membershipRes, profileRes] = await Promise.all([
       supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
       supabase.from("memberships").select("status").eq("user_id", userId).eq("status", "active").maybeSingle(),
@@ -53,6 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setMembershipActive(isAdmin || !!membershipRes.data);
     setMustChangePassword((profileRes.data as any)?.must_change_password ?? false);
     setOnboardingCompleted((profileRes.data as any)?.onboarding_completed ?? true);
+    setMembershipLoading(false);
   };
 
   const refreshProfile = async () => {
