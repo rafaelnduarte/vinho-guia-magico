@@ -8,6 +8,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  membershipLoading: boolean;
   role: AppRole | null;
   membershipActive: boolean;
   mustChangePassword: boolean;
