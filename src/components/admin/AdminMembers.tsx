@@ -342,6 +342,15 @@ function MemberDetail({ userId, onBack }: { userId: string; onBack: () => void }
     onError: (e) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
   });
 
+  const resetOnboardingMutation = useMutation({
+    mutationFn: () => callAdminMembers("reset_onboarding", { userId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-member-detail", userId] });
+      toast({ title: "Senha redefinida", description: "A senha foi resetada para o email do usuário. No próximo login ele será obrigado a criar uma nova senha." });
+    },
+    onError: (e) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+
   if (isLoading) {
     return (
       <div className="space-y-4">
