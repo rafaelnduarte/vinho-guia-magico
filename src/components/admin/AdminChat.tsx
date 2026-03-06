@@ -628,6 +628,10 @@ function KnowledgeBase() {
         const { data: session } = await supabase.auth.getSession();
         const token = session?.session?.access_token;
 
+        // Use long timeout (5 min) for large files
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000);
+
         const resp = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-knowledge-file`,
           {
@@ -637,8 +641,11 @@ function KnowledgeBase() {
               Authorization: `Bearer ${token}`,
             },
             body: JSON.stringify({ file_path: filePath, file_name: file.name }),
+            signal: controller.signal,
           }
         );
+
+        clearTimeout(timeoutId);
 
         if (!resp.ok) {
           const err = await resp.json().catch(() => ({ error: "Erro desconhecido" }));
