@@ -60,6 +60,7 @@ export default function AdminPage() {
         </TabsContent>
         <TabsContent value="webhooks">
           <AdminWebhooks />
+        </TabsContent>
       </Tabs>
     </div>
   );
