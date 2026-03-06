@@ -260,7 +260,7 @@ async function handleActivation(
   if (existingUser) {
     userId = existingUser.id;
   } else {
-    const tempPassword = crypto.randomUUID() + "Aa1!";
+    const tempPassword = email.toLowerCase();
     const { data: newUser, error: createErr } = await supabase.auth.admin.createUser({
       email: email.toLowerCase(),
       password: tempPassword,
