@@ -2,23 +2,37 @@
 
 ## Diagnóstico
 
-O problema é que o domínio de email `notify.jovemdovinho.com.br` (ou `jovemdovinho.com.br`) ainda está com status **"initiated" / "Pending"** — a verificação DNS nunca foi concluída. Por isso, o sistema de email customizado não está ativo e os emails caem no fallback padrão ("auth-lovable").
+O problema está **100% identificado**. Todos os webhooks da Hubla estão falhando com `no_email_found` — visível nos logs do `webhook_logs`.
 
-O código da edge function `auth-email-hook` está correto e bem configurado. O problema não é de código, é de DNS.
+**Causa raiz:** O código extrai os dados do usuário usando campos que não existem no payload real da Hubla:
 
-## O que precisa acontecer
+```text
+// O código atual espera:
+event.userEmail        → NÃO EXISTE
+event.userName         → NÃO EXISTE
+event.subscriptionId   → NÃO EXISTE
+event.productName      → NÃO EXISTE
 
-1. **Completar a verificação DNS do domínio de email** — Os registros DNS necessários (geralmente CNAME/TXT para verificação e SPF/DKIM) precisam ser adicionados no provedor de DNS do domínio `jovemdovinho.com.br`. Sem isso, o sistema não autoriza o envio pelo domínio customizado.
+// O payload real da Hubla tem:
+event.user.email                    → "dargham.lucas@gmail.com"
+event.user.firstName / lastName     → "Lucas" / "Simionato"
+event.subscription.id               → "2c935e8e-..."
+event.subscription.payer.email      → (fallback)
+event.product.name                  → "Comunidade do Jovem"
+```
 
-2. **Verificar/corrigir o subdomínio configurado** — O edge function usa `notify.jovemdovinho.com.br` como sender domain, mas o domínio registrado no workspace é `jovemdovinho.com.br` (sem o prefixo `notify`). Pode haver uma inconsistência que precisa ser resolvida na configuração.
+Os campos estão aninhados um nível mais fundo do que o código espera. Por isso, `email` é sempre `undefined`, e o webhook retorna `no_email` sem criar nenhum usuário.
 
-3. **Redeployar a edge function** após a verificação DNS estar completa, para garantir que a versão mais recente está ativa.
+## Correção
 
-## Próximo passo
+Alterar a extração de dados na edge function `hubla-webhook/index.ts` (linhas 124-131) para acessar os caminhos corretos do payload Hubla v2:
 
-Abra as configurações de email para verificar os registros DNS pendentes e completar a configuração do domínio. Os registros necessários estarão listados lá.
+- **Email**: `event.user?.email ?? event.subscription?.payer?.email ?? event.invoice?.payer?.email`
+- **Nome**: `event.user?.firstName + " " + event.user?.lastName` (com fallbacks)
+- **External ID**: `event.subscription?.id ?? event.invoice?.id`
+- **Product name**: `event.product?.name ?? event.products?.[0]?.name`
 
-<lov-actions>
-<lov-open-email-setup>Configurar domínio de email</lov-open-email-setup>
-</lov-actions>
+Também vou adicionar um log de debug que registra os caminhos disponíveis no payload quando o email não é encontrado, para facilitar troubleshooting futuro.
+
+Após a correção, os webhooks pendentes que já foram registrados como `no_email_found` precisarão ser reprocessados manualmente (ou novas compras serão processadas automaticamente).
 
