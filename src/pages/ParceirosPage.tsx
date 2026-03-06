@@ -115,15 +115,13 @@ function PartnerCard({ partner }: { partner: Partner }) {
   return (
     <div className="rounded-xl border border-border bg-card p-5 flex gap-4 items-start">
       {/* Logo — square with rounded corners */}
-      <div className="h-16 w-16 flex-shrink-0 rounded-xl bg-muted/50 flex items-center justify-center overflow-hidden">
-        {logo ? (
-          <img src={logo} alt={partner.name} className="h-full w-full object-contain p-1.5" />
+      {logo ? (
+          <img src={logo} alt={partner.name} className="h-16 w-16 flex-shrink-0 rounded-xl object-contain" />
         ) : (
-          <span className="text-xs font-medium text-muted-foreground text-center leading-tight px-1">
+          <span className="h-16 w-16 flex-shrink-0 rounded-xl flex items-center justify-center text-xs font-medium text-muted-foreground">
             {partner.name.slice(0, 2).toUpperCase()}
           </span>
         )}
-      </div>
 
       {/* Info */}
       <div className="flex-1 min-w-0 space-y-1.5">
