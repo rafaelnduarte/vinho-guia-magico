@@ -19,24 +19,45 @@ export default function ResetPasswordPage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Check if we have a recovery session from the email link
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+    // Listen for auth events FIRST — the recovery link triggers PASSWORD_RECOVERY
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
+        if (session) {
+          setValidSession(true);
+          setChecking(false);
+        }
+      }
+    });
+
+    // Also check if there's a hash fragment with tokens (recovery redirect)
+    const hash = window.location.hash;
+    if (hash && (hash.includes("type=recovery") || hash.includes("access_token"))) {
+      // Supabase client will automatically process the hash fragment
+      // and trigger onAuthStateChange — just wait a bit longer
+      const timeout = setTimeout(() => {
+        // Fallback: check session after giving Supabase time to process the hash
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (session) {
+            setValidSession(true);
+          }
+          setChecking(false);
+        });
+      }, 2000);
+
+      return () => {
+        timeout && clearTimeout(timeout);
+        subscription.unsubscribe();
+      };
+    }
+
+    // No hash fragment — check existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         setValidSession(true);
       }
       setChecking(false);
-    };
-
-    // Listen for auth events - the recovery link triggers PASSWORD_RECOVERY
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") {
-        setValidSession(true);
-        setChecking(false);
-      }
     });
 
-    checkSession();
     return () => subscription.unsubscribe();
   }, []);
 
@@ -71,6 +92,8 @@ export default function ResetPasswordPage() {
         variant: "destructive",
       });
     } else {
+      // Sign out so user logs in fresh with new password
+      await supabase.auth.signOut();
       setSuccess(true);
       setTimeout(() => navigate("/login"), 3000);
     }
