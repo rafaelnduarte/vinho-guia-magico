@@ -9,7 +9,7 @@ import AdminAnalytics from "@/components/admin/AdminAnalytics";
 import AdminTutorials from "@/components/admin/AdminTutorials";
 import AdminChat from "@/components/admin/AdminChat";
 import AdminBanners from "@/components/admin/AdminBanners";
-import AdminWebhooks from "@/components/admin/AdminWebhooks";
+
 
 export default function AdminPage() {
   return (
@@ -30,7 +30,7 @@ export default function AdminPage() {
             <TabsTrigger value="seals" className="text-xs sm:text-sm px-3 py-2">Selos</TabsTrigger>
             <TabsTrigger value="tutorials" className="text-xs sm:text-sm px-3 py-2">Tutoriais</TabsTrigger>
             <TabsTrigger value="chat" className="text-xs sm:text-sm px-3 py-2">Jovem AI</TabsTrigger>
-            <TabsTrigger value="webhooks" className="text-xs sm:text-sm px-3 py-2">Webhooks</TabsTrigger>
+            
           </TabsList>
         </div>
 
@@ -57,9 +57,6 @@ export default function AdminPage() {
         </TabsContent>
         <TabsContent value="chat">
           <AdminChat />
-        </TabsContent>
-        <TabsContent value="webhooks">
-          <AdminWebhooks />
         </TabsContent>
       </Tabs>
     </div>
