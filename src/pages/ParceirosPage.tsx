@@ -21,7 +21,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   importadoras: "Importadoras",
   lojas: "Lojas de Vinho",
   produtores: "Produtores",
-  restaurantes: "Restaurantes",
+  restaurantes: "Experiências",
   acessorios: "Acessórios",
 };
 

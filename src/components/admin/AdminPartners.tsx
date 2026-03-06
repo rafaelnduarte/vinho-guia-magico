@@ -19,7 +19,7 @@ const CATEGORY_OPTIONS = [
   { value: "importadoras", label: "Importadoras" },
   { value: "lojas", label: "Lojas de Vinho" },
   { value: "produtores", label: "Produtores" },
-  { value: "restaurantes", label: "Restaurantes" },
+  { value: "restaurantes", label: "Experiências" },
   { value: "acessorios", label: "Acessórios" },
 ];
 
@@ -28,13 +28,14 @@ interface PartnerForm {
   logo_url: string;
   website_url: string;
   coupon_code: string;
+  discount: string;
   conditions: string;
   is_active: boolean;
   category: string;
 }
 
 const emptyForm: PartnerForm = {
-  name: "", logo_url: "", website_url: "", coupon_code: "", conditions: "", is_active: true, category: "importadoras",
+  name: "", logo_url: "", website_url: "", coupon_code: "", discount: "", conditions: "", is_active: true, category: "importadoras",
 };
 
 export default function AdminPartners() {
@@ -109,6 +110,7 @@ export default function AdminPartners() {
         logo_url: form.logo_url.trim() || null,
         website_url: form.website_url.trim() || null,
         coupon_code: form.coupon_code.trim() || null,
+        discount: form.discount.trim() || null,
         conditions: form.conditions.trim() || null,
         is_active: form.is_active,
         category: form.category,
@@ -147,7 +149,7 @@ export default function AdminPartners() {
   const openEdit = (p: PartnerRow) => {
     setForm({
       name: p.name, logo_url: p.logo_url ?? "", website_url: p.website_url ?? "",
-      coupon_code: p.coupon_code ?? "", conditions: p.conditions ?? "", is_active: p.is_active,
+      coupon_code: p.coupon_code ?? "", discount: p.discount ?? "", conditions: p.conditions ?? "", is_active: p.is_active,
       category: p.category ?? "importadoras",
     });
     setEditing(p.id);
@@ -308,6 +310,10 @@ export default function AdminPartners() {
             <div className="space-y-1">
               <Label>Cupom</Label>
               <Input value={form.coupon_code} onChange={(e) => setField("coupon_code", e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label>Desconto</Label>
+              <Input value={form.discount} onChange={(e) => setField("discount", e.target.value)} placeholder="Ex: 10% de desconto" />
             </div>
             <div className="space-y-1">
               <Label>Condições</Label>
