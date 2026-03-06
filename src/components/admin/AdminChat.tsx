@@ -10,7 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   BarChart3, DollarSign, Users, MessageSquare, Settings,
   Loader2, Save, Wine, Plus, Trash2, Edit2, Check, X,
-  BookOpen, FileText, ToggleLeft, ToggleRight, Download, Clock
+  BookOpen, FileText, ToggleLeft, ToggleRight, Download, Clock,
+  Upload, File
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -511,6 +512,8 @@ function KnowledgeBase() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ title: "", content: "", category: "geral" });
   const [newEntry, setNewEntry] = useState({ title: "", content: "", category: "geral" });
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
 
   const { data: entries, isLoading } = useQuery({
     queryKey: ["admin-knowledge-base"],
@@ -534,6 +537,7 @@ function KnowledgeBase() {
     onSuccess: () => {
       toast({ title: "Documento adicionado!" });
       setNewEntry({ title: "", content: "", category: "geral" });
+      setUploadedFileName(null);
       queryClient.invalidateQueries({ queryKey: ["admin-knowledge-base"] });
     },
     onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
@@ -581,6 +585,84 @@ function KnowledgeBase() {
     onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
   });
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      toast({ title: "Arquivo muito grande", description: "Máximo 10MB", variant: "destructive" });
+      return;
+    }
+
+    const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+    const supportedExts = ["txt", "md", "csv", "tsv", "pdf"];
+    if (!supportedExts.includes(ext)) {
+      toast({ title: "Formato não suportado", description: "Use .txt, .md, .csv ou .pdf", variant: "destructive" });
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadedFileName(file.name);
+
+    try {
+      // For text files, read directly in browser
+      if (["txt", "md", "csv", "tsv"].includes(ext)) {
+        const text = await file.text();
+        setNewEntry(p => ({
+          ...p,
+          content: text,
+          title: p.title || file.name.replace(/\.[^/.]+$/, ""),
+        }));
+        toast({ title: "Arquivo carregado", description: `${text.length} caracteres extraídos` });
+      } else {
+        // PDF: upload to storage, then call edge function to extract text
+        const filePath = `${crypto.randomUUID()}-${file.name}`;
+        const { error: uploadErr } = await supabase.storage
+          .from("knowledge-files")
+          .upload(filePath, file);
+
+        if (uploadErr) throw new Error(`Upload falhou: ${uploadErr.message}`);
+
+        // Call parse function
+        const { data: session } = await supabase.auth.getSession();
+        const token = session?.session?.access_token;
+
+        const resp = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-knowledge-file`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ file_path: filePath, file_name: file.name }),
+          }
+        );
+
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({ error: "Erro desconhecido" }));
+          throw new Error(err.error || `Erro ${resp.status}`);
+        }
+
+        const { text } = await resp.json();
+        setNewEntry(p => ({
+          ...p,
+          content: text,
+          title: p.title || file.name.replace(/\.[^/.]+$/, ""),
+        }));
+        toast({ title: "PDF processado", description: `${text.length} caracteres extraídos via IA` });
+      }
+    } catch (err: any) {
+      toast({ title: "Erro ao processar arquivo", description: err.message, variant: "destructive" });
+      setUploadedFileName(null);
+    } finally {
+      setIsUploading(false);
+      // Reset file input
+      e.target.value = "";
+    }
+  };
+
   const categories = [
     { value: "geral", label: "Geral" },
     { value: "regioes", label: "Regiões" },
@@ -600,7 +682,7 @@ function KnowledgeBase() {
       </h3>
       <p className="text-xs text-muted-foreground">
         Adicione documentos, artigos e textos que o Jovem AI usará como referência. 
-        Esses conteúdos são injetados automaticamente no contexto quando relevantes à pergunta do usuário.
+        Você pode digitar o conteúdo ou fazer upload de arquivos (.txt, .md, .csv, .pdf).
       </p>
 
       {/* Add new entry */}
@@ -619,15 +701,46 @@ function KnowledgeBase() {
             {categories.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
           </SelectContent>
         </Select>
+
+        {/* File upload area */}
+        <div className="flex items-center gap-2">
+          <label className="flex-1">
+            <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-dashed border-border cursor-pointer hover:bg-accent/50 transition-colors">
+              {isUploading ? (
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              ) : (
+                <Upload className="h-4 w-4 text-muted-foreground" />
+              )}
+              <span className="text-xs text-muted-foreground">
+                {isUploading
+                  ? "Processando arquivo..."
+                  : uploadedFileName
+                    ? uploadedFileName
+                    : "Upload de arquivo (.txt, .md, .csv, .pdf)"}
+              </span>
+              {uploadedFileName && !isUploading && (
+                <File className="h-3 w-3 text-primary ml-auto" />
+              )}
+            </div>
+            <input
+              type="file"
+              accept=".txt,.md,.csv,.tsv,.pdf"
+              className="hidden"
+              onChange={handleFileUpload}
+              disabled={isUploading}
+            />
+          </label>
+        </div>
+
         <Textarea
           value={newEntry.content}
           onChange={e => setNewEntry(p => ({ ...p, content: e.target.value }))}
-          placeholder="Cole aqui o conteúdo do documento, artigo ou texto de referência..."
+          placeholder="Cole aqui o conteúdo ou faça upload de um arquivo acima..."
           rows={6}
         />
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted-foreground">{newEntry.content.length} caracteres</span>
-          <Button size="sm" onClick={() => addMutation.mutate()} disabled={addMutation.isPending} className="gap-1">
+          <Button size="sm" onClick={() => addMutation.mutate()} disabled={addMutation.isPending || !newEntry.content.trim()} className="gap-1">
             <Plus className="h-3 w-3" /> Adicionar
           </Button>
         </div>
