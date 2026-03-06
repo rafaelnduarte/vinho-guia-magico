@@ -312,6 +312,9 @@ export default function AdminPartners() {
               <Input value={form.coupon_code} onChange={(e) => setField("coupon_code", e.target.value)} />
             </div>
             <div className="space-y-1">
+              <Label>Desconto</Label>
+              <Input value={form.discount} onChange={(e) => setField("discount", e.target.value)} placeholder="Ex: 10% de desconto" />
+            <div className="space-y-1">
               <Label>Condições</Label>
               <Textarea value={form.conditions} onChange={(e) => setField("conditions", e.target.value)} rows={2} />
             </div>
