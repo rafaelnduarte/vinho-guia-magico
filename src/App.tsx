@@ -8,6 +8,7 @@ import { ProtectedRoute, AdminRoute } from "@/components/ProtectedRoute";
 import AppLayout from "@/components/AppLayout";
 import LoginPage from "@/pages/LoginPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
+import ForceChangePasswordPage from "@/pages/ForceChangePasswordPage";
 import HomePage from "@/pages/HomePage";
 import CuradoriaPage from "@/pages/CuradoriaPage";
 import WineDetailPage from "@/pages/WineDetailPage";
@@ -31,6 +32,7 @@ const App = () => (
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/trocar-senha" element={<ForceChangePasswordPage />} />
             <Route
               element={
                 <ProtectedRoute>

@@ -151,7 +151,7 @@ Deno.serve(async (req) => {
         if (existing) {
           userId = existing.id;
         } else {
-          const userPassword = password || (crypto.randomUUID() + "Aa1!");
+          const userPassword = password || email.toLowerCase();
           const { data: newUser, error: createErr } = await adminClient.auth.admin.createUser({
             email,
             password: userPassword,
