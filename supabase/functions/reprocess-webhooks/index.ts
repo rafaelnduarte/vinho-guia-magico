@@ -232,18 +232,15 @@ async function logWebhook(
 
 async function handleActivation(
   supabase: any, eventId: string, email: string,
-  fullName: string | null, externalId: string, membershipType: string
+  fullName: string | null, externalId: string, membershipType: string,
+  usersByEmail: Map<string, any>
 ) {
   let userId: string;
-  const { data: existingUsers } = await supabase.auth.admin.listUsers();
-  const existingUser = existingUsers?.users?.find(
-    (u: any) => u.email?.toLowerCase() === email.toLowerCase()
-  );
+  const existingUser = usersByEmail.get(email.toLowerCase());
 
   if (existingUser) {
     userId = existingUser.id;
   } else {
-    // Create user WITHOUT sending any email notification
     const tempPassword = crypto.randomUUID() + "Aa1!";
     const { data: newUser, error: createErr } = await supabase.auth.admin.createUser({
       email: email.toLowerCase(),
@@ -253,19 +250,17 @@ async function handleActivation(
     });
     if (createErr) throw new Error(`Failed to create user: ${createErr.message}`);
     userId = newUser.user.id;
+    // Add to cache for subsequent lookups
+    usersByEmail.set(email.toLowerCase(), newUser.user);
     await logWebhook(supabase, eventId, "reprocess_user_created", "success", { userId, email });
   }
 
   const { data: existingMembership } = await supabase
-    .from("memberships")
-    .select("id, status")
-    .eq("user_id", userId)
-    .eq("source", "hubla")
-    .maybeSingle();
+    .from("memberships").select("id, status")
+    .eq("user_id", userId).eq("source", "hubla").maybeSingle();
 
   if (existingMembership) {
-    await supabase
-      .from("memberships")
+    await supabase.from("memberships")
       .update({ status: "active", ended_at: null, external_id: externalId, membership_type: membershipType })
       .eq("id", existingMembership.id);
   } else {
@@ -282,32 +277,4 @@ async function handleActivation(
   }
 
   await logWebhook(supabase, eventId, "reprocess_activation_complete", "success", { userId, email });
-}
-
-async function handleCancellation(
-  supabase: any, eventId: string, email: string, externalId: string
-) {
-  const { data: existingUsers } = await supabase.auth.admin.listUsers();
-  const user = existingUsers?.users?.find(
-    (u: any) => u.email?.toLowerCase() === email.toLowerCase()
-  );
-
-  if (!user) {
-    await logWebhook(supabase, eventId, "reprocess_cancel_user_not_found", "warn", { email });
-    return;
-  }
-
-  const { data: membership } = await supabase
-    .from("memberships").select("id")
-    .eq("user_id", user.id).eq("source", "hubla").eq("status", "active").maybeSingle();
-
-  if (membership) {
-    await supabase.from("memberships")
-      .update({ status: "inactive", ended_at: new Date().toISOString() })
-      .eq("id", membership.id);
-  }
-
-  await logWebhook(supabase, eventId, "reprocess_cancellation_complete", "success", {
-    userId: user.id, email,
-  });
 }
