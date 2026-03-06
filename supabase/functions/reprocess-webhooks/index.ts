@@ -52,40 +52,35 @@ Deno.serve(async (req) => {
   const dryRun = body.dry_run === true;
   const specificIds: string[] | null = body.event_ids ?? null;
 
-  // Find failed webhook events by joining with webhook_logs
-  let query = supabaseAdmin
+  // Only fetch activation events that previously failed
+  const activationTypes = [
+    "NewUser", "NewSale",
+    "subscription.activated", "subscription.renewed", "subscription.created",
+    "customer.member_added", "invoice.payment_succeeded",
+    "purchase.approved", "purchase.completed", "payment.approved", "invoice.paid",
+  ];
+
+  // Get failed event IDs from logs
+  const { data: failedLogs, error: logErr } = await supabaseAdmin
     .from("webhook_logs")
     .select("event_id")
     .eq("action", "no_email_found")
     .eq("status", "warn");
-
-  const { data: failedLogs, error: logErr } = await query;
   if (logErr) return json(500, { error: logErr.message });
 
-  const failedEventIds = [...new Set(
-    (failedLogs ?? [])
-      .map((l: any) => l.event_id)
-      .filter(Boolean)
-  )];
+  const failedEventIds = [...new Set((failedLogs ?? []).map((l: any) => l.event_id).filter(Boolean))];
+  if (failedEventIds.length === 0) return json(200, { status: "nothing_to_reprocess", count: 0, results: [] });
 
-  // Filter to specific IDs if provided
-  const targetIds = specificIds
-    ? failedEventIds.filter((id: string) => specificIds.includes(id))
-    : failedEventIds;
-
-  if (targetIds.length === 0) {
-    return json(200, { status: "nothing_to_reprocess", count: 0, results: [] });
-  }
-
-  // Fetch the actual webhook events in batches to avoid URL length limits
+  // Fetch only activation-type events in batches
   const BATCH_SIZE = 30;
   const allEvents: any[] = [];
-  for (let i = 0; i < targetIds.length; i += BATCH_SIZE) {
-    const batch = targetIds.slice(i, i + BATCH_SIZE);
+  for (let i = 0; i < failedEventIds.length; i += BATCH_SIZE) {
+    const batch = failedEventIds.slice(i, i + BATCH_SIZE);
     const { data: batchEvents, error: evErr } = await supabaseAdmin
       .from("webhook_events")
       .select("*")
-      .in("event_id", batch);
+      .in("event_id", batch)
+      .in("event_type", activationTypes);
     if (evErr) return json(500, { error: evErr.message });
     if (batchEvents) allEvents.push(...batchEvents);
   }
