@@ -73,13 +73,20 @@ Deno.serve(async (req) => {
     return json(200, { status: "nothing_to_reprocess", count: 0, results: [] });
   }
 
-  // Fetch the actual webhook events
-  const { data: events, error: evErr } = await supabaseAdmin
-    .from("webhook_events")
-    .select("*")
-    .in("event_id", targetIds);
+  // Fetch the actual webhook events in batches to avoid URL length limits
+  const BATCH_SIZE = 30;
+  const allEvents: any[] = [];
+  for (let i = 0; i < targetIds.length; i += BATCH_SIZE) {
+    const batch = targetIds.slice(i, i + BATCH_SIZE);
+    const { data: batchEvents, error: evErr } = await supabaseAdmin
+      .from("webhook_events")
+      .select("*")
+      .in("event_id", batch);
+    if (evErr) return json(500, { error: evErr.message });
+    if (batchEvents) allEvents.push(...batchEvents);
+  }
 
-  if (evErr) return json(500, { error: evErr.message });
+  const events = allEvents;
 
   if (dryRun) {
     const preview = (events ?? []).map((e: any) => {
