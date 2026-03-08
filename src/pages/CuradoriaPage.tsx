@@ -183,7 +183,7 @@ export default function CuradoriaPage() {
     });
 
     return result;
-  }, [wines, search, typeFilter, countryFilter, importerFilter, regionFilter, sealFilter, sort, wineSealsData]);
+  }, [wines, search, tab, typeFilter, countryFilter, importerFilter, regionFilter, sealFilter, sort, wineSealsData]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
