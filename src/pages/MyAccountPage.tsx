@@ -183,12 +183,19 @@ export default function MyAccountPage() {
                 type="file"
                 accept="image/*"
                 className="hidden"
-                onChange={handleAvatarUpload}
+                onChange={handleAvatarSelect}
               />
             </div>
             <div className="text-sm text-muted-foreground">
-              Clique para trocar a foto.<br />Máx. 2MB.
+              Clique para trocar a foto.<br />Máx. 5MB.
             </div>
+
+            <AvatarCropDialog
+              open={cropOpen}
+              imageSrc={cropSrc}
+              onClose={() => { setCropOpen(false); setCropSrc(null); }}
+              onConfirm={handleCroppedUpload}
+            />
           </div>
 
           {/* Name */}
