@@ -43,7 +43,7 @@ export default function AdminMembers() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
-  const [createForm, setCreateForm] = useState({ email: "", full_name: "", status: "active", membership_type: "comunidade", role: "member" as "member" | "admin" });
+  const [createForm, setCreateForm] = useState({ email: "", full_name: "", status: "active", membership_type: "radar", role: "member" as "member" | "admin" });
 
   const { data: members, isLoading } = useQuery({
     queryKey: ["admin-members-enriched"],
@@ -65,7 +65,7 @@ export default function AdminMembers() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-members-enriched"] });
       setCreateOpen(false);
-      setCreateForm({ email: "", full_name: "", status: "active", membership_type: "comunidade", role: "member" });
+      setCreateForm({ email: "", full_name: "", status: "active", membership_type: "radar", role: "member" });
       toast({ title: "Membro criado com sucesso" });
     },
     onError: (e) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
@@ -82,7 +82,7 @@ export default function AdminMembers() {
           email: rows[i].email?.toLowerCase(),
           full_name: rows[i].full_name,
           status: rows[i].status?.toLowerCase() || "active",
-          membership_type: rows[i].membership_type?.toLowerCase() || "comunidade",
+          membership_type: rows[i].membership_type?.toLowerCase() || "radar",
           role: rows[i].role?.toLowerCase() || "member",
           source: rows[i].source || "csv_import",
         });
