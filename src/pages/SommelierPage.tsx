@@ -37,7 +37,7 @@ const QUICK_SUGGESTIONS = [
 ];
 
 export default function SommelierPage() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const { toast } = useToast();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
