@@ -831,6 +831,17 @@ export type Database = {
         }
         Returns: boolean
       }
+      list_members_paginated: {
+        Args: {
+          _membership_type?: string
+          _page?: number
+          _page_size?: number
+          _role?: string
+          _search?: string
+          _status?: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       app_role: "admin" | "member"

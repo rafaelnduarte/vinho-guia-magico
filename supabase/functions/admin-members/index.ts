@@ -44,38 +44,24 @@ Deno.serve(async (req) => {
 
     switch (action) {
       case "list_members": {
-        const { data: memberships } = await adminClient
-          .from("memberships")
-          .select("*")
-          .order("created_at", { ascending: false });
+        const page = params.page ?? 1;
+        const pageSize = params.pageSize ?? 50;
+        const search = params.search ?? "";
+        const status = params.status ?? "";
+        const membershipType = params.membership_type ?? "";
+        const role = params.role ?? "";
 
-        const userIds = [...new Set((memberships ?? []).map((m: any) => m.user_id))];
+        const { data: result, error: rpcErr } = await adminClient.rpc("list_members_paginated", {
+          _page: page,
+          _page_size: pageSize,
+          _search: search,
+          _status: status,
+          _membership_type: membershipType,
+          _role: role,
+        });
+        if (rpcErr) throw rpcErr;
 
-        const { data: profiles } = await adminClient
-          .from("profiles")
-          .select("user_id, full_name, avatar_url, last_seen_at")
-          .in("user_id", userIds);
-        const profileMap: Record<string, any> = {};
-        for (const p of profiles ?? []) profileMap[p.user_id] = p;
-
-        const emailMap: Record<string, string> = {};
-        for (const uid of userIds) {
-          const { data: { user: authUser } } = await adminClient.auth.admin.getUserById(uid);
-          if (authUser?.email) emailMap[uid] = authUser.email;
-        }
-
-        const { data: roles } = await adminClient.from("user_roles").select("user_id, role");
-        const roleMap: Record<string, string> = {};
-        for (const r of roles ?? []) roleMap[r.user_id] = r.role;
-
-        const enriched = (memberships ?? []).map((m: any) => ({
-          ...m,
-          profiles: profileMap[m.user_id] ?? null,
-          email: emailMap[m.user_id] ?? "—",
-          role: roleMap[m.user_id] ?? "member",
-        }));
-
-        return new Response(JSON.stringify(enriched), {
+        return new Response(JSON.stringify(result), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -198,7 +184,7 @@ Deno.serve(async (req) => {
             // Upsert membership
             const membershipType = row.membership_type?.toLowerCase() || "radar";
             const status = row.status?.toLowerCase() || "active";
-            const source = row.source || "csv_import";
+            const source = row.source || "csv";
 
             const { data: existingMembership } = await adminClient
               .from("memberships")
