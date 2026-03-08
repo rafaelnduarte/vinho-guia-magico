@@ -17,6 +17,8 @@ const memberColumns: CsvColumn[] = [
   { key: "email", label: "Email", required: true, validate: (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? null : "Email inválido" },
   { key: "full_name", label: "Nome Completo", required: true },
   { key: "status", label: "Status", validate: (v) => ["active", "inactive"].includes(v.toLowerCase()) ? null : "Use 'active' ou 'inactive'" },
+  { key: "membership_type", label: "Tipo", validate: (v) => ["radar", "comunidade"].includes(v.toLowerCase()) ? null : "Use 'radar' ou 'comunidade'" },
+  { key: "role", label: "Role", validate: (v) => ["admin", "member"].includes(v.toLowerCase()) ? null : "Use 'admin' ou 'member'" },
   { key: "source", label: "Origem" },
   { key: "external_id", label: "ID Externo" },
 ];
@@ -80,6 +82,8 @@ export default function AdminMembers() {
           email: rows[i].email?.toLowerCase(),
           full_name: rows[i].full_name,
           status: rows[i].status?.toLowerCase() || "active",
+          membership_type: rows[i].membership_type?.toLowerCase() || "comunidade",
+          role: rows[i].role?.toLowerCase() || "member",
           source: rows[i].source || "csv_import",
         });
         success++;
