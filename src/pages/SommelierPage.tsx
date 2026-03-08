@@ -28,8 +28,8 @@ interface ChatSession {
   created_at: string;
   user_id: string;
   owner_name?: string;
+  owner_membership?: "radar" | "comunidade" | "admin";
 }
-
 const QUICK_SUGGESTIONS = [
   { label: "🍷 Harmonização", prompt: "Me ajuda com harmonização! Qual vinho do portal combina com um jantar de massas?" },
   { label: "✈️ Flight de 4", prompt: "Monte um flight de 4 vinhos do portal por um tema interessante." },
