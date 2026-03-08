@@ -25,6 +25,8 @@ interface ChatSession {
   id: string;
   title: string;
   created_at: string;
+  user_id: string;
+  owner_name?: string;
 }
 
 const QUICK_SUGGESTIONS = [
