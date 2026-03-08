@@ -242,38 +242,55 @@ export default function SommelierPage() {
       <div className="flex flex-1 overflow-hidden relative">
         {/* Sidebar - sessions */}
         <div className={cn(
-          "absolute inset-y-0 left-0 z-30 w-64 bg-card border-r border-border transition-transform md:relative md:translate-x-0",
+          "absolute inset-y-0 left-0 z-30 w-72 bg-card/95 backdrop-blur-sm border-r border-border transition-transform md:relative md:translate-x-0 flex flex-col",
           showSidebar ? "translate-x-0" : "-translate-x-full"
         )}>
-          <div className="p-3 border-b border-border flex items-center justify-between">
-            <span className="text-sm font-medium text-foreground">Conversas</span>
-            <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setShowSidebar(false)}>
+          <div className="px-4 py-3 border-b border-border flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-2">
+              <MessageSquare className="h-4 w-4 text-primary" />
+              <span className="text-sm font-semibold text-foreground">Histórico</span>
+            </div>
+            <Button variant="ghost" size="icon" className="h-7 w-7 md:hidden" onClick={() => setShowSidebar(false)}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
           </div>
-          <ScrollArea className="h-full">
-            <div className="p-2 space-y-1">
-              {sessions?.map(s => (
-                <button
-                  key={s.id}
-                  onClick={() => loadSession(s.id)}
-                  className={cn(
-                    "w-full text-left px-3 py-2 rounded-md text-sm transition-colors",
-                    sessionId === s.id
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:bg-muted/50"
-                  )}
-                >
-                  <span className="block truncate">{s.title}</span>
-                  {s.owner_name && (
-                    <span className="block text-[10px] text-muted-foreground/70 truncate mt-0.5">
-                      👤 {s.owner_name}
+          <ScrollArea className="flex-1">
+            <div className="p-2 space-y-0.5">
+              {sessions?.map(s => {
+                const isActive = sessionId === s.id;
+                const isOwn = !s.owner_name;
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => loadSession(s.id)}
+                    className={cn(
+                      "w-full text-left px-3 py-2.5 rounded-lg text-sm transition-all group",
+                      isActive
+                        ? "bg-primary/10 text-primary shadow-sm"
+                        : "text-foreground/80 hover:bg-muted/40"
+                    )}
+                  >
+                    <span className="block truncate text-[13px] leading-snug font-medium">
+                      {s.title || "Nova conversa"}
                     </span>
-                  )}
-                </button>
-              ))}
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <span className="text-[11px] text-muted-foreground/60">
+                        {new Date(s.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
+                      </span>
+                      {!isOwn && (
+                        <span className="text-[11px] text-primary/70 bg-primary/5 px-1.5 py-0.5 rounded truncate max-w-[120px]">
+                          {s.owner_name}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
               {(!sessions || sessions.length === 0) && (
-                <p className="text-xs text-muted-foreground text-center py-4">Nenhuma conversa ainda</p>
+                <div className="text-center py-8 px-4">
+                  <MessageSquare className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
+                  <p className="text-xs text-muted-foreground/60">Nenhuma conversa ainda</p>
+                </div>
               )}
             </div>
           </ScrollArea>

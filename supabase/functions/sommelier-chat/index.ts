@@ -369,7 +369,34 @@ serve(async (req) => {
       });
     }
 
-    // 12. Update summary if conversation is long
+    // 12a. Auto-generate session title after first exchange (when history was empty)
+    if (allHistory.length === 0) {
+      fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${lovableApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash-lite",
+          messages: [
+            { role: "system", content: "Crie um título MUITO curto (máximo 6 palavras) em português para esta conversa sobre vinhos. Retorne APENAS o título, sem aspas, sem pontuação final." },
+            { role: "user", content: `Pergunta: ${message.slice(0, 200)}\nResposta: ${assistantContent.slice(0, 300)}` },
+          ],
+          max_tokens: 30,
+        }),
+      }).then(async (res) => {
+        if (res.ok) {
+          const data = await res.json();
+          const title = data.choices?.[0]?.message?.content?.trim();
+          if (title) {
+            await adminClient.from("chat_sessions").update({ title: title.slice(0, 80) }).eq("id", sessionId);
+          }
+        }
+      }).catch(console.error);
+    }
+
+    // 12b. Update summary if conversation is long
     if (allHistory.length >= 12 && allHistory.length % 6 === 0) {
       // Generate summary asynchronously (fire and forget)
       const summaryMessages = allHistory.map(m => `${m.role}: ${m.content.slice(0, 100)}`).join("\n");
