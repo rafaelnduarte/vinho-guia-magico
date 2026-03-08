@@ -184,7 +184,7 @@ Deno.serve(async (req) => {
             // Upsert membership
             const membershipType = row.membership_type?.toLowerCase() || "radar";
             const status = row.status?.toLowerCase() || "active";
-            const source = row.source || "csv_import";
+            const source = row.source || "csv";
 
             const { data: existingMembership } = await adminClient
               .from("memberships")

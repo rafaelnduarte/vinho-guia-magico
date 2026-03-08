@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -8,10 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, Loader2, Users, Plus, Search, ArrowLeft, BarChart3, KeyRound, Pencil, Clock, ThumbsUp, MessageSquare, Eye, Download, RotateCcw } from "lucide-react";
+import { Upload, Loader2, Users, Plus, Search, ArrowLeft, BarChart3, KeyRound, Pencil, Clock, ThumbsUp, MessageSquare, Eye, Download, RotateCcw, ChevronLeft, ChevronRight } from "lucide-react";
 import CsvImportDialog, { type CsvColumn, type CsvImportResult } from "./CsvImportDialog";
 import MemberBadge from "@/components/MemberBadge";
 import { exportToCsv } from "@/lib/exportCsv";
+
+const PAGE_SIZE = 50;
 
 const memberColumns: CsvColumn[] = [
   { key: "email", label: "Email", required: true, validate: (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? null : "Email inválido" },
@@ -24,7 +26,6 @@ const memberColumns: CsvColumn[] = [
 ];
 
 async function callAdminMembers(action: string, params: Record<string, any> = {}) {
-  const { data: { session } } = await supabase.auth.getSession();
   const resp = await supabase.functions.invoke("admin-members", {
     body: { action, ...params },
   });
@@ -39,16 +40,44 @@ export default function AdminMembers() {
   const [csvOpen, setCsvOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+
+  // Server-side pagination & filters
+  const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchInput, setSearchInput] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
   const [createForm, setCreateForm] = useState({ email: "", full_name: "", status: "active", membership_type: "radar", role: "member" as "member" | "admin" });
 
-  const { data: members, isLoading } = useQuery({
-    queryKey: ["admin-members-enriched"],
-    queryFn: () => callAdminMembers("list_members"),
+  const queryKey = ["admin-members-paginated", page, searchQuery, statusFilter, typeFilter, roleFilter];
+
+  const { data: membersResult, isLoading } = useQuery({
+    queryKey,
+    queryFn: () => callAdminMembers("list_members", {
+      page,
+      pageSize: PAGE_SIZE,
+      search: searchQuery,
+      status: statusFilter === "all" ? "" : statusFilter,
+      membership_type: typeFilter === "all" ? "" : typeFilter,
+      role: roleFilter === "all" ? "" : roleFilter,
+    }),
+    placeholderData: (prev) => prev,
   });
+
+  const members = membersResult?.data ?? [];
+  const totalMembers = membersResult?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalMembers / PAGE_SIZE));
+
+  const handleFilterChange = useCallback((setter: (v: string) => void) => (v: string) => {
+    setter(v);
+    setPage(1);
+  }, []);
+
+  const handleSearchSubmit = useCallback(() => {
+    setSearchQuery(searchInput);
+    setPage(1);
+  }, [searchInput]);
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -63,7 +92,7 @@ export default function AdminMembers() {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-members-enriched"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-members-paginated"] });
       setCreateOpen(false);
       setCreateForm({ email: "", full_name: "", status: "active", membership_type: "radar", role: "member" });
       toast({ title: "Membro criado com sucesso" });
@@ -78,7 +107,7 @@ export default function AdminMembers() {
       status: row.status?.toLowerCase() || "active",
       membership_type: row.membership_type?.toLowerCase() || "radar",
       role: row.role?.toLowerCase() || "member",
-      source: row.source || "csv_import",
+      source: row.source || "csv",
       external_id: row.external_id || null,
     }));
 
@@ -86,67 +115,63 @@ export default function AdminMembers() {
     let totalSuccess = 0;
     let totalSkipped = 0;
     const allErrors: CsvImportResult["errors"] = [];
-
     const totalBatches = Math.ceil(allMembers.length / BATCH_SIZE);
 
     for (let i = 0; i < allMembers.length; i += BATCH_SIZE) {
       const batch = allMembers.slice(i, i + BATCH_SIZE);
       const batchNum = Math.floor(i / BATCH_SIZE) + 1;
-      
+
       toast({ title: `Importando lote ${batchNum}/${totalBatches}...`, description: `${i + 1}-${Math.min(i + BATCH_SIZE, allMembers.length)} de ${allMembers.length}` });
 
       try {
         const result = await callAdminMembers("bulk_create_members", { members: batch });
-
         totalSuccess += result.success ?? 0;
         totalSkipped += result.skipped ?? 0;
         (result.errors ?? []).forEach((e: any) => {
           allErrors.push({ row: (e.row ?? 0) + i, field: "geral", message: `${e.email}: ${e.message}` });
         });
       } catch (batchErr: any) {
-        // Log but continue with next batch
         console.error(`Batch ${batchNum} failed:`, batchErr.message);
         batch.forEach((m, j) => {
           allErrors.push({ row: i + j + 2, field: "geral", message: `${m.email}: Erro no lote - ${batchErr.message}` });
         });
       }
 
-      // Small delay between batches to avoid rate limiting
       if (i + BATCH_SIZE < allMembers.length) {
         await new Promise(r => setTimeout(r, 500));
       }
     }
 
-    queryClient.invalidateQueries({ queryKey: ["admin-members-enriched"] });
+    queryClient.invalidateQueries({ queryKey: ["admin-members-paginated"] });
     return { success: totalSuccess, errors: allErrors, skipped: totalSkipped };
   };
 
-  const filteredMembers = (members ?? []).filter((m: any) => {
-    if (statusFilter !== "all" && m.status !== statusFilter) return false;
-    if (typeFilter !== "all" && m.membership_type !== typeFilter) return false;
-    if (roleFilter !== "all" && m.role !== roleFilter) return false;
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      if (!m.email?.toLowerCase().includes(q) && !m.profiles?.full_name?.toLowerCase().includes(q)) return false;
+  const handleExport = async () => {
+    // Export all matching members (not just current page)
+    try {
+      const allData = await callAdminMembers("list_members", {
+        page: 1,
+        pageSize: 10000,
+        search: searchQuery,
+        status: statusFilter === "all" ? "" : statusFilter,
+        membership_type: typeFilter === "all" ? "" : typeFilter,
+        role: roleFilter === "all" ? "" : roleFilter,
+      });
+      const rows = (allData?.data ?? []).map((m: any) => [
+        m.full_name || "",
+        "", // email not available from DB function
+        m.status === "active" ? "Ativo" : "Inativo",
+        m.membership_type || "comunidade",
+        m.role || "member",
+        m.source || "",
+        m.started_at ? new Date(m.started_at).toLocaleDateString("pt-BR") : "",
+      ]);
+      exportToCsv(`membros-${new Date().toISOString().slice(0, 10)}.csv`, ["Nome", "Email", "Status", "Tipo", "Role", "Origem", "Membro desde"], rows);
+    } catch (e: any) {
+      toast({ title: "Erro ao exportar", description: e.message, variant: "destructive" });
     }
-    return true;
-  });
-
-  const handleExport = () => {
-    const headers = ["Nome", "Email", "Status", "Tipo", "Role", "Origem", "Membro desde"];
-    const rows = filteredMembers.map((m: any) => [
-      m.profiles?.full_name || "",
-      m.email || "",
-      m.status === "active" ? "Ativo" : "Inativo",
-      m.membership_type || "comunidade",
-      m.role || "member",
-      m.source || "",
-      m.started_at ? new Date(m.started_at).toLocaleDateString("pt-BR") : "",
-    ]);
-    exportToCsv(`membros-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
   };
 
-  // If a member is selected, show detail view
   if (selectedUserId) {
     return <MemberDetail userId={selectedUserId} onBack={() => setSelectedUserId(null)} />;
   }
@@ -154,7 +179,7 @@ export default function AdminMembers() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <h2 className="text-lg font-semibold text-foreground">Membros ({members?.length ?? 0})</h2>
+        <h2 className="text-lg font-semibold text-foreground">Membros ({totalMembers})</h2>
         <div className="flex gap-2">
           <Button onClick={handleExport} variant="outline" className="gap-2">
             <Download className="h-4 w-4" /> Exportar
@@ -170,16 +195,16 @@ export default function AdminMembers() {
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
+        <form className="relative flex-1" onSubmit={(e) => { e.preventDefault(); handleSearchSubmit(); }}>
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por nome ou email..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Buscar por nome... (Enter para buscar)"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             className="pl-9"
           />
-        </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
+        </form>
+        <Select value={statusFilter} onValueChange={handleFilterChange(setStatusFilter)}>
           <SelectTrigger className="w-full sm:w-40"><SelectValue placeholder="Status" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos os status</SelectItem>
@@ -187,7 +212,7 @@ export default function AdminMembers() {
             <SelectItem value="inactive">Inativo</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={typeFilter} onValueChange={setTypeFilter}>
+        <Select value={typeFilter} onValueChange={handleFilterChange(setTypeFilter)}>
           <SelectTrigger className="w-full sm:w-40"><SelectValue placeholder="Tipo" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos os tipos</SelectItem>
@@ -195,7 +220,7 @@ export default function AdminMembers() {
             <SelectItem value="comunidade">Comunidade</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={roleFilter} onValueChange={setRoleFilter}>
+        <Select value={roleFilter} onValueChange={handleFilterChange(setRoleFilter)}>
           <SelectTrigger className="w-full sm:w-40"><SelectValue placeholder="Role" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas as roles</SelectItem>
@@ -208,59 +233,77 @@ export default function AdminMembers() {
       {isLoading ? (
         <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
       ) : (
-        <div className="rounded-lg border border-border overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50 text-left">
-                <tr>
-                  <th className="px-4 py-3 font-medium">Membro</th>
-                  <th className="px-4 py-3 font-medium">Email</th>
-                  <th className="px-4 py-3 font-medium hidden md:table-cell">Origem</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium hidden lg:table-cell">Desde</th>
-                  <th className="px-4 py-3 font-medium text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {filteredMembers.map((m: any) => (
-                  <tr key={m.id} className="hover:bg-muted/30 cursor-pointer" onClick={() => setSelectedUserId(m.user_id)}>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
-                          <Users className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                        <p className="font-medium text-foreground">
-                          {m.profiles?.full_name || "Sem nome"}
-                        </p>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">{m.email}</td>
-                    <td className="px-4 py-3 hidden md:table-cell text-muted-foreground">{m.source}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <MemberBadge type={m.role === "admin" ? "admin" : (m.membership_type || "comunidade")} />
-                        <Badge variant={m.status === "active" ? "default" : "secondary"}>
-                          {m.status === "active" ? "Ativo" : "Inativo"}
-                        </Badge>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 hidden lg:table-cell text-muted-foreground">
-                      {new Date(m.started_at).toLocaleDateString("pt-BR")}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setSelectedUserId(m.user_id); }}>
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                    </td>
+        <>
+          <div className="rounded-lg border border-border overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/50 text-left">
+                  <tr>
+                    <th className="px-4 py-3 font-medium">Membro</th>
+                    <th className="px-4 py-3 font-medium hidden md:table-cell">Origem</th>
+                    <th className="px-4 py-3 font-medium">Status</th>
+                    <th className="px-4 py-3 font-medium hidden lg:table-cell">Desde</th>
+                    <th className="px-4 py-3 font-medium text-right">Ações</th>
                   </tr>
-                ))}
-                {filteredMembers.length === 0 && (
-                  <tr><td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">Nenhum membro encontrado.</td></tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {members.map((m: any) => (
+                    <tr key={m.id} className="hover:bg-muted/30 cursor-pointer" onClick={() => setSelectedUserId(m.user_id)}>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+                            <Users className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                          <p className="font-medium text-foreground">
+                            {m.full_name || "Sem nome"}
+                          </p>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 hidden md:table-cell text-muted-foreground">{m.source}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <MemberBadge type={m.role === "admin" ? "admin" : (m.membership_type || "comunidade")} />
+                          <Badge variant={m.status === "active" ? "default" : "secondary"}>
+                            {m.status === "active" ? "Ativo" : "Inativo"}
+                          </Badge>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 hidden lg:table-cell text-muted-foreground">
+                        {m.started_at ? new Date(m.started_at).toLocaleDateString("pt-BR") : "—"}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setSelectedUserId(m.user_id); }}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                  {members.length === 0 && (
+                    <tr><td colSpan={5} className="px-4 py-12 text-center text-muted-foreground">Nenhum membro encontrado.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-2">
+              <p className="text-sm text-muted-foreground">
+                Mostrando {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, totalMembers)} de {totalMembers}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="gap-1">
+                  <ChevronLeft className="h-4 w-4" /> Anterior
+                </Button>
+                <span className="text-sm text-foreground font-medium">{page} / {totalPages}</span>
+                <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} className="gap-1">
+                  Próximo <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Create Member Dialog */}
@@ -352,7 +395,7 @@ function MemberDetail({ userId, onBack }: { userId: string; onBack: () => void }
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-member-detail", userId] });
-      queryClient.invalidateQueries({ queryKey: ["admin-members-enriched"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-members-paginated"] });
       setEditOpen(false);
       toast({ title: "Membro atualizado" });
     },
@@ -361,7 +404,7 @@ function MemberDetail({ userId, onBack }: { userId: string; onBack: () => void }
 
   const resetMutation = useMutation({
     mutationFn: () => callAdminMembers("reset_password", { email: data?.email }),
-    onSuccess: (resp) => {
+    onSuccess: () => {
       toast({ title: "Link de recuperação gerado", description: "O link foi gerado. Copie e envie ao membro." });
     },
     onError: (e) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
@@ -403,12 +446,9 @@ function MemberDetail({ userId, onBack }: { userId: string; onBack: () => void }
     setEditOpen(true);
   };
 
-  // Group activity by type
   const pageViewCount = data.stats?.pageViews ?? 0;
   const voteCount = data.stats?.voteCount ?? 0;
   const commentCount = data.stats?.commentCount ?? 0;
-
-  // Recent activity
   const recentActivity = (data.recentActivity ?? []).slice(0, 20);
 
   return (
@@ -439,11 +479,11 @@ function MemberDetail({ userId, onBack }: { userId: string; onBack: () => void }
             disabled={resetMutation.isPending}
             className="gap-2"
           >
-           <KeyRound className="h-4 w-4" /> Redefinir Senha
+            <KeyRound className="h-4 w-4" /> Redefinir Senha
           </Button>
           <Button
             variant="outline"
-            onClick={() => { if (confirm("Resetar senha para o email do usuário? Ele será obrigado a criar uma nova senha no próximo login.")) resetOnboardingMutation.mutate(); }}
+            onClick={() => { if (confirm("Resetar senha para o email do usuário?")) resetOnboardingMutation.mutate(); }}
             disabled={resetOnboardingMutation.isPending}
             className="gap-2"
           >
