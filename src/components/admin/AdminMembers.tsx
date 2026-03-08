@@ -43,7 +43,7 @@ export default function AdminMembers() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
-  const [createForm, setCreateForm] = useState({ email: "", full_name: "", status: "active", membership_type: "comunidade", role: "member" as "member" | "admin" });
+  const [createForm, setCreateForm] = useState({ email: "", full_name: "", status: "active", membership_type: "radar", role: "member" as "member" | "admin" });
 
   const { data: members, isLoading } = useQuery({
     queryKey: ["admin-members-enriched"],
