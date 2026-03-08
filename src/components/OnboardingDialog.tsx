@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from "react";
+import AvatarCropDialog from "@/components/AvatarCropDialog";
 import confetti from "canvas-confetti";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -49,18 +50,30 @@ export default function OnboardingDialog({
   const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
   const [uploading, setUploading] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
+  const [cropOpen, setCropOpen] = useState(false);
 
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !user) return;
-    if (file.size > 2 * 1024 * 1024) {
-      toast({ title: "Arquivo muito grande", description: "Máximo de 2MB.", variant: "destructive" });
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: "Arquivo muito grande", description: "Máximo de 5MB.", variant: "destructive" });
       return;
     }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCropSrc(reader.result as string);
+      setCropOpen(true);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const handleCroppedUpload = async (blob: Blob) => {
+    if (!user) return;
     setUploading(true);
-    const ext = file.name.split(".").pop();
-    const path = `avatars/${user.id}.${ext}`;
-    const { error } = await supabase.storage.from("wine-images").upload(path, file, { upsert: true });
+    const path = `avatars/${user.id}.jpg`;
+    const { error } = await supabase.storage.from("wine-images").upload(path, blob, { upsert: true, contentType: "image/jpeg" });
     if (error) {
       toast({ title: "Erro no upload", description: error.message, variant: "destructive" });
       setUploading(false);
@@ -71,6 +84,8 @@ export default function OnboardingDialog({
     await supabase.from("profiles").update({ avatar_url: url }).eq("user_id", user.id);
     setAvatarUrl(url);
     setUploading(false);
+    setCropOpen(false);
+    setCropSrc(null);
   };
 
   const handleSaveProfile = async () => {
@@ -233,9 +248,15 @@ export default function OnboardingDialog({
                     type="file"
                     accept="image/*"
                     className="hidden"
-                    onChange={handleAvatarUpload}
+                    onChange={handleAvatarSelect}
                   />
                 </div>
+                <AvatarCropDialog
+                  open={cropOpen}
+                  imageSrc={cropSrc}
+                  onClose={() => { setCropOpen(false); setCropSrc(null); }}
+                  onConfirm={handleCroppedUpload}
+                />
               </div>
 
               {/* Name */}

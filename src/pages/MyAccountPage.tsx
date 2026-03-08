@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import AvatarCropDialog from "@/components/AvatarCropDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,8 @@ export default function MyAccountPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
+  const [cropOpen, setCropOpen] = useState(false);
 
   // Password
   const [newPassword, setNewPassword] = useState("");
@@ -54,22 +57,29 @@ export default function MyAccountPage() {
     });
   }, [user]);
 
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !user) return;
-
-    if (file.size > 2 * 1024 * 1024) {
-      toast({ title: "Arquivo muito grande", description: "Máximo de 2MB.", variant: "destructive" });
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: "Arquivo muito grande", description: "Máximo de 5MB.", variant: "destructive" });
       return;
     }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCropSrc(reader.result as string);
+      setCropOpen(true);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
 
+  const handleCroppedUpload = async (blob: Blob) => {
+    if (!user) return;
     setUploading(true);
-    const ext = file.name.split(".").pop();
-    const path = `avatars/${user.id}.${ext}`;
-
+    const path = `avatars/${user.id}.jpg`;
     const { error: uploadError } = await supabase.storage
       .from("wine-images")
-      .upload(path, file, { upsert: true });
+      .upload(path, blob, { upsert: true, contentType: "image/jpeg" });
 
     if (uploadError) {
       toast({ title: "Erro no upload", description: uploadError.message, variant: "destructive" });
@@ -77,19 +87,13 @@ export default function MyAccountPage() {
       return;
     }
 
-    const { data: publicUrlData } = supabase.storage
-      .from("wine-images")
-      .getPublicUrl(path);
-
+    const { data: publicUrlData } = supabase.storage.from("wine-images").getPublicUrl(path);
     const url = publicUrlData.publicUrl + "?t=" + Date.now();
-
-    await supabase
-      .from("profiles")
-      .update({ avatar_url: url })
-      .eq("user_id", user.id);
-
+    await supabase.from("profiles").update({ avatar_url: url }).eq("user_id", user.id);
     setAvatarUrl(url);
     setUploading(false);
+    setCropOpen(false);
+    setCropSrc(null);
     toast({ title: "Foto atualizada!" });
   };
 
@@ -179,12 +183,19 @@ export default function MyAccountPage() {
                 type="file"
                 accept="image/*"
                 className="hidden"
-                onChange={handleAvatarUpload}
+                onChange={handleAvatarSelect}
               />
             </div>
             <div className="text-sm text-muted-foreground">
-              Clique para trocar a foto.<br />Máx. 2MB.
+              Clique para trocar a foto.<br />Máx. 5MB.
             </div>
+
+            <AvatarCropDialog
+              open={cropOpen}
+              imageSrc={cropSrc}
+              onClose={() => { setCropOpen(false); setCropSrc(null); }}
+              onConfirm={handleCroppedUpload}
+            />
           </div>
 
           {/* Name */}
