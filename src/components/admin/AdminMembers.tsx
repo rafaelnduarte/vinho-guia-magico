@@ -52,20 +52,24 @@ export default function AdminMembers() {
 
   const queryKey = ["admin-members-paginated", page, searchQuery, statusFilter, typeFilter, roleFilter];
 
-  const { data: membersResult, isLoading } = useQuery({
+  const { data: membersResult, isLoading, isError, error } = useQuery({
     queryKey,
-    queryFn: () => callAdminMembers("list_members", {
-      page,
-      pageSize: PAGE_SIZE,
-      search: searchQuery,
-      status: statusFilter === "all" ? "" : statusFilter,
-      membership_type: typeFilter === "all" ? "" : typeFilter,
-      role: roleFilter === "all" ? "" : roleFilter,
-    }),
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("list_members_paginated", {
+        _page: page,
+        _page_size: PAGE_SIZE,
+        _search: searchQuery,
+        _status: statusFilter === "all" ? "" : statusFilter,
+        _membership_type: typeFilter === "all" ? "" : typeFilter,
+        _role: roleFilter === "all" ? "" : roleFilter,
+      });
+      if (error) throw error;
+      return data as { data: any[]; total: number; page: number; page_size: number } | null;
+    },
     placeholderData: (prev) => prev,
   });
 
-  const members = membersResult?.data ?? [];
+  const members = Array.isArray(membersResult?.data) ? membersResult.data : [];
   const totalMembers = membersResult?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalMembers / PAGE_SIZE));
 
@@ -232,6 +236,14 @@ export default function AdminMembers() {
 
       {isLoading ? (
         <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+      ) : isError ? (
+        <div className="text-center py-12 text-destructive">
+          <p className="font-medium">Erro ao carregar membros</p>
+          <p className="text-sm text-muted-foreground mt-1">{(error as any)?.message || "Tente novamente"}</p>
+          <Button variant="outline" className="mt-4" onClick={() => queryClient.invalidateQueries({ queryKey: ["admin-members-paginated"] })}>
+            <RotateCcw className="h-4 w-4 mr-2" /> Tentar novamente
+          </Button>
+        </div>
       ) : (
         <>
           <div className="rounded-lg border border-border overflow-hidden">
