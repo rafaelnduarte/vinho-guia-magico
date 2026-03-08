@@ -236,6 +236,14 @@ export default function AdminMembers() {
 
       {isLoading ? (
         <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+      ) : isError ? (
+        <div className="text-center py-12 text-destructive">
+          <p className="font-medium">Erro ao carregar membros</p>
+          <p className="text-sm text-muted-foreground mt-1">{(error as any)?.message || "Tente novamente"}</p>
+          <Button variant="outline" className="mt-4" onClick={() => queryClient.invalidateQueries({ queryKey: ["admin-members-paginated"] })}>
+            <RotateCcw className="h-4 w-4 mr-2" /> Tentar novamente
+          </Button>
+        </div>
       ) : (
         <>
           <div className="rounded-lg border border-border overflow-hidden">
