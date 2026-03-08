@@ -156,20 +156,6 @@ Deno.serve(async (req) => {
         }
         const uniqueRows = Array.from(emailMap.values());
 
-        // Build email lookup cache from auth (paginated)
-        const existingEmailMap = new Map<string, string>(); // email -> userId
-        let page = 1;
-        const perPage = 1000;
-        while (true) {
-          const { data: listData, error: listErr } = await adminClient.auth.admin.listUsers({ page, perPage });
-          if (listErr) throw listErr;
-          for (const u of listData.users) {
-            if (u.email) existingEmailMap.set(u.email.toLowerCase(), u.id);
-          }
-          if (listData.users.length < perPage) break;
-          page++;
-        }
-
         let success = 0;
         let skipped = 0;
         const errors: { row: number; email: string; message: string }[] = [];
@@ -180,20 +166,29 @@ Deno.serve(async (req) => {
             const email = row.email?.toLowerCase();
             if (!email) { skipped++; continue; }
 
-            let userId = existingEmailMap.get(email);
+            let userId: string | undefined;
 
-            if (!userId) {
-              // Create user
-              const userPassword = row.password || email;
-              const { data: newUser, error: createErr } = await adminClient.auth.admin.createUser({
-                email,
-                password: userPassword,
-                email_confirm: true,
-                user_metadata: { full_name: row.full_name },
-              });
-              if (createErr) throw createErr;
+            // Try to create user first — fastest path for new users
+            const userPassword = row.password || email;
+            const { data: newUser, error: createErr } = await adminClient.auth.admin.createUser({
+              email,
+              password: userPassword,
+              email_confirm: true,
+              user_metadata: { full_name: row.full_name },
+            });
+
+            if (newUser?.user) {
               userId = newUser.user.id;
-              existingEmailMap.set(email, userId);
+            } else if (createErr?.message?.includes("already been registered")) {
+              // Look up existing user via DB function (fast, indexed)
+              const { data: existingId } = await adminClient.rpc("get_user_id_by_email", { _email: email });
+              if (existingId) {
+                userId = existingId;
+              } else {
+                throw new Error("User exists but could not resolve ID");
+              }
+            } else if (createErr) {
+              throw createErr;
             }
 
             // Upsert membership

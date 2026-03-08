@@ -81,7 +81,7 @@ export default function AdminMembers() {
       source: row.source || "csv_import",
     }));
 
-    const BATCH_SIZE = 50;
+    const BATCH_SIZE = 25;
     let totalSuccess = 0;
     let totalSkipped = 0;
     const allErrors: CsvImportResult["errors"] = [];
