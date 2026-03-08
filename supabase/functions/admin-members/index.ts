@@ -180,28 +180,13 @@ Deno.serve(async (req) => {
             if (newUser?.user) {
               userId = newUser.user.id;
             } else if (createErr?.message?.includes("already been registered")) {
-              // User exists — fetch by email using listUsers with a 1-page filter workaround
-              const { data: listData } = await adminClient.auth.admin.listUsers({ page: 1, perPage: 1 });
-              // listUsers doesn't filter by email, so search directly
-              // Use a workaround: get all users is too slow; instead query profiles
-              const { data: profile } = await adminClient
-                .from("profiles")
-                .select("user_id")
-                .eq("user_id", (await adminClient.rpc("get_user_id_by_email", { _email: email })).data)
-                .maybeSingle();
-              
-              // Fallback: iterate to find user (but limited)
-              if (!userId) {
-                let pg = 1;
-                while (!userId) {
-                  const { data: pg_data } = await adminClient.auth.admin.listUsers({ page: pg, perPage: 100 });
-                  const found = pg_data?.users?.find((u: any) => u.email?.toLowerCase() === email);
-                  if (found) { userId = found.id; break; }
-                  if (!pg_data?.users?.length || pg_data.users.length < 100) break;
-                  pg++;
-                }
+              // Look up existing user via DB function (fast, indexed)
+              const { data: existingId } = await adminClient.rpc("get_user_id_by_email", { _email: email });
+              if (existingId) {
+                userId = existingId;
+              } else {
+                throw new Error("User exists but could not resolve ID");
               }
-              if (!userId) throw new Error("User exists but could not resolve ID");
             } else if (createErr) {
               throw createErr;
             }
