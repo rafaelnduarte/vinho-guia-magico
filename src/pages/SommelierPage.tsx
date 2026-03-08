@@ -78,20 +78,27 @@ export default function SommelierPage() {
       }
 
       // For admins, resolve owner names for other users' sessions
-      const otherUserIds = [...new Set(sessionsRaw.filter(s => s.user_id !== user!.id).map(s => s.user_id))];
+      const allOtherUserIds = [...new Set(sessionsRaw.filter(s => s.user_id !== user!.id).map(s => s.user_id))];
       let profileMap: Record<string, string> = {};
+      let membershipMap: Record<string, string> = {};
 
-      if (otherUserIds.length > 0) {
-        const { data: profiles } = await supabase
-          .from("profiles")
-          .select("user_id, full_name")
-          .in("user_id", otherUserIds);
+      if (allOtherUserIds.length > 0) {
+        const [{ data: profiles }, { data: memberships }, { data: roles }] = await Promise.all([
+          supabase.from("profiles").select("user_id, full_name").in("user_id", allOtherUserIds),
+          supabase.from("memberships").select("user_id, membership_type").eq("status", "active").in("user_id", allOtherUserIds),
+          supabase.from("user_roles").select("user_id, role").in("user_id", allOtherUserIds),
+        ]);
         profileMap = Object.fromEntries((profiles ?? []).map(p => [p.user_id, p.full_name ?? "Usuário"]));
+        const roleMap = Object.fromEntries((roles ?? []).map(r => [r.user_id, r.role]));
+        (memberships ?? []).forEach(m => { membershipMap[m.user_id] = m.membership_type; });
+        // Override with admin role
+        Object.entries(roleMap).forEach(([uid, role]) => { if (role === "admin") membershipMap[uid] = "admin"; });
       }
 
       return sessionsRaw.map(s => ({
         ...s,
         owner_name: s.user_id !== user!.id ? (profileMap[s.user_id] || "Usuário") : undefined,
+        owner_membership: s.user_id !== user!.id ? (membershipMap[s.user_id] as any || "comunidade") : undefined,
       })) as ChatSession[];
     },
     enabled: !!user,
