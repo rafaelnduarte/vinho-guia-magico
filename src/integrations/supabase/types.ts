@@ -809,6 +809,7 @@ export type Database = {
           vote_count: number
         }[]
       }
+      get_user_id_by_email: { Args: { _email: string }; Returns: string }
       get_wine_rankings: {
         Args: { period?: string }
         Returns: {
