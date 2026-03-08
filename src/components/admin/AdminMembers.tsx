@@ -65,7 +65,7 @@ export default function AdminMembers() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-members-enriched"] });
       setCreateOpen(false);
-      setCreateForm({ email: "", full_name: "", status: "active", membership_type: "comunidade", role: "member" });
+      setCreateForm({ email: "", full_name: "", status: "active", membership_type: "radar", role: "member" });
       toast({ title: "Membro criado com sucesso" });
     },
     onError: (e) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
