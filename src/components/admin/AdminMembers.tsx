@@ -82,7 +82,7 @@ export default function AdminMembers() {
           email: rows[i].email?.toLowerCase(),
           full_name: rows[i].full_name,
           status: rows[i].status?.toLowerCase() || "active",
-          membership_type: rows[i].membership_type?.toLowerCase() || "comunidade",
+          membership_type: rows[i].membership_type?.toLowerCase() || "radar",
           role: rows[i].role?.toLowerCase() || "member",
           source: rows[i].source || "csv_import",
         });
