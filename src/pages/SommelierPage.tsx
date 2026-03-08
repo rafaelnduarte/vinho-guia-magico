@@ -288,9 +288,11 @@ export default function SommelierPage() {
                         {new Date(s.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
                       </span>
                       {!isOwn && (
-                        <span className="text-[11px] text-primary/70 bg-primary/5 px-1.5 py-0.5 rounded truncate max-w-[120px]">
-                          {s.owner_name}
-                        </span>
+                        <>
+                          <span className="text-[11px] text-muted-foreground/40">·</span>
+                          <span className="truncate max-w-[80px] text-[11px] text-muted-foreground/70">{s.owner_name}</span>
+                          <MemberBadge type={s.owner_membership || "comunidade"} className="scale-[0.8] origin-left" />
+                        </>
                       )}
                     </div>
                   </button>
