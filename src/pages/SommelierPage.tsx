@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import MemberBadge from "@/components/MemberBadge";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -27,8 +28,8 @@ interface ChatSession {
   created_at: string;
   user_id: string;
   owner_name?: string;
+  owner_membership?: "radar" | "comunidade" | "admin";
 }
-
 const QUICK_SUGGESTIONS = [
   { label: "🍷 Harmonização", prompt: "Me ajuda com harmonização! Qual vinho do portal combina com um jantar de massas?" },
   { label: "✈️ Flight de 4", prompt: "Monte um flight de 4 vinhos do portal por um tema interessante." },
@@ -77,20 +78,27 @@ export default function SommelierPage() {
       }
 
       // For admins, resolve owner names for other users' sessions
-      const otherUserIds = [...new Set(sessionsRaw.filter(s => s.user_id !== user!.id).map(s => s.user_id))];
+      const allOtherUserIds = [...new Set(sessionsRaw.filter(s => s.user_id !== user!.id).map(s => s.user_id))];
       let profileMap: Record<string, string> = {};
+      let membershipMap: Record<string, string> = {};
 
-      if (otherUserIds.length > 0) {
-        const { data: profiles } = await supabase
-          .from("profiles")
-          .select("user_id, full_name")
-          .in("user_id", otherUserIds);
+      if (allOtherUserIds.length > 0) {
+        const [{ data: profiles }, { data: memberships }, { data: roles }] = await Promise.all([
+          supabase.from("profiles").select("user_id, full_name").in("user_id", allOtherUserIds),
+          supabase.from("memberships").select("user_id, membership_type").eq("status", "active").in("user_id", allOtherUserIds),
+          supabase.from("user_roles").select("user_id, role").in("user_id", allOtherUserIds),
+        ]);
         profileMap = Object.fromEntries((profiles ?? []).map(p => [p.user_id, p.full_name ?? "Usuário"]));
+        const roleMap = Object.fromEntries((roles ?? []).map(r => [r.user_id, r.role]));
+        (memberships ?? []).forEach(m => { membershipMap[m.user_id] = m.membership_type; });
+        // Override with admin role
+        Object.entries(roleMap).forEach(([uid, role]) => { if (role === "admin") membershipMap[uid] = "admin"; });
       }
 
       return sessionsRaw.map(s => ({
         ...s,
         owner_name: s.user_id !== user!.id ? (profileMap[s.user_id] || "Usuário") : undefined,
+        owner_membership: s.user_id !== user!.id ? (membershipMap[s.user_id] as any || "comunidade") : undefined,
       })) as ChatSession[];
     },
     enabled: !!user,
@@ -280,9 +288,11 @@ export default function SommelierPage() {
                         {new Date(s.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
                       </span>
                       {!isOwn && (
-                        <span className="text-[11px] text-primary/70 bg-primary/5 px-1.5 py-0.5 rounded truncate max-w-[120px]">
-                          {s.owner_name}
-                        </span>
+                        <>
+                          <span className="text-[11px] text-muted-foreground/40">·</span>
+                          <span className="truncate max-w-[80px] text-[11px] text-muted-foreground/70">{s.owner_name}</span>
+                          <MemberBadge type={s.owner_membership || "comunidade"} className="scale-[0.8] origin-left" />
+                        </>
                       )}
                     </div>
                   </button>
