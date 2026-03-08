@@ -25,6 +25,8 @@ interface ChatSession {
   id: string;
   title: string;
   created_at: string;
+  user_id: string;
+  owner_name?: string;
 }
 
 const QUICK_SUGGESTIONS = [
@@ -35,7 +37,7 @@ const QUICK_SUGGESTIONS = [
 ];
 
 export default function SommelierPage() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const { toast } = useToast();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -49,17 +51,47 @@ export default function SommelierPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Fetch user sessions
+  const isAdmin = role === "admin";
+
+  // Fetch sessions — admins see all (with owner name), members see only own
   const { data: sessions, refetch: refetchSessions } = useQuery({
-    queryKey: ["chat-sessions", user?.id],
+    queryKey: ["chat-sessions", user?.id, isAdmin],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("chat_sessions")
-        .select("id, title, created_at")
+        .select("id, title, created_at, user_id")
         .order("updated_at", { ascending: false })
-        .limit(20);
+        .limit(30);
+
+      if (!isAdmin) {
+        query = query.eq("user_id", user!.id);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
-      return (data ?? []) as ChatSession[];
+
+      const sessionsRaw = data ?? [];
+
+      if (!isAdmin) {
+        return sessionsRaw.map(s => ({ ...s, owner_name: undefined })) as ChatSession[];
+      }
+
+      // For admins, resolve owner names for other users' sessions
+      const otherUserIds = [...new Set(sessionsRaw.filter(s => s.user_id !== user!.id).map(s => s.user_id))];
+      let profileMap: Record<string, string> = {};
+
+      if (otherUserIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("user_id, full_name")
+          .in("user_id", otherUserIds);
+        profileMap = Object.fromEntries((profiles ?? []).map(p => [p.user_id, p.full_name ?? "Usuário"]));
+      }
+
+      return sessionsRaw.map(s => ({
+        ...s,
+        owner_name: s.user_id !== user!.id ? (profileMap[s.user_id] || "Usuário") : undefined,
+      })) as ChatSession[];
     },
     enabled: !!user,
   });
@@ -226,13 +258,18 @@ export default function SommelierPage() {
                   key={s.id}
                   onClick={() => loadSession(s.id)}
                   className={cn(
-                    "w-full text-left px-3 py-2 rounded-md text-sm truncate transition-colors",
+                    "w-full text-left px-3 py-2 rounded-md text-sm transition-colors",
                     sessionId === s.id
                       ? "bg-primary/10 text-primary"
                       : "text-muted-foreground hover:bg-muted/50"
                   )}
                 >
-                  {s.title}
+                  <span className="block truncate">{s.title}</span>
+                  {s.owner_name && (
+                    <span className="block text-[10px] text-muted-foreground/70 truncate mt-0.5">
+                      👤 {s.owner_name}
+                    </span>
+                  )}
                 </button>
               ))}
               {(!sessions || sessions.length === 0) && (
