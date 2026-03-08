@@ -79,27 +79,42 @@ export default function AdminMembers() {
       membership_type: row.membership_type?.toLowerCase() || "radar",
       role: row.role?.toLowerCase() || "member",
       source: row.source || "csv_import",
+      external_id: row.external_id || null,
     }));
 
-    const BATCH_SIZE = 25;
+    const BATCH_SIZE = 10;
     let totalSuccess = 0;
     let totalSkipped = 0;
     const allErrors: CsvImportResult["errors"] = [];
 
+    const totalBatches = Math.ceil(allMembers.length / BATCH_SIZE);
+
     for (let i = 0; i < allMembers.length; i += BATCH_SIZE) {
       const batch = allMembers.slice(i, i + BATCH_SIZE);
       const batchNum = Math.floor(i / BATCH_SIZE) + 1;
-      const totalBatches = Math.ceil(allMembers.length / BATCH_SIZE);
       
       toast({ title: `Importando lote ${batchNum}/${totalBatches}...`, description: `${i + 1}-${Math.min(i + BATCH_SIZE, allMembers.length)} de ${allMembers.length}` });
 
-      const result = await callAdminMembers("bulk_create_members", { members: batch });
+      try {
+        const result = await callAdminMembers("bulk_create_members", { members: batch });
 
-      totalSuccess += result.success ?? 0;
-      totalSkipped += result.skipped ?? 0;
-      (result.errors ?? []).forEach((e: any) => {
-        allErrors.push({ row: (e.row ?? 0) + i, field: "geral", message: `${e.email}: ${e.message}` });
-      });
+        totalSuccess += result.success ?? 0;
+        totalSkipped += result.skipped ?? 0;
+        (result.errors ?? []).forEach((e: any) => {
+          allErrors.push({ row: (e.row ?? 0) + i, field: "geral", message: `${e.email}: ${e.message}` });
+        });
+      } catch (batchErr: any) {
+        // Log but continue with next batch
+        console.error(`Batch ${batchNum} failed:`, batchErr.message);
+        batch.forEach((m, j) => {
+          allErrors.push({ row: i + j + 2, field: "geral", message: `${m.email}: Erro no lote - ${batchErr.message}` });
+        });
+      }
+
+      // Small delay between batches to avoid rate limiting
+      if (i + BATCH_SIZE < allMembers.length) {
+        await new Promise(r => setTimeout(r, 500));
+      }
     }
 
     queryClient.invalidateQueries({ queryKey: ["admin-members-enriched"] });

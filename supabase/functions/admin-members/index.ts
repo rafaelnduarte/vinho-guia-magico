@@ -147,6 +147,8 @@ Deno.serve(async (req) => {
         const { members: memberRows } = params;
         if (!Array.isArray(memberRows)) throw new Error("members must be an array");
 
+        console.log(`[bulk_create] Starting batch of ${memberRows.length} members`);
+
         // Deduplicate by email (keep last occurrence)
         const emailMap = new Map<string, any>();
         for (const row of memberRows) {
@@ -179,11 +181,13 @@ Deno.serve(async (req) => {
 
             if (newUser?.user) {
               userId = newUser.user.id;
+              console.log(`[bulk_create] Created new user: ${email}`);
             } else if (createErr?.message?.includes("already been registered")) {
               // Look up existing user via DB function (fast, indexed)
               const { data: existingId } = await adminClient.rpc("get_user_id_by_email", { _email: email });
               if (existingId) {
                 userId = existingId;
+                console.log(`[bulk_create] Existing user found: ${email}`);
               } else {
                 throw new Error("User exists but could not resolve ID");
               }
@@ -230,10 +234,12 @@ Deno.serve(async (req) => {
 
             success++;
           } catch (err: any) {
+            console.error(`[bulk_create] Error for ${row.email}: ${err.message}`);
             errors.push({ row: i + 2, email: row.email || "", message: err.message });
           }
         }
 
+        console.log(`[bulk_create] Done: ${success} success, ${skipped} skipped, ${errors.length} errors`);
         return new Response(JSON.stringify({ success, skipped, errors, total: uniqueRows.length }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
