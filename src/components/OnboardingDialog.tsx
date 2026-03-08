@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from "react";
+import AvatarCropDialog from "@/components/AvatarCropDialog";
 import confetti from "canvas-confetti";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
