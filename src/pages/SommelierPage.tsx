@@ -258,13 +258,18 @@ export default function SommelierPage() {
                   key={s.id}
                   onClick={() => loadSession(s.id)}
                   className={cn(
-                    "w-full text-left px-3 py-2 rounded-md text-sm truncate transition-colors",
+                    "w-full text-left px-3 py-2 rounded-md text-sm transition-colors",
                     sessionId === s.id
                       ? "bg-primary/10 text-primary"
                       : "text-muted-foreground hover:bg-muted/50"
                   )}
                 >
-                  {s.title}
+                  <span className="block truncate">{s.title}</span>
+                  {s.owner_name && (
+                    <span className="block text-[10px] text-muted-foreground/70 truncate mt-0.5">
+                      👤 {s.owner_name}
+                    </span>
+                  )}
                 </button>
               ))}
               {(!sessions || sessions.length === 0) && (
