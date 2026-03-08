@@ -431,6 +431,16 @@ function MemberDetail({ userId, onBack }: { userId: string; onBack: () => void }
     onError: (e) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: () => callAdminMembers("delete_user", { userId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-members-paginated"] });
+      toast({ title: "Membro excluído com sucesso" });
+      onBack();
+    },
+    onError: (e) => toast({ title: "Erro ao excluir", description: e.message, variant: "destructive" }),
+  });
+
   if (isLoading) {
     return (
       <div className="space-y-4">
