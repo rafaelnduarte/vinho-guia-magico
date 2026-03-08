@@ -57,22 +57,29 @@ export default function MyAccountPage() {
     });
   }, [user]);
 
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !user) return;
-
-    if (file.size > 2 * 1024 * 1024) {
-      toast({ title: "Arquivo muito grande", description: "Máximo de 2MB.", variant: "destructive" });
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: "Arquivo muito grande", description: "Máximo de 5MB.", variant: "destructive" });
       return;
     }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCropSrc(reader.result as string);
+      setCropOpen(true);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
 
+  const handleCroppedUpload = async (blob: Blob) => {
+    if (!user) return;
     setUploading(true);
-    const ext = file.name.split(".").pop();
-    const path = `avatars/${user.id}.${ext}`;
-
+    const path = `avatars/${user.id}.jpg`;
     const { error: uploadError } = await supabase.storage
       .from("wine-images")
-      .upload(path, file, { upsert: true });
+      .upload(path, blob, { upsert: true, contentType: "image/jpeg" });
 
     if (uploadError) {
       toast({ title: "Erro no upload", description: uploadError.message, variant: "destructive" });
@@ -80,19 +87,13 @@ export default function MyAccountPage() {
       return;
     }
 
-    const { data: publicUrlData } = supabase.storage
-      .from("wine-images")
-      .getPublicUrl(path);
-
+    const { data: publicUrlData } = supabase.storage.from("wine-images").getPublicUrl(path);
     const url = publicUrlData.publicUrl + "?t=" + Date.now();
-
-    await supabase
-      .from("profiles")
-      .update({ avatar_url: url })
-      .eq("user_id", user.id);
-
+    await supabase.from("profiles").update({ avatar_url: url }).eq("user_id", user.id);
     setAvatarUrl(url);
     setUploading(false);
+    setCropOpen(false);
+    setCropSrc(null);
     toast({ title: "Foto atualizada!" });
   };
 
