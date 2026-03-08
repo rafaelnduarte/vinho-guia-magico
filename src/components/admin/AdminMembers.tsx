@@ -72,8 +72,7 @@ export default function AdminMembers() {
   });
 
   const handleImport = async (rows: Record<string, any>[]): Promise<CsvImportResult> => {
-    // Send all rows in a single bulk call to avoid timeout
-    const members = rows.map((row) => ({
+    const allMembers = rows.map((row) => ({
       email: row.email?.toLowerCase(),
       full_name: row.full_name,
       status: row.status?.toLowerCase() || "active",
@@ -82,16 +81,29 @@ export default function AdminMembers() {
       source: row.source || "csv_import",
     }));
 
-    const result = await callAdminMembers("bulk_create_members", { members });
+    const BATCH_SIZE = 50;
+    let totalSuccess = 0;
+    let totalSkipped = 0;
+    const allErrors: CsvImportResult["errors"] = [];
 
-    const errors: CsvImportResult["errors"] = (result.errors ?? []).map((e: any) => ({
-      row: e.row,
-      field: "geral",
-      message: `${e.email}: ${e.message}`,
-    }));
+    for (let i = 0; i < allMembers.length; i += BATCH_SIZE) {
+      const batch = allMembers.slice(i, i + BATCH_SIZE);
+      const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+      const totalBatches = Math.ceil(allMembers.length / BATCH_SIZE);
+      
+      toast({ title: `Importando lote ${batchNum}/${totalBatches}...`, description: `${i + 1}-${Math.min(i + BATCH_SIZE, allMembers.length)} de ${allMembers.length}` });
+
+      const result = await callAdminMembers("bulk_create_members", { members: batch });
+
+      totalSuccess += result.success ?? 0;
+      totalSkipped += result.skipped ?? 0;
+      (result.errors ?? []).forEach((e: any) => {
+        allErrors.push({ row: (e.row ?? 0) + i, field: "geral", message: `${e.email}: ${e.message}` });
+      });
+    }
 
     queryClient.invalidateQueries({ queryKey: ["admin-members-enriched"] });
-    return { success: result.success ?? 0, errors, skipped: result.skipped ?? 0 };
+    return { success: totalSuccess, errors: allErrors, skipped: totalSkipped };
   };
 
   const filteredMembers = (members ?? []).filter((m: any) => {
