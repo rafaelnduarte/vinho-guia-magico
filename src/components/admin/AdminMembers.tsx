@@ -511,6 +511,18 @@ function MemberDetail({ userId, onBack }: { userId: string; onBack: () => void }
           >
             <RotateCcw className="h-4 w-4" /> Resetar Acesso
           </Button>
+          <Button
+            variant="destructive"
+            onClick={() => {
+              if (confirm(`Tem certeza que deseja EXCLUIR este membro permanentemente?\n\nEssa ação não pode ser desfeita. Todos os dados do membro serão removidos.`))
+                deleteMutation.mutate();
+            }}
+            disabled={deleteMutation.isPending}
+            className="gap-2"
+          >
+            {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+            Excluir
+          </Button>
         </div>
       </div>
 
