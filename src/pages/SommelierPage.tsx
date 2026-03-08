@@ -200,6 +200,8 @@ export default function SommelierPage() {
       if (data.session_id && !sessionId) {
         setSessionId(data.session_id);
         refetchSessions();
+        // Refetch again after a delay to pick up AI-generated title
+        setTimeout(() => refetchSessions(), 4000);
       }
 
       setMessages(prev => [...prev, { role: "assistant", content: data.message }]);
