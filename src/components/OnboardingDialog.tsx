@@ -248,9 +248,15 @@ export default function OnboardingDialog({
                     type="file"
                     accept="image/*"
                     className="hidden"
-                    onChange={handleAvatarUpload}
+                    onChange={handleAvatarSelect}
                   />
                 </div>
+                <AvatarCropDialog
+                  open={cropOpen}
+                  imageSrc={cropSrc}
+                  onClose={() => { setCropOpen(false); setCropSrc(null); }}
+                  onConfirm={handleCroppedUpload}
+                />
               </div>
 
               {/* Name */}
