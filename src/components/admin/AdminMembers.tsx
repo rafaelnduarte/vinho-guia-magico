@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, Loader2, Users, Plus, Search, ArrowLeft, BarChart3, KeyRound, Pencil, Clock, ThumbsUp, MessageSquare, Eye, Download, RotateCcw, ChevronLeft, ChevronRight } from "lucide-react";
+import { Upload, Loader2, Users, Plus, Search, ArrowLeft, BarChart3, KeyRound, Pencil, Clock, ThumbsUp, MessageSquare, Eye, Download, RotateCcw, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import CsvImportDialog, { type CsvColumn, type CsvImportResult } from "./CsvImportDialog";
 import MemberBadge from "@/components/MemberBadge";
 import { exportToCsv } from "@/lib/exportCsv";
@@ -431,6 +431,16 @@ function MemberDetail({ userId, onBack }: { userId: string; onBack: () => void }
     onError: (e) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: () => callAdminMembers("delete_user", { userId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-members-paginated"] });
+      toast({ title: "Membro excluído com sucesso" });
+      onBack();
+    },
+    onError: (e) => toast({ title: "Erro ao excluir", description: e.message, variant: "destructive" }),
+  });
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -500,6 +510,18 @@ function MemberDetail({ userId, onBack }: { userId: string; onBack: () => void }
             className="gap-2"
           >
             <RotateCcw className="h-4 w-4" /> Resetar Acesso
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={() => {
+              if (confirm(`Tem certeza que deseja EXCLUIR este membro permanentemente?\n\nEssa ação não pode ser desfeita. Todos os dados do membro serão removidos.`))
+                deleteMutation.mutate();
+            }}
+            disabled={deleteMutation.isPending}
+            className="gap-2"
+          >
+            {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+            Excluir
           </Button>
         </div>
       </div>
