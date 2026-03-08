@@ -38,16 +38,13 @@ Deno.serve(async (req) => {
 
     switch (action) {
       case "list_members": {
-        // Get memberships
         const { data: memberships } = await adminClient
           .from("memberships")
           .select("*")
           .order("created_at", { ascending: false });
 
-        // Get all user_ids
         const userIds = [...new Set((memberships ?? []).map((m: any) => m.user_id))];
 
-        // Get profiles for all members
         const { data: profiles } = await adminClient
           .from("profiles")
           .select("user_id, full_name, avatar_url, last_seen_at")
@@ -55,14 +52,12 @@ Deno.serve(async (req) => {
         const profileMap: Record<string, any> = {};
         for (const p of profiles ?? []) profileMap[p.user_id] = p;
 
-        // Get emails from auth for all member user_ids
         const emailMap: Record<string, string> = {};
         for (const uid of userIds) {
           const { data: { user: authUser } } = await adminClient.auth.admin.getUserById(uid);
           if (authUser?.email) emailMap[uid] = authUser.email;
         }
 
-        // Get roles
         const { data: roles } = await adminClient.from("user_roles").select("user_id, role");
         const roleMap: Record<string, string> = {};
         for (const r of roles ?? []) roleMap[r.user_id] = r.role;
@@ -95,7 +90,6 @@ Deno.serve(async (req) => {
           .eq("user_id", userId)
           .maybeSingle();
 
-        // Get analytics events for this user
         const { data: events } = await adminClient
           .from("analytics_events")
           .select("*")
@@ -103,7 +97,6 @@ Deno.serve(async (req) => {
           .order("created_at", { ascending: false })
           .limit(100);
 
-        // Get vote and comment counts
         const { count: voteCount } = await adminClient
           .from("wine_votes")
           .select("*", { count: "exact", head: true })
@@ -114,10 +107,8 @@ Deno.serve(async (req) => {
           .select("*", { count: "exact", head: true })
           .eq("user_id", userId);
 
-        // Count page views
         const pageViews = (events ?? []).filter((e: any) => e.event_type === "page_view").length;
 
-        // Get role
         const { data: roleData2 } = await adminClient
           .from("user_roles")
           .select("role")
@@ -140,62 +131,109 @@ Deno.serve(async (req) => {
 
       case "create_member": {
         const { email, full_name, status = "active", source = "manual", membership_type = "comunidade", role = "member", password } = params;
+        const result = await createSingleMember(adminClient, { email, full_name, status, source, membership_type, role, password });
+        return new Response(JSON.stringify(result), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
 
-        // Create or find user
-        let userId: string;
-        const { data: existingUsers } = await adminClient.auth.admin.listUsers();
-        const existing = existingUsers?.users?.find(
-          (u: any) => u.email?.toLowerCase() === email.toLowerCase()
-        );
+      case "bulk_create_members": {
+        const { members: memberRows } = params;
+        if (!Array.isArray(memberRows)) throw new Error("members must be an array");
 
-        if (existing) {
-          userId = existing.id;
-        } else {
-          const userPassword = password || email.toLowerCase();
-          const { data: newUser, error: createErr } = await adminClient.auth.admin.createUser({
-            email,
-            password: userPassword,
-            email_confirm: true,
-            user_metadata: { full_name },
-          });
-          if (createErr) throw createErr;
-          userId = newUser.user.id;
-        }
-
-        // Upsert membership
-        const { data: existingMembership } = await adminClient
-          .from("memberships")
-          .select("id")
-          .eq("user_id", userId)
-          .maybeSingle();
-
-        if (existingMembership) {
-          await adminClient.from("memberships").update({ status, source, membership_type }).eq("id", existingMembership.id);
-        } else {
-          await adminClient.from("memberships").insert({ user_id: userId, status, source, membership_type });
-        }
-
-        // Ensure profile name
-        if (full_name) {
-          await adminClient.from("profiles").update({ full_name }).eq("user_id", userId);
-        }
-
-        // Upsert role (allow setting admin)
-        const targetRole = role === "admin" ? "admin" : "member";
-        const { data: existingRole } = await adminClient
-          .from("user_roles")
-          .select("id, role")
-          .eq("user_id", userId)
-          .maybeSingle();
-        if (existingRole) {
-          if (existingRole.role !== targetRole) {
-            await adminClient.from("user_roles").update({ role: targetRole }).eq("id", existingRole.id);
+        // Deduplicate by email (keep last occurrence)
+        const emailMap = new Map<string, any>();
+        for (const row of memberRows) {
+          if (row.email) {
+            emailMap.set(row.email.toLowerCase(), row);
           }
-        } else {
-          await adminClient.from("user_roles").insert({ user_id: userId, role: targetRole });
+        }
+        const uniqueRows = Array.from(emailMap.values());
+
+        // Build email lookup cache from auth (paginated)
+        const existingEmailMap = new Map<string, string>(); // email -> userId
+        let page = 1;
+        const perPage = 1000;
+        while (true) {
+          const { data: listData, error: listErr } = await adminClient.auth.admin.listUsers({ page, perPage });
+          if (listErr) throw listErr;
+          for (const u of listData.users) {
+            if (u.email) existingEmailMap.set(u.email.toLowerCase(), u.id);
+          }
+          if (listData.users.length < perPage) break;
+          page++;
         }
 
-        return new Response(JSON.stringify({ success: true, userId }), {
+        let success = 0;
+        let skipped = 0;
+        const errors: { row: number; email: string; message: string }[] = [];
+
+        for (let i = 0; i < uniqueRows.length; i++) {
+          const row = uniqueRows[i];
+          try {
+            const email = row.email?.toLowerCase();
+            if (!email) { skipped++; continue; }
+
+            let userId = existingEmailMap.get(email);
+
+            if (!userId) {
+              // Create user
+              const userPassword = row.password || email;
+              const { data: newUser, error: createErr } = await adminClient.auth.admin.createUser({
+                email,
+                password: userPassword,
+                email_confirm: true,
+                user_metadata: { full_name: row.full_name },
+              });
+              if (createErr) throw createErr;
+              userId = newUser.user.id;
+              existingEmailMap.set(email, userId);
+            }
+
+            // Upsert membership
+            const membershipType = row.membership_type?.toLowerCase() || "radar";
+            const status = row.status?.toLowerCase() || "active";
+            const source = row.source || "csv_import";
+
+            const { data: existingMembership } = await adminClient
+              .from("memberships")
+              .select("id")
+              .eq("user_id", userId)
+              .maybeSingle();
+
+            if (existingMembership) {
+              await adminClient.from("memberships").update({ status, source, membership_type: membershipType }).eq("id", existingMembership.id);
+            } else {
+              await adminClient.from("memberships").insert({ user_id: userId, status, source, membership_type: membershipType });
+            }
+
+            // Update profile name
+            if (row.full_name) {
+              await adminClient.from("profiles").update({ full_name: row.full_name }).eq("user_id", userId);
+            }
+
+            // Upsert role
+            const targetRole = row.role?.toLowerCase() === "admin" ? "admin" : "member";
+            const { data: existingRole } = await adminClient
+              .from("user_roles")
+              .select("id, role")
+              .eq("user_id", userId)
+              .maybeSingle();
+            if (existingRole) {
+              if (existingRole.role !== targetRole) {
+                await adminClient.from("user_roles").update({ role: targetRole }).eq("id", existingRole.id);
+              }
+            } else {
+              await adminClient.from("user_roles").insert({ user_id: userId, role: targetRole });
+            }
+
+            success++;
+          } catch (err: any) {
+            errors.push({ row: i + 2, email: row.email || "", message: err.message });
+          }
+        }
+
+        return new Response(JSON.stringify({ success, skipped, errors, total: uniqueRows.length }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -218,7 +256,6 @@ Deno.serve(async (req) => {
 
       case "reset_password": {
         const { email } = params;
-        // Send password reset email via Supabase Auth
         const { error } = await adminClient.auth.admin.generateLink({
           type: "recovery",
           email,
@@ -252,7 +289,6 @@ Deno.serve(async (req) => {
 
       case "reset_onboarding": {
         const { userId } = params;
-        // Reset password to email and set must_change_password
         const { data: userData } = await adminClient.auth.admin.getUserById(userId);
         if (!userData?.user?.email) throw new Error("User not found");
         const email = userData.user.email.toLowerCase();
@@ -273,3 +309,60 @@ Deno.serve(async (req) => {
     });
   }
 });
+
+// Helper to create a single member (reused by create_member action)
+async function createSingleMember(adminClient: any, params: any) {
+  const { email, full_name, status = "active", source = "manual", membership_type = "comunidade", role = "member", password } = params;
+
+  let userId: string;
+  const { data: existingUsers } = await adminClient.auth.admin.listUsers();
+  const existing = existingUsers?.users?.find(
+    (u: any) => u.email?.toLowerCase() === email.toLowerCase()
+  );
+
+  if (existing) {
+    userId = existing.id;
+  } else {
+    const userPassword = password || email.toLowerCase();
+    const { data: newUser, error: createErr } = await adminClient.auth.admin.createUser({
+      email,
+      password: userPassword,
+      email_confirm: true,
+      user_metadata: { full_name },
+    });
+    if (createErr) throw createErr;
+    userId = newUser.user.id;
+  }
+
+  const { data: existingMembership } = await adminClient
+    .from("memberships")
+    .select("id")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (existingMembership) {
+    await adminClient.from("memberships").update({ status, source, membership_type }).eq("id", existingMembership.id);
+  } else {
+    await adminClient.from("memberships").insert({ user_id: userId, status, source, membership_type });
+  }
+
+  if (full_name) {
+    await adminClient.from("profiles").update({ full_name }).eq("user_id", userId);
+  }
+
+  const targetRole = role === "admin" ? "admin" : "member";
+  const { data: existingRole } = await adminClient
+    .from("user_roles")
+    .select("id, role")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (existingRole) {
+    if (existingRole.role !== targetRole) {
+      await adminClient.from("user_roles").update({ role: targetRole }).eq("id", existingRole.id);
+    }
+  } else {
+    await adminClient.from("user_roles").insert({ user_id: userId, role: targetRole });
+  }
+
+  return { success: true, userId };
+}

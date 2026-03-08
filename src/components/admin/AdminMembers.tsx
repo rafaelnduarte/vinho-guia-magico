@@ -72,32 +72,26 @@ export default function AdminMembers() {
   });
 
   const handleImport = async (rows: Record<string, any>[]): Promise<CsvImportResult> => {
-    let success = 0;
-    let skipped = 0;
-    const errors: CsvImportResult["errors"] = [];
+    // Send all rows in a single bulk call to avoid timeout
+    const members = rows.map((row) => ({
+      email: row.email?.toLowerCase(),
+      full_name: row.full_name,
+      status: row.status?.toLowerCase() || "active",
+      membership_type: row.membership_type?.toLowerCase() || "radar",
+      role: row.role?.toLowerCase() || "member",
+      source: row.source || "csv_import",
+    }));
 
-    for (let i = 0; i < rows.length; i++) {
-      try {
-        await callAdminMembers("create_member", {
-          email: rows[i].email?.toLowerCase(),
-          full_name: rows[i].full_name,
-          status: rows[i].status?.toLowerCase() || "active",
-          membership_type: rows[i].membership_type?.toLowerCase() || "radar",
-          role: rows[i].role?.toLowerCase() || "member",
-          source: rows[i].source || "csv_import",
-        });
-        success++;
-      } catch (err: any) {
-        if (err.message?.includes("already")) {
-          skipped++;
-        } else {
-          errors.push({ row: i + 2, field: "geral", message: err.message });
-        }
-      }
-    }
+    const result = await callAdminMembers("bulk_create_members", { members });
+
+    const errors: CsvImportResult["errors"] = (result.errors ?? []).map((e: any) => ({
+      row: e.row,
+      field: "geral",
+      message: `${e.email}: ${e.message}`,
+    }));
 
     queryClient.invalidateQueries({ queryKey: ["admin-members-enriched"] });
-    return { success, errors, skipped };
+    return { success: result.success ?? 0, errors, skipped: result.skipped ?? 0 };
   };
 
   const filteredMembers = (members ?? []).filter((m: any) => {
