@@ -156,20 +156,6 @@ Deno.serve(async (req) => {
         }
         const uniqueRows = Array.from(emailMap.values());
 
-        // Build email lookup cache from auth (paginated)
-        const existingEmailMap = new Map<string, string>(); // email -> userId
-        let page = 1;
-        const perPage = 1000;
-        while (true) {
-          const { data: listData, error: listErr } = await adminClient.auth.admin.listUsers({ page, perPage });
-          if (listErr) throw listErr;
-          for (const u of listData.users) {
-            if (u.email) existingEmailMap.set(u.email.toLowerCase(), u.id);
-          }
-          if (listData.users.length < perPage) break;
-          page++;
-        }
-
         let success = 0;
         let skipped = 0;
         const errors: { row: number; email: string; message: string }[] = [];
@@ -180,20 +166,44 @@ Deno.serve(async (req) => {
             const email = row.email?.toLowerCase();
             if (!email) { skipped++; continue; }
 
-            let userId = existingEmailMap.get(email);
+            let userId: string | undefined;
 
-            if (!userId) {
-              // Create user
-              const userPassword = row.password || email;
-              const { data: newUser, error: createErr } = await adminClient.auth.admin.createUser({
-                email,
-                password: userPassword,
-                email_confirm: true,
-                user_metadata: { full_name: row.full_name },
-              });
-              if (createErr) throw createErr;
+            // Try to create user first — fastest path for new users
+            const userPassword = row.password || email;
+            const { data: newUser, error: createErr } = await adminClient.auth.admin.createUser({
+              email,
+              password: userPassword,
+              email_confirm: true,
+              user_metadata: { full_name: row.full_name },
+            });
+
+            if (newUser?.user) {
               userId = newUser.user.id;
-              existingEmailMap.set(email, userId);
+            } else if (createErr?.message?.includes("already been registered")) {
+              // User exists — fetch by email using listUsers with a 1-page filter workaround
+              const { data: listData } = await adminClient.auth.admin.listUsers({ page: 1, perPage: 1 });
+              // listUsers doesn't filter by email, so search directly
+              // Use a workaround: get all users is too slow; instead query profiles
+              const { data: profile } = await adminClient
+                .from("profiles")
+                .select("user_id")
+                .eq("user_id", (await adminClient.rpc("get_user_id_by_email", { _email: email })).data)
+                .maybeSingle();
+              
+              // Fallback: iterate to find user (but limited)
+              if (!userId) {
+                let pg = 1;
+                while (!userId) {
+                  const { data: pg_data } = await adminClient.auth.admin.listUsers({ page: pg, perPage: 100 });
+                  const found = pg_data?.users?.find((u: any) => u.email?.toLowerCase() === email);
+                  if (found) { userId = found.id; break; }
+                  if (!pg_data?.users?.length || pg_data.users.length < 100) break;
+                  pg++;
+                }
+              }
+              if (!userId) throw new Error("User exists but could not resolve ID");
+            } else if (createErr) {
+              throw createErr;
             }
 
             // Upsert membership
