@@ -51,17 +51,47 @@ export default function SommelierPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Fetch user sessions
+  const isAdmin = role === "admin";
+
+  // Fetch sessions — admins see all (with owner name), members see only own
   const { data: sessions, refetch: refetchSessions } = useQuery({
-    queryKey: ["chat-sessions", user?.id],
+    queryKey: ["chat-sessions", user?.id, isAdmin],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("chat_sessions")
-        .select("id, title, created_at")
+        .select("id, title, created_at, user_id")
         .order("updated_at", { ascending: false })
-        .limit(20);
+        .limit(30);
+
+      if (!isAdmin) {
+        query = query.eq("user_id", user!.id);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
-      return (data ?? []) as ChatSession[];
+
+      const sessionsRaw = data ?? [];
+
+      if (!isAdmin) {
+        return sessionsRaw.map(s => ({ ...s, owner_name: undefined })) as ChatSession[];
+      }
+
+      // For admins, resolve owner names for other users' sessions
+      const otherUserIds = [...new Set(sessionsRaw.filter(s => s.user_id !== user!.id).map(s => s.user_id))];
+      let profileMap: Record<string, string> = {};
+
+      if (otherUserIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("user_id, full_name")
+          .in("user_id", otherUserIds);
+        profileMap = Object.fromEntries((profiles ?? []).map(p => [p.user_id, p.full_name ?? "Usuário"]));
+      }
+
+      return sessionsRaw.map(s => ({
+        ...s,
+        owner_name: s.user_id !== user!.id ? (profileMap[s.user_id] || "Usuário") : undefined,
+      })) as ChatSession[];
     },
     enabled: !!user,
   });
