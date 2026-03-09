@@ -122,6 +122,66 @@ export type Database = {
         }
         Relationships: []
       }
+      aulas: {
+        Row: {
+          created_at: string
+          curso_id: string
+          descricao: string | null
+          duracao_segundos: number
+          id: string
+          is_published: boolean
+          modulo_id: string
+          panda_quiz_id: string | null
+          panda_video_id: string | null
+          sort_order: number
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          curso_id: string
+          descricao?: string | null
+          duracao_segundos?: number
+          id?: string
+          is_published?: boolean
+          modulo_id: string
+          panda_quiz_id?: string | null
+          panda_video_id?: string | null
+          sort_order?: number
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          curso_id?: string
+          descricao?: string | null
+          duracao_segundos?: number
+          id?: string
+          is_published?: boolean
+          modulo_id?: string
+          panda_quiz_id?: string | null
+          panda_video_id?: string | null
+          sort_order?: number
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "aulas_curso_id_fkey"
+            columns: ["curso_id"]
+            isOneToOne: false
+            referencedRelation: "cursos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aulas_modulo_id_fkey"
+            columns: ["modulo_id"]
+            isOneToOne: false
+            referencedRelation: "modulos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_feedback: {
         Row: {
           comment: string | null
@@ -238,6 +298,96 @@ export type Database = {
         }
         Relationships: []
       }
+      cursos: {
+        Row: {
+          created_at: string
+          descricao: string | null
+          id: string
+          is_published: boolean
+          nivel: string
+          panda_folder_id: string | null
+          sort_order: number
+          tipo: string
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          is_published?: boolean
+          nivel?: string
+          panda_folder_id?: string | null
+          sort_order?: number
+          tipo?: string
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          is_published?: boolean
+          nivel?: string
+          panda_folder_id?: string | null
+          sort_order?: number
+          tipo?: string
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      downloads: {
+        Row: {
+          aula_id: string
+          created_at: string
+          curso_id: string
+          expires_at: string | null
+          id: string
+          panda_download_url: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          aula_id: string
+          created_at?: string
+          curso_id: string
+          expires_at?: string | null
+          id?: string
+          panda_download_url?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          aula_id?: string
+          created_at?: string
+          curso_id?: string
+          expires_at?: string | null
+          id?: string
+          panda_download_url?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "downloads_aula_id_fkey"
+            columns: ["aula_id"]
+            isOneToOne: false
+            referencedRelation: "aulas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "downloads_curso_id_fkey"
+            columns: ["curso_id"]
+            isOneToOne: false
+            referencedRelation: "cursos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       home_banners: {
         Row: {
           created_at: string
@@ -264,6 +414,50 @@ export type Database = {
           sort_order?: number
         }
         Relationships: []
+      }
+      matriculas: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          curso_id: string
+          id: string
+          progresso_pct: number
+          started_at: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          curso_id: string
+          id?: string
+          progresso_pct?: number
+          started_at?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          curso_id?: string
+          id?: string
+          progresso_pct?: number
+          started_at?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "matriculas_curso_id_fkey"
+            columns: ["curso_id"]
+            isOneToOne: false
+            referencedRelation: "cursos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       memberships: {
         Row: {
@@ -303,6 +497,44 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      modulos: {
+        Row: {
+          created_at: string
+          curso_id: string
+          descricao: string | null
+          id: string
+          sort_order: number
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          curso_id: string
+          descricao?: string | null
+          id?: string
+          sort_order?: number
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          curso_id?: string
+          descricao?: string | null
+          id?: string
+          sort_order?: number
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "modulos_curso_id_fkey"
+            columns: ["curso_id"]
+            isOneToOne: false
+            referencedRelation: "cursos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       partners: {
         Row: {
@@ -387,6 +619,67 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      progresso: {
+        Row: {
+          aula_id: string
+          concluido: boolean
+          concluido_at: string | null
+          created_at: string
+          curso_id: string
+          id: string
+          modulo_id: string
+          posicao_segundos: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          aula_id: string
+          concluido?: boolean
+          concluido_at?: string | null
+          created_at?: string
+          curso_id: string
+          id?: string
+          modulo_id: string
+          posicao_segundos?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          aula_id?: string
+          concluido?: boolean
+          concluido_at?: string | null
+          created_at?: string
+          curso_id?: string
+          id?: string
+          modulo_id?: string
+          posicao_segundos?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "progresso_aula_id_fkey"
+            columns: ["aula_id"]
+            isOneToOne: false
+            referencedRelation: "aulas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "progresso_curso_id_fkey"
+            columns: ["curso_id"]
+            isOneToOne: false
+            referencedRelation: "cursos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "progresso_modulo_id_fkey"
+            columns: ["modulo_id"]
+            isOneToOne: false
+            referencedRelation: "modulos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       seals: {
         Row: {
