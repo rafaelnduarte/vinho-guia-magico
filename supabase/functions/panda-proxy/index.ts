@@ -78,9 +78,21 @@ Deno.serve(async (req) => {
       headers: { Authorization: `Bearer ${pandaApiKey}` },
     });
 
-    const pandaData = await pandaRes.json();
+    const rawData = await pandaRes.json();
+    console.log("RAW:", JSON.stringify(rawData));
+    console.log("KEYS:", Object.keys(rawData));
 
-    return new Response(JSON.stringify(pandaData), {
+    // Normalize: extract array from whichever key Panda uses
+    let normalized: unknown;
+    if (Array.isArray(rawData)) {
+      normalized = rawData;
+    } else if (resource === "videos") {
+      normalized = rawData.videos ?? rawData.data ?? rawData.items ?? rawData;
+    } else {
+      normalized = rawData.folders ?? rawData.data ?? rawData.items ?? rawData;
+    }
+
+    return new Response(JSON.stringify(normalized), {
       status: pandaRes.status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
