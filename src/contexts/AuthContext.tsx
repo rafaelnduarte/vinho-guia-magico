@@ -94,6 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (session?.user) {
         fetchUserData(session.user.id).finally(() => setLoading(false));
       } else {
+        setMembershipLoading(false);
         setLoading(false);
       }
     });
