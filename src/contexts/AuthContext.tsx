@@ -71,35 +71,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
+    let initialised = false;
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
-          fetchUserData(session.user.id).finally(() => setLoading(false));
+          fetchUserData(session.user.id).finally(() => {
+            initialised = true;
+            setLoading(false);
+          });
         } else {
           setRole(null);
           setMembershipActive(false);
           setMustChangePassword(false);
           setOnboardingCompleted(true);
           setMembershipLoading(false);
+          initialised = true;
           setLoading(false);
         }
       }
     );
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchUserData(session.user.id).finally(() => setLoading(false));
-      } else {
+    // Safety timeout: if onAuthStateChange never fires, unblock the UI
+    const timeout = setTimeout(() => {
+      if (!initialised) {
         setMembershipLoading(false);
         setLoading(false);
       }
-    });
+    }, 5000);
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, []);
 
   const signOut = async () => {
