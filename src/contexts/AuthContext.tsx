@@ -82,6 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setMembershipActive(false);
           setMustChangePassword(false);
           setOnboardingCompleted(true);
+          setMembershipLoading(false);
           setLoading(false);
         }
       }
