@@ -9,6 +9,7 @@ import AdminAnalytics from "@/components/admin/AdminAnalytics";
 import AdminTutorials from "@/components/admin/AdminTutorials";
 import AdminChat from "@/components/admin/AdminChat";
 import AdminBanners from "@/components/admin/AdminBanners";
+import AdminCursos from "@/components/admin/AdminCursos";
 
 
 export default function AdminPage() {
