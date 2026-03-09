@@ -7,3 +7,7 @@ project_id = "hrpnufesbjmaaiqgjwtn"
     verify_jwt = false
   [functions.sommelier-chat]
     verify_jwt = false
+  [functions.panda-proxy]
+    verify_jwt = false
+  [functions.panda-webhook]
+    verify_jwt = false
