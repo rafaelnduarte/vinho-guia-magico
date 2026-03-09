@@ -308,25 +308,35 @@ async function createSingleMember(adminClient: any, params: any) {
   const { email, full_name, status = "active", source = "manual", membership_type = "comunidade", role = "member", password } = params;
 
   let userId: string;
-  const { data: existingUsers } = await adminClient.auth.admin.listUsers();
-  const existing = existingUsers?.users?.find(
-    (u: any) => u.email?.toLowerCase() === email.toLowerCase()
-  );
 
-  if (existing) {
-    userId = existing.id;
-  } else {
-    const userPassword = password || email.toLowerCase();
-    const { data: newUser, error: createErr } = await adminClient.auth.admin.createUser({
-      email,
-      password: userPassword,
-      email_confirm: true,
-      user_metadata: { full_name },
-    });
-    if (createErr) throw createErr;
+  // Try to create the user first (fastest path for new users)
+  const userPassword = password || email.toLowerCase();
+  const { data: newUser, error: createErr } = await adminClient.auth.admin.createUser({
+    email,
+    password: userPassword,
+    email_confirm: true,
+    user_metadata: { full_name },
+  });
+
+  if (newUser?.user) {
     userId = newUser.user.id;
+    console.log(`[create_member] Created new user: ${email}`);
+  } else if (createErr?.message?.includes("already been registered")) {
+    // Look up existing user via DB function (fast, indexed)
+    const { data: existingId } = await adminClient.rpc("get_user_id_by_email", { _email: email });
+    if (existingId) {
+      userId = existingId;
+      console.log(`[create_member] Existing user found: ${email}`);
+    } else {
+      throw new Error("Usuário já existe mas não foi possível resolver o ID");
+    }
+  } else if (createErr) {
+    throw createErr;
+  } else {
+    throw new Error("Falha inesperada ao criar usuário");
   }
 
+  // Upsert membership
   const { data: existingMembership } = await adminClient
     .from("memberships")
     .select("id")
@@ -339,10 +349,12 @@ async function createSingleMember(adminClient: any, params: any) {
     await adminClient.from("memberships").insert({ user_id: userId, status, source, membership_type });
   }
 
+  // Update profile name
   if (full_name) {
     await adminClient.from("profiles").update({ full_name }).eq("user_id", userId);
   }
 
+  // Upsert role
   const targetRole = role === "admin" ? "admin" : "member";
   const { data: existingRole } = await adminClient
     .from("user_roles")
