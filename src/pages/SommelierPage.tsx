@@ -63,7 +63,7 @@ export default function SommelierPage() {
         .from("chat_sessions")
         .select("id, title, created_at, user_id")
         .order("updated_at", { ascending: false })
-        .limit(30);
+        .limit(100);
 
       if (!isAdmin) {
         query = query.eq("user_id", user!.id);
