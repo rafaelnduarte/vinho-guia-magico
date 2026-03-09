@@ -1,81 +1,76 @@
 
 
-## Plano: Nova Aba "Cursos" no Painel Admin + Edge Functions
+## Plano: Nova Página Inicial com Dois Carrosséis
 
 ### Resumo
 
-Adicionar a 9a aba "Cursos" ao painel Admin com grid de pastas do Panda Vídeo, modal de vídeos, e duas Edge Functions (proxy de leitura + webhook de sincronização). Nenhum componente/aba/rota existente será modificado.
+Substituir todo o conteúdo da HomePage por duas seções de carrossel:
+1. **Banners gerenciáveis** — imagens promocionais administráveis pelo painel admin
+2. **Vinhos recentes** — os 10 vinhos mais novos, exibidos 3 por vez
 
 ---
 
-### 1. Edge Function: `panda-proxy` (leitura segura)
+### Dimensão recomendada das imagens (Linha 1)
 
-**Arquivo:** `supabase/functions/panda-proxy/index.ts`
-
-- Aceita query param `resource`: `folders` ou `videos&folder_id={id}`
-- Injeta `Authorization: Bearer {PANDA_API_KEY}` no request para `api-v2.pandavideo.com.br`
-- Valida JWT do Supabase Auth + verifica `has_role(uid, 'admin')` via query ao banco
-- Retorna 401 se não autorizado
-- Faz proxy GET e retorna JSON do Panda
-
-### 2. Edge Function: `panda-webhook` (sincronização automática)
-
-**Arquivo:** `supabase/functions/panda-webhook/index.ts`
-
-- `verify_jwt = false` (chamado pelo Panda, não pelo usuário)
-- Valida via query param `?token=` comparando com `N8N_WEBHOOK_URL` (ou outro secret — nota: o `PANDA_WEBHOOK_SECRET` foi removido, usaremos um token fixo gerado ou pediremos um novo secret)
-- Eventos capturados:
-  - `folder.created` → INSERT em `cursos` (status draft)
-  - `video.created` → INSERT em `aulas` + atualiza contagem
-  - `video.encoded` → UPDATE aula `is_published = true`
-  - `video.deleted` → UPDATE aula (soft delete)
-  - `folder.deleted` → UPDATE curso status archived
-- Todos os eventos logados em `webhook_logs`
-
-**Nota sobre autenticação do webhook:** Como o `PANDA_WEBHOOK_SECRET` foi removido a seu pedido, será necessário um secret para validar o token do webhook. Vou solicitar a criação de um novo secret `PANDA_WEBHOOK_TOKEN` para este fim.
-
-### 3. Componente: `AdminCursos.tsx`
-
-**Arquivo:** `src/components/admin/AdminCursos.tsx`
-
-- **Cabeçalho:** "CURSOS (N)" — mesmo padrão bold do AdminWines
-- **Grid 3 colunas** de cards de pastas (via `panda-proxy?resource=folders`):
-  - Ícone `FolderOpen`
-  - Nome da pasta
-  - Badge com total de vídeos
-  - Badge de sincronização (verde = existe em `cursos`, amarelo = pendente)
-  - Botão "Ver Vídeos"
-- **Loading:** Skeleton cards
-- **Empty:** Mensagem "Nenhuma pasta encontrada"
-
-### 4. Modal de Vídeos
-
-Dentro de `AdminCursos.tsx` — Dialog/Modal ao clicar "Ver Vídeos":
-
-- Header: nome da pasta + badge total + botão X
-- Tabela com colunas: #, Título, Duração (mm:ss), Status (badge colorido), Sync (verde/amarelo), Upload (data pt-BR)
-- Padrão visual idêntico à tabela de Vinhos (header dark, rows alternadas, hover)
-- Loading: skeleton rows
-- Empty: "Nenhum vídeo nesta pasta"
-
-### 5. Alteração no AdminPage.tsx (cirúrgica)
-
-- Importar `AdminCursos`
-- Adicionar `<TabsTrigger value="cursos">` após "Jovem AI"
-- Adicionar `<TabsContent value="cursos"><AdminCursos /></TabsContent>`
-- Nenhuma outra alteração
-
-### 6. Secret necessário
-
-Será solicitado: **`PANDA_WEBHOOK_TOKEN`** — token customizado para validar chamadas do webhook do Panda (substitui o antigo `PANDA_WEBHOOK_SECRET`).
+As imagens dos banners devem ser enviadas em **1200 × 500 px** (proporção 12:5). Isso garante boa resolução em desktop e boa proporção em mobile. Formato: JPG ou WebP.
 
 ---
 
-### Ordem de execução
+### Mudanças necessárias
 
-1. Solicitar secret `PANDA_WEBHOOK_TOKEN`
-2. Deploy Edge Function `panda-proxy`
-3. Deploy Edge Function `panda-webhook`
-4. Criar componente `AdminCursos.tsx`
-5. Atualizar `AdminPage.tsx` (apenas adicionar aba)
+#### 1. Nova tabela `home_banners` (migration)
+
+```sql
+CREATE TABLE public.home_banners (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  image_url text NOT NULL,
+  link_url text,
+  sort_order integer NOT NULL DEFAULT 0,
+  is_active boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.home_banners ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Active members can view active banners"
+  ON public.home_banners FOR SELECT
+  TO authenticated
+  USING (is_active = true AND has_active_access(auth.uid()));
+
+CREATE POLICY "Admins can manage banners"
+  ON public.home_banners FOR ALL
+  TO authenticated
+  USING (has_role(auth.uid(), 'admin'::app_role));
+```
+
+#### 2. Nova aba "Banners" no Admin (`AdminPage.tsx`)
+
+- Criar componente `AdminBanners.tsx` com CRUD simples: listar banners, upload de imagem (bucket `wine-images` ou novo bucket), definir link opcional, reordenar, ativar/desativar.
+- Adicionar aba no `AdminPage.tsx`.
+
+#### 3. Reescrever `HomePage.tsx`
+
+**Linha 1 — Carrossel de Banners:**
+- Usar `embla-carousel-react` (já instalado).
+- Buscar `home_banners` ordenados por `sort_order`.
+- Desktop/tablet: mostrar 3 slides visíveis por vez.
+- Mobile: mostrar 1 slide por vez.
+- Dots ou setas de navegação.
+- Cada imagem pode ter link opcional (clicável).
+
+**Linha 2 — Carrossel de Vinhos Recentes:**
+- Query: 10 vinhos mais recentes (`status = 'curadoria'`, ordenados por `created_at DESC`, `LIMIT 10`).
+- Reutilizar o componente `WineCard` existente.
+- Desktop/tablet: 3 cards visíveis por vez, com scroll lateral.
+- Mobile: 1 card por vez.
+- Setas de navegação.
+
+#### 4. Arquivos envolvidos
+
+| Arquivo | Ação |
+|---------|------|
+| `src/pages/HomePage.tsx` | Reescrever completamente |
+| `src/components/admin/AdminBanners.tsx` | Criar (CRUD de banners) |
+| `src/pages/AdminPage.tsx` | Adicionar aba "Banners" |
+| Migration SQL | Criar tabela `home_banners` |
 

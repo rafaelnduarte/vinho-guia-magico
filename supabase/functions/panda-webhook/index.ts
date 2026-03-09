@@ -1,0 +1,131 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  const url = new URL(req.url);
+  const token = url.searchParams.get("token");
+  const expectedToken = Deno.env.get("PANDA_WEBHOOK_TOKEN");
+
+  if (!token || token !== expectedToken) {
+    return new Response(JSON.stringify({ error: "Invalid token" }), {
+      status: 401,
+      headers: corsHeaders,
+    });
+  }
+
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+  );
+
+  try {
+    const payload = await req.json();
+    const eventType = payload.event || payload.action || "unknown";
+    const eventId = payload.id || crypto.randomUUID();
+
+    // Log event
+    await supabase.from("webhook_logs").insert({
+      event_id: eventId,
+      action: `panda.${eventType}`,
+      status: "received",
+      details: payload,
+    });
+
+    // Process based on event type
+    if (eventType === "folder.created" && payload.folder) {
+      const folder = payload.folder;
+      await supabase.from("cursos").insert({
+        titulo: folder.name || "Sem título",
+        panda_folder_id: folder.id,
+        is_published: false,
+      });
+    } else if (eventType === "video.created" && payload.video) {
+      const video = payload.video;
+      // Find curso by folder_id
+      const { data: curso } = await supabase
+        .from("cursos")
+        .select("id")
+        .eq("panda_folder_id", video.folder_id)
+        .maybeSingle();
+
+      if (curso) {
+        // Need a default modulo — find or create one
+        let { data: modulo } = await supabase
+          .from("modulos")
+          .select("id")
+          .eq("curso_id", curso.id)
+          .order("sort_order")
+          .limit(1)
+          .maybeSingle();
+
+        if (!modulo) {
+          const { data: newModulo } = await supabase
+            .from("modulos")
+            .insert({ curso_id: curso.id, titulo: "Módulo 1" })
+            .select("id")
+            .single();
+          modulo = newModulo;
+        }
+
+        if (modulo) {
+          await supabase.from("aulas").insert({
+            curso_id: curso.id,
+            modulo_id: modulo.id,
+            titulo: video.title || video.name || "Sem título",
+            panda_video_id: video.id,
+            duracao_segundos: Math.round((video.duration || 0)),
+            is_published: false,
+          });
+        }
+      }
+    } else if (eventType === "video.encoded" && payload.video) {
+      const video = payload.video;
+      if (video.id) {
+        await supabase
+          .from("aulas")
+          .update({ is_published: true })
+          .eq("panda_video_id", video.id);
+      }
+    } else if (eventType === "video.deleted" && payload.video) {
+      const video = payload.video;
+      if (video.id) {
+        await supabase
+          .from("aulas")
+          .update({ is_published: false })
+          .eq("panda_video_id", video.id);
+      }
+    } else if (eventType === "folder.deleted" && payload.folder) {
+      const folder = payload.folder;
+      if (folder.id) {
+        await supabase
+          .from("cursos")
+          .update({ is_published: false })
+          .eq("panda_folder_id", folder.id);
+      }
+    }
+
+    // Update log status
+    await supabase
+      .from("webhook_logs")
+      .update({ status: "processed" })
+      .eq("event_id", eventId)
+      .eq("action", `panda.${eventType}`);
+
+    return new Response(JSON.stringify({ ok: true }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 500,
+      headers: corsHeaders,
+    });
+  }
+});
