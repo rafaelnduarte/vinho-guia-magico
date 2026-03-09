@@ -49,6 +49,7 @@ export default function SommelierPage() {
   const [capBrl, setCapBrl] = useState(10);
   const [warning, setWarning] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(false);
+  const [sessionSearch, setSessionSearch] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
