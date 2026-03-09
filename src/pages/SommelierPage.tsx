@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import ReactMarkdown from "react-markdown";
 import {
   Wine, Send, Loader2, Sparkles, AlertTriangle,
-  MessageSquare, Plus, ChevronLeft, Zap, BookOpen
+  MessageSquare, Plus, ChevronLeft, Zap, BookOpen, Search, X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -49,6 +49,7 @@ export default function SommelierPage() {
   const [capBrl, setCapBrl] = useState(10);
   const [warning, setWarning] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(false);
+  const [sessionSearch, setSessionSearch] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -62,7 +63,7 @@ export default function SommelierPage() {
         .from("chat_sessions")
         .select("id, title, created_at, user_id")
         .order("updated_at", { ascending: false })
-        .limit(30);
+        .limit(100);
 
       if (!isAdmin) {
         query = query.eq("user_id", user!.id);
@@ -264,9 +265,36 @@ export default function SommelierPage() {
               <ChevronLeft className="h-4 w-4" />
             </Button>
           </div>
+          {/* Search */}
+          <div className="px-3 py-2 border-b border-border shrink-0">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <input
+                type="text"
+                value={sessionSearch}
+                onChange={e => setSessionSearch(e.target.value)}
+                placeholder="Buscar conversas..."
+                className="w-full rounded-md border border-input bg-background pl-8 pr-8 py-1.5 text-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              />
+              {sessionSearch && (
+                <button
+                  onClick={() => setSessionSearch("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
           <ScrollArea className="flex-1">
             <div className="p-2 space-y-0.5">
-              {sessions?.map(s => {
+              {(sessions ?? [])
+                .filter(s => {
+                  if (!sessionSearch.trim()) return true;
+                  const q = sessionSearch.toLowerCase();
+                  return (s.title || "").toLowerCase().includes(q) || (s.owner_name || "").toLowerCase().includes(q);
+                })
+                .map(s => {
                 const isActive = sessionId === s.id;
                 const isOwn = !s.owner_name;
                 return (
@@ -298,6 +326,12 @@ export default function SommelierPage() {
                   </button>
                 );
               })}
+              {sessions && sessions.length > 0 && sessionSearch.trim() && (sessions ?? []).filter(s => (s.title || "").toLowerCase().includes(sessionSearch.toLowerCase()) || (s.owner_name || "").toLowerCase().includes(sessionSearch.toLowerCase())).length === 0 && (
+                <div className="text-center py-6 px-4">
+                  <Search className="h-6 w-6 text-muted-foreground/30 mx-auto mb-2" />
+                  <p className="text-xs text-muted-foreground/60">Nenhuma conversa encontrada</p>
+                </div>
+              )}
               {(!sessions || sessions.length === 0) && (
                 <div className="text-center py-8 px-4">
                   <MessageSquare className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
