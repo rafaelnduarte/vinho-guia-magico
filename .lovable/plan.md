@@ -1,76 +1,42 @@
 
 
-## Plano: Nova Página Inicial com Dois Carrosséis
+## Plano: Trilha de Aulas — 6 Novas Tabelas + Secrets
 
 ### Resumo
 
-Substituir todo o conteúdo da HomePage por duas seções de carrossel:
-1. **Banners gerenciáveis** — imagens promocionais administráveis pelo painel admin
-2. **Vinhos recentes** — os 10 vinhos mais novos, exibidos 3 por vez
+O documento solicita a criação de **6 tabelas aditivas** para a funcionalidade de Trilha de Aulas com integração Panda Vídeo, além de **3 novos secrets**. Nenhuma tabela existente será modificada.
 
 ---
 
-### Dimensão recomendada das imagens (Linha 1)
+### 1. Migration SQL — 6 tabelas
 
-As imagens dos banners devem ser enviadas em **1200 × 500 px** (proporção 12:5). Isso garante boa resolução em desktop e boa proporção em mobile. Formato: JPG ou WebP.
+Uma única migration criará, em ordem de dependência:
 
----
+| Tabela | Colunas-chave | RLS Policies |
+|--------|--------------|--------------|
+| `cursos` | titulo, nivel, tipo, panda_folder_id, is_published | 2 (select membros + all admin) |
+| `modulos` | curso_id (FK), titulo, sort_order | 2 (select membros + all admin) |
+| `aulas` | modulo_id + curso_id (FK), panda_video_id, panda_quiz_id, duracao_segundos | 2 (select membros + all admin) |
+| `matriculas` | user_id, curso_id (FK), progresso_pct, status | 4 (select/insert/update own + admin all) |
+| `progresso` | user_id, aula_id/curso_id/modulo_id (FK), posicao_segundos, concluido | 4 (select/insert/update/upsert own + admin) |
+| `downloads` | user_id, aula_id/curso_id (FK), panda_download_url, status | 5 (CRUD own + admin all) |
 
-### Mudanças necessárias
+Cada tabela terá:
+- RLS habilitado
+- Trigger `update_updated_at_column()` (função já existente)
+- Índices nos campos de FK relevantes
 
-#### 1. Nova tabela `home_banners` (migration)
+### 2. Secrets novos (3)
 
-```sql
-CREATE TABLE public.home_banners (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  image_url text NOT NULL,
-  link_url text,
-  sort_order integer NOT NULL DEFAULT 0,
-  is_active boolean NOT NULL DEFAULT true,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
+Serão solicitados ao usuário via ferramenta de secrets:
+- **PANDA_API_KEY** — Chave da API do Panda Vídeo
+- **PANDA_WEBHOOK_SECRET** — Token de validação de webhooks do Panda
+- **N8N_WEBHOOK_URL** — URL do endpoint N8N para eventos
 
-ALTER TABLE public.home_banners ENABLE ROW LEVEL SECURITY;
+### 3. Observações
 
-CREATE POLICY "Active members can view active banners"
-  ON public.home_banners FOR SELECT
-  TO authenticated
-  USING (is_active = true AND has_active_access(auth.uid()));
-
-CREATE POLICY "Admins can manage banners"
-  ON public.home_banners FOR ALL
-  TO authenticated
-  USING (has_role(auth.uid(), 'admin'::app_role));
-```
-
-#### 2. Nova aba "Banners" no Admin (`AdminPage.tsx`)
-
-- Criar componente `AdminBanners.tsx` com CRUD simples: listar banners, upload de imagem (bucket `wine-images` ou novo bucket), definir link opcional, reordenar, ativar/desativar.
-- Adicionar aba no `AdminPage.tsx`.
-
-#### 3. Reescrever `HomePage.tsx`
-
-**Linha 1 — Carrossel de Banners:**
-- Usar `embla-carousel-react` (já instalado).
-- Buscar `home_banners` ordenados por `sort_order`.
-- Desktop/tablet: mostrar 3 slides visíveis por vez.
-- Mobile: mostrar 1 slide por vez.
-- Dots ou setas de navegação.
-- Cada imagem pode ter link opcional (clicável).
-
-**Linha 2 — Carrossel de Vinhos Recentes:**
-- Query: 10 vinhos mais recentes (`status = 'curadoria'`, ordenados por `created_at DESC`, `LIMIT 10`).
-- Reutilizar o componente `WineCard` existente.
-- Desktop/tablet: 3 cards visíveis por vez, com scroll lateral.
-- Mobile: 1 card por vez.
-- Setas de navegação.
-
-#### 4. Arquivos envolvidos
-
-| Arquivo | Ação |
-|---------|------|
-| `src/pages/HomePage.tsx` | Reescrever completamente |
-| `src/components/admin/AdminBanners.tsx` | Criar (CRUD de banners) |
-| `src/pages/AdminPage.tsx` | Adicionar aba "Banners" |
-| Migration SQL | Criar tabela `home_banners` |
+- A função `update_updated_at_column()` já existe no banco; o script usará `CREATE OR REPLACE` para segurança.
+- Os campos `user_id` nas tabelas `matriculas`, `progresso` e `downloads` **não** terão FK para `auth.users` (seguindo o padrão do projeto).
+- Nenhuma alteração de frontend nesta etapa — o documento indica que o próximo passo é criar a Edge Function `panda-webhook`.
+- O `has_role` será chamado com `'admin'::app_role` (cast correto para o enum existente).
 
