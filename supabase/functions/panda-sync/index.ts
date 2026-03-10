@@ -82,8 +82,8 @@ Deno.serve(async (req) => {
     const folders = foldersData.folders ?? [];
 
     for (const folder of folders) {
-      // 2. Upsert curso
-      const { data: cursoData, error: cursoError } = await supabase
+      // PASSO 1 — Upsert curso + fetch id separately
+      const { error: cursoUpsertErr } = await supabase
         .from("cursos")
         .upsert(
           {
@@ -92,56 +92,59 @@ Deno.serve(async (req) => {
             is_published: false,
           },
           { onConflict: "panda_folder_id" }
-        )
+        );
+
+      if (cursoUpsertErr) {
+        results.errors.push(`Folder ${folder.name}: ${cursoUpsertErr.message}`);
+        continue;
+      }
+
+      const { data: cursoData } = await supabase
+        .from("cursos")
         .select("id")
+        .eq("panda_folder_id", folder.id)
         .single();
 
-      if (cursoError) {
-        results.errors.push(`Folder ${folder.name}: ${cursoError.message}`);
+      if (!cursoData) {
+        results.errors.push(`Folder ${folder.name}: could not find curso after upsert`);
         continue;
       }
 
       const cursoId = cursoData.id;
       results.folders_synced++;
+      console.log(`cursoId: ${cursoId} (folder: "${folder.name}")`);
 
-      // 3. Upsert default module "Geral"
-      const { data: moduloData, error: moduloError } = await supabase
+      // PASSO 2 — Select-then-insert module
+      let { data: moduloData } = await supabase
         .from("modulos")
-        .upsert(
-          {
-            curso_id: cursoId,
-            titulo: "Geral",
-            sort_order: 0,
-          },
-          { onConflict: "curso_id,titulo" }
-        )
         .select("id")
+        .eq("curso_id", cursoId)
+        .order("sort_order", { ascending: true })
+        .limit(1)
         .single();
 
-      // Fallback: if upsert failed, try fetching existing
-      let moduloId: string;
-      if (moduloError || !moduloData) {
-        console.log(`Modulo upsert issue for ${folder.name}:`, moduloError?.message);
-        const { data: existing } = await supabase
+      if (!moduloData) {
+        const { data: novoModulo, error: moduloInsertErr } = await supabase
           .from("modulos")
+          .insert({
+            curso_id: cursoId,
+            titulo: "Módulo 1",
+            sort_order: 1,
+          })
           .select("id")
-          .eq("curso_id", cursoId)
-          .eq("titulo", "Geral")
           .single();
-        if (!existing) {
-          results.errors.push(
-            `Module for ${folder.name}: could not create or find`
-          );
+
+        if (moduloInsertErr || !novoModulo) {
+          results.errors.push(`Module for ${folder.name}: ${moduloInsertErr?.message || "insert failed"}`);
           continue;
         }
-        moduloId = existing.id;
-      } else {
-        moduloId = moduloData.id;
+        moduloData = novoModulo;
       }
 
-      console.log(`Folder "${folder.name}" → curso=${cursoId}, modulo=${moduloId}`);
+      const moduloId = moduloData.id;
+      console.log(`moduloId: ${moduloId}`);
 
-      // 4. Fetch videos for this folder
+      // PASSO 3 — Fetch videos for this folder
       const videosRes = await fetch(
         `${PANDA_BASE}/videos?folder_id=${folder.id}`,
         { headers: { Authorization: apiKey, Accept: "application/json" } }
@@ -149,28 +152,28 @@ Deno.serve(async (req) => {
       const videosData = await videosRes.json();
       const videos = videosData.videos ?? [];
 
-      console.log(`Folder "${folder.name}": ${videos.length} videos found`);
+      console.log(`videos a sincronizar: ${videos.length}`);
 
-      for (const video of videos) {
-        console.log(`Syncing video: "${video.title}" (id=${video.id}, status=${video.status})`);
+      for (const [index, video] of videos.entries()) {
+        console.log(`Syncing video [${index + 1}/${videos.length}]: "${video.title}" (id=${video.id})`);
 
-        const { data: aulaData, error: aulaError } = await supabase.from("aulas").upsert(
+        const { error: aulaError } = await supabase.from("aulas").upsert(
           {
             panda_video_id: video.id,
             curso_id: cursoId,
             modulo_id: moduloId,
             titulo: video.title || "Sem título",
+            descricao: "",
             duracao_segundos: Math.floor(video.length || 0),
+            sort_order: index + 1,
             is_published: video.status === "CONVERTED",
           },
           { onConflict: "panda_video_id" }
         );
 
         if (aulaError) {
-          console.log(`VIDEO ERROR for "${video.title}":`, aulaError.message, aulaError.details);
-          results.errors.push(
-            `Video ${video.title}: ${aulaError.message}`
-          );
+          console.log(`VIDEO ERROR: ${aulaError.message}`, aulaError.details);
+          results.errors.push(`${video.title}: ${aulaError.message}`);
           continue;
         }
         console.log(`Video "${video.title}" synced OK`);
