@@ -4,6 +4,8 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Content-Type": "application/json",
 };
 
 const PANDA_BASE = "https://api-v2.pandavideo.com";
@@ -41,7 +43,6 @@ Deno.serve(async (req) => {
 
     const userId = claimsData.claims.sub;
 
-    // Check admin role
     const { data: roleCheck } = await supabase.rpc("has_role", {
       _user_id: userId,
       _role: "admin",
@@ -56,83 +57,54 @@ Deno.serve(async (req) => {
 
     // Parse resource
     const url = new URL(req.url);
-    const resource = url.searchParams.get("resource") || "folders";
+    const resource = url.searchParams.get("resource");
     const folderId = url.searchParams.get("folder_id");
 
     let pandaUrl: string;
-    if (resource === "videos" && folderId) {
+    if (resource === "folders") {
+      pandaUrl = `${PANDA_BASE}/folders`;
+    } else if (resource === "videos" && folderId) {
       pandaUrl = `${PANDA_BASE}/videos?folder_id=${folderId}`;
     } else {
-      pandaUrl = `${PANDA_BASE}/folders`;
+      return new Response(
+        JSON.stringify({ error: "Invalid resource or missing folder_id" }),
+        { status: 400, headers: corsHeaders }
+      );
     }
 
     const pandaApiKey = Deno.env.get("PANDA_API_KEY");
     if (!pandaApiKey) {
-      return new Response(JSON.stringify({ error: "PANDA_API_KEY not set" }), {
-        status: 500,
-        headers: corsHeaders,
-      });
-    }
-
-    console.log("AUTH HEADER:", `Bearer ${pandaApiKey?.substring(0, 8)}...`);
-    console.log("KEY LENGTH:", pandaApiKey?.length);
-    console.log(
-      "KEY TRIMMED:",
-      pandaApiKey?.trim().length === pandaApiKey?.length
-        ? "OK (sem espaços)"
-        : "PROBLEMA (tem espaços!)"
-    );
-
-    // Try all 3 auth variations
-    const variations = [
-      { name: "Bearer", header: `Bearer ${pandaApiKey}` },
-      { name: "Raw", header: pandaApiKey },
-      { name: "ApiKey", header: `ApiKey ${pandaApiKey}` },
-    ];
-
-    let pandaRes: Response | null = null;
-    let rawData: any = null;
-    let winningVariation = "none";
-
-    for (const v of variations) {
-      const res = await fetch(pandaUrl, {
-        headers: { Authorization: v.header },
-      });
-      const data = await res.json();
-      console.log(`VARIATION ${v.name}: status=${res.status}`);
-      if (res.status === 200) {
-        pandaRes = res;
-        rawData = data;
-        winningVariation = v.name;
-        console.log(`WINNER: ${v.name}`);
-        console.log("RAW:", JSON.stringify(data));
-        console.log("KEYS:", Object.keys(data));
-        break;
-      }
-    }
-
-    if (!pandaRes || !rawData) {
-      // All failed, log last attempt details
-      console.log("ALL VARIATIONS FAILED");
       return new Response(
-        JSON.stringify({ error: "All auth variations failed", winner: "none" }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: "PANDA_API_KEY not configured" }),
+        { status: 500, headers: corsHeaders }
       );
     }
 
-    // Normalize: extract array from whichever key Panda uses
-    let normalized: unknown;
-    if (Array.isArray(rawData)) {
-      normalized = rawData;
-    } else if (resource === "videos") {
-      normalized = rawData.videos ?? rawData.data ?? rawData.items ?? rawData;
-    } else {
-      normalized = rawData.folders ?? rawData.data ?? rawData.items ?? rawData;
+    const pandaRes = await fetch(pandaUrl, {
+      method: "GET",
+      headers: {
+        Authorization: pandaApiKey,
+        Accept: "application/json",
+      },
+    });
+
+    const rawData = await pandaRes.json();
+
+    if (!pandaRes.ok) {
+      return new Response(
+        JSON.stringify({ error: "Panda API error", details: rawData }),
+        { status: pandaRes.status, headers: corsHeaders }
+      );
     }
 
-    return new Response(JSON.stringify(normalized), {
-      status: pandaRes.status,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    const result =
+      resource === "folders"
+        ? rawData.folders ?? []
+        : rawData.videos ?? [];
+
+    return new Response(JSON.stringify(result), {
+      status: 200,
+      headers: corsHeaders,
     });
   } catch (err) {
     return new Response(JSON.stringify({ error: err.message }), {

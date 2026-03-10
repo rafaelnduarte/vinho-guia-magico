@@ -24,16 +24,17 @@ import {
 interface PandaFolder {
   id: string;
   name: string;
-  videos_count?: number;
+  videos_count?: string | number;
   created_at?: string;
 }
 
 interface PandaVideo {
   id: string;
   title?: string;
-  name?: string;
-  duration?: number;
+  length?: number;
   status?: string;
+  thumbnail?: string;
+  video_player?: string;
   created_at?: string;
 }
 
@@ -48,10 +49,31 @@ function formatDate(dateStr?: string) {
   return new Date(dateStr).toLocaleDateString("pt-BR");
 }
 
+function StatusBadge({ status }: { status?: string }) {
+  if (status === "CONVERTED") {
+    return (
+      <Badge className="text-xs bg-green-600/20 text-green-400 border-green-600/30">
+        <CheckCircle2 className="h-3 w-3 mr-1" /> Pronto
+      </Badge>
+    );
+  }
+  if (status === "PROCESSING") {
+    return (
+      <Badge className="text-xs bg-yellow-600/20 text-yellow-400 border-yellow-600/30">
+        <Clock className="h-3 w-3 mr-1" /> Processando
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="destructive" className="text-xs">
+      {status || "—"}
+    </Badge>
+  );
+}
+
 export default function AdminCursos() {
   const [selectedFolder, setSelectedFolder] = useState<PandaFolder | null>(null);
 
-  // Fetch Panda folders
   const { data: folders, isLoading: foldersLoading, refetch: refetchFolders } = useQuery({
     queryKey: ["panda-folders"],
     queryFn: async () => {
@@ -63,12 +85,10 @@ export default function AdminCursos() {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (!res.ok) throw new Error("Erro ao buscar pastas");
-      const json = await res.json();
-      return (json.folders || json) as PandaFolder[];
+      return (await res.json()) as PandaFolder[];
     },
   });
 
-  // Fetch synced cursos from DB
   const { data: cursos } = useQuery({
     queryKey: ["admin-cursos-sync"],
     queryFn: async () => {
@@ -77,7 +97,6 @@ export default function AdminCursos() {
     },
   });
 
-  // Fetch videos for selected folder
   const { data: videos, isLoading: videosLoading } = useQuery({
     queryKey: ["panda-videos", selectedFolder?.id],
     enabled: !!selectedFolder,
@@ -90,12 +109,10 @@ export default function AdminCursos() {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (!res.ok) throw new Error("Erro ao buscar vídeos");
-      const json = await res.json();
-      return (json.videos || json) as PandaVideo[];
+      return (await res.json()) as PandaVideo[];
     },
   });
 
-  // Fetch synced aulas
   const { data: aulas } = useQuery({
     queryKey: ["admin-aulas-sync"],
     queryFn: async () => {
@@ -106,7 +123,6 @@ export default function AdminCursos() {
 
   const syncedFolderIds = new Set((cursos || []).map((c) => c.panda_folder_id).filter(Boolean));
   const syncedVideoIds = new Set((aulas || []).map((a) => a.panda_video_id).filter(Boolean));
-
   const folderList = Array.isArray(folders) ? folders : [];
 
   return (
@@ -132,6 +148,7 @@ export default function AdminCursos() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {folderList.map((folder) => {
             const isSynced = syncedFolderIds.has(folder.id);
+            const count = parseInt(String(folder.videos_count ?? "0"), 10);
             return (
               <Card key={folder.id} className="hover:shadow-md transition-shadow">
                 <CardContent className="p-5 space-y-3">
@@ -142,7 +159,7 @@ export default function AdminCursos() {
                       <div className="flex items-center gap-2 mt-1.5">
                         <Badge variant="secondary" className="text-xs">
                           <Video className="h-3 w-3 mr-1" />
-                          {folder.videos_count ?? "—"} vídeos
+                          {count} vídeos
                         </Badge>
                         {isSynced ? (
                           <Badge className="text-xs bg-green-600/20 text-green-400 border-green-600/30">
@@ -171,7 +188,6 @@ export default function AdminCursos() {
         </div>
       )}
 
-      {/* Video Modal */}
       <Dialog open={!!selectedFolder} onOpenChange={(open) => !open && setSelectedFolder(null)}>
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
@@ -212,15 +228,10 @@ export default function AdminCursos() {
                   return (
                     <TableRow key={video.id}>
                       <TableCell className="font-mono text-muted-foreground">{idx + 1}</TableCell>
-                      <TableCell className="font-medium">{video.title || video.name || "Sem título"}</TableCell>
-                      <TableCell>{video.duration ? formatDuration(video.duration) : "—"}</TableCell>
+                      <TableCell className="font-medium">{video.title || "Sem título"}</TableCell>
+                      <TableCell>{video.length ? formatDuration(video.length) : "—"}</TableCell>
                       <TableCell>
-                        <Badge
-                          variant={video.status === "encoded" ? "default" : "secondary"}
-                          className="text-xs"
-                        >
-                          {video.status || "—"}
-                        </Badge>
+                        <StatusBadge status={video.status} />
                       </TableCell>
                       <TableCell>
                         {isSynced ? (
