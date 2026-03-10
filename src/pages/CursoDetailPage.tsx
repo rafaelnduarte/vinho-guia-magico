@@ -93,7 +93,7 @@ export default function CursoDetailPage() {
             >
               <div className="flex items-center justify-center h-8 w-8 rounded-full bg-secondary text-secondary-foreground text-sm font-bold shrink-0">
                 {aula.concluido ? (
-                  <CheckCircle2 className="h-5 w-5 text-green-500" />
+                  <CheckCircle2 className="h-5 w-5 text-accent" />
                 ) : (
                   <span>{String(i + 1).padStart(2, "0")}</span>
                 )}

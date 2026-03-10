@@ -189,8 +189,8 @@ export default function AulaPage() {
         </div>
         <Progress value={pct} className="h-1.5" />
         {completed && (
-          <div className="flex items-center gap-1.5 text-sm text-green-600 font-medium mt-2">
-            <CheckCircle2 className="h-4 w-4" /> Aula concluída!
+          <div className="flex items-center gap-1.5 text-sm text-accent-foreground font-medium mt-2">
+            <CheckCircle2 className="h-4 w-4 text-accent" /> Aula concluída!
           </div>
         )}
       </div>
