@@ -1,76 +1,44 @@
 
 
-## Plano: Nova Página Inicial com Dois Carrosséis
+## Criar Edge Function `panda-sync` e botão de sincronização
 
-### Resumo
+### Problema com o código proposto
+O código proposto usa colunas que **nao existem** nas tabelas reais:
+- `cursos` nao tem `nome`, `status`, `total_aulas` — tem `titulo`, `is_published`
+- `aulas` nao tem `panda_folder_id`, `duracao`, `thumbnail_url`, `status` — tem `duracao_segundos`, `is_published`
+- `aulas` exige `modulo_id` e `curso_id` (NOT NULL) — precisamos criar um modulo default por curso
+- Nao existem constraints UNIQUE em `panda_folder_id` nem `panda_video_id` — necessarias para upsert
 
-Substituir todo o conteúdo da HomePage por duas seções de carrossel:
-1. **Banners gerenciáveis** — imagens promocionais administráveis pelo painel admin
-2. **Vinhos recentes** — os 10 vinhos mais novos, exibidos 3 por vez
+### Alteracoes
 
----
+#### 1. Migration SQL
+- `ALTER TABLE cursos ADD CONSTRAINT cursos_panda_folder_id_key UNIQUE (panda_folder_id)`
+- `ALTER TABLE aulas ADD CONSTRAINT aulas_panda_video_id_key UNIQUE (panda_video_id)`
 
-### Dimensão recomendada das imagens (Linha 1)
+#### 2. Criar `supabase/functions/panda-sync/index.ts`
+- Admin-only (verifica role via service_role client)
+- Busca pastas do Panda (`GET /folders`, header `Authorization: apiKey`)
+- Para cada pasta:
+  - Upsert em `cursos` (`titulo`, `panda_folder_id`, `is_published: false`)
+  - Upsert um modulo default em `modulos` (`titulo: "Geral"`, `curso_id`)
+  - Busca videos da pasta (`GET /videos?folder_id=X`)
+  - Para cada video: upsert em `aulas` (`titulo`, `panda_video_id`, `curso_id`, `modulo_id`, `duracao_segundos`, `is_published` baseado em status CONVERTED)
+- Retorna JSON com `folders_synced`, `videos_synced`, `errors`
 
-As imagens dos banners devem ser enviadas em **1200 × 500 px** (proporção 12:5). Isso garante boa resolução em desktop e boa proporção em mobile. Formato: JPG ou WebP.
+#### 3. Atualizar `supabase/config.toml`
+- Adicionar `[functions.panda-sync]` com `verify_jwt = false` (auth manual no codigo)
 
----
+#### 4. Atualizar `src/components/admin/AdminCursos.tsx`
+- Adicionar botao "Sincronizar com Panda" ao lado do botao "Atualizar"
+- Ao clicar: POST para panda-sync com token do usuario
+- Toast de loading/sucesso/erro
+- Apos sucesso: refetch das queries de cursos e aulas
 
-### Mudanças necessárias
+### Arquivos alterados
+1. Nova migration (unique constraints)
+2. `supabase/functions/panda-sync/index.ts` (novo)
+3. `supabase/config.toml` (nova entrada)
+4. `src/components/admin/AdminCursos.tsx` (botao de sync)
 
-#### 1. Nova tabela `home_banners` (migration)
-
-```sql
-CREATE TABLE public.home_banners (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  image_url text NOT NULL,
-  link_url text,
-  sort_order integer NOT NULL DEFAULT 0,
-  is_active boolean NOT NULL DEFAULT true,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
-
-ALTER TABLE public.home_banners ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Active members can view active banners"
-  ON public.home_banners FOR SELECT
-  TO authenticated
-  USING (is_active = true AND has_active_access(auth.uid()));
-
-CREATE POLICY "Admins can manage banners"
-  ON public.home_banners FOR ALL
-  TO authenticated
-  USING (has_role(auth.uid(), 'admin'::app_role));
-```
-
-#### 2. Nova aba "Banners" no Admin (`AdminPage.tsx`)
-
-- Criar componente `AdminBanners.tsx` com CRUD simples: listar banners, upload de imagem (bucket `wine-images` ou novo bucket), definir link opcional, reordenar, ativar/desativar.
-- Adicionar aba no `AdminPage.tsx`.
-
-#### 3. Reescrever `HomePage.tsx`
-
-**Linha 1 — Carrossel de Banners:**
-- Usar `embla-carousel-react` (já instalado).
-- Buscar `home_banners` ordenados por `sort_order`.
-- Desktop/tablet: mostrar 3 slides visíveis por vez.
-- Mobile: mostrar 1 slide por vez.
-- Dots ou setas de navegação.
-- Cada imagem pode ter link opcional (clicável).
-
-**Linha 2 — Carrossel de Vinhos Recentes:**
-- Query: 10 vinhos mais recentes (`status = 'curadoria'`, ordenados por `created_at DESC`, `LIMIT 10`).
-- Reutilizar o componente `WineCard` existente.
-- Desktop/tablet: 3 cards visíveis por vez, com scroll lateral.
-- Mobile: 1 card por vez.
-- Setas de navegação.
-
-#### 4. Arquivos envolvidos
-
-| Arquivo | Ação |
-|---------|------|
-| `src/pages/HomePage.tsx` | Reescrever completamente |
-| `src/components/admin/AdminBanners.tsx` | Criar (CRUD de banners) |
-| `src/pages/AdminPage.tsx` | Adicionar aba "Banners" |
-| Migration SQL | Criar tabela `home_banners` |
+Nenhum outro componente ou tela sera alterado.
 
