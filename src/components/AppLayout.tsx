@@ -27,6 +27,7 @@ import { supabase } from "@/integrations/supabase/client";
 const memberLinks = [
   { to: "/home", label: "Home", icon: Home },
   { to: "/curadoria", label: "Curadoria", icon: Wine },
+  { to: "/cursos", label: "Cursos", icon: GraduationCap },
   { to: "/ranking", label: "Ranking", icon: Trophy },
   { to: "/sommelier", label: "Jovem AI", icon: Sparkles },
   { to: "/parceiros", label: "Parceiros", icon: Handshake },

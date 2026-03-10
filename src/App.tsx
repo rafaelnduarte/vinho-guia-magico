@@ -52,6 +52,9 @@ const App = () => (
               <Route path="/selos" element={<SelosPage />} />
               <Route path="/minha-conta" element={<MyAccountPage />} />
               <Route path="/ranking" element={<RankingPage />} />
+              <Route path="/cursos" element={<CursosPage />} />
+              <Route path="/cursos/:cursoId" element={<CursoDetailPage />} />
+              <Route path="/cursos/:cursoId/aula/:aulaId" element={<AulaPage />} />
               <Route
                 path="/admin"
                 element={
