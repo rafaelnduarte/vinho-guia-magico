@@ -74,14 +74,51 @@ Deno.serve(async (req) => {
       });
     }
 
-    const pandaRes = await fetch(pandaUrl, {
-      headers: { Authorization: `Bearer ${pandaApiKey}` },
-    });
+    console.log("AUTH HEADER:", `Bearer ${pandaApiKey?.substring(0, 8)}...`);
+    console.log("KEY LENGTH:", pandaApiKey?.length);
+    console.log(
+      "KEY TRIMMED:",
+      pandaApiKey?.trim().length === pandaApiKey?.length
+        ? "OK (sem espaços)"
+        : "PROBLEMA (tem espaços!)"
+    );
 
-    const rawData = await pandaRes.json();
-    console.log("STATUS:", pandaRes.status);
-    console.log("RAW:", JSON.stringify(rawData));
-    console.log("KEYS:", Object.keys(rawData));
+    // Try all 3 auth variations
+    const variations = [
+      { name: "Bearer", header: `Bearer ${pandaApiKey}` },
+      { name: "Raw", header: pandaApiKey },
+      { name: "ApiKey", header: `ApiKey ${pandaApiKey}` },
+    ];
+
+    let pandaRes: Response | null = null;
+    let rawData: any = null;
+    let winningVariation = "none";
+
+    for (const v of variations) {
+      const res = await fetch(pandaUrl, {
+        headers: { Authorization: v.header },
+      });
+      const data = await res.json();
+      console.log(`VARIATION ${v.name}: status=${res.status}`);
+      if (res.status === 200) {
+        pandaRes = res;
+        rawData = data;
+        winningVariation = v.name;
+        console.log(`WINNER: ${v.name}`);
+        console.log("RAW:", JSON.stringify(data));
+        console.log("KEYS:", Object.keys(data));
+        break;
+      }
+    }
+
+    if (!pandaRes || !rawData) {
+      // All failed, log last attempt details
+      console.log("ALL VARIATIONS FAILED");
+      return new Response(
+        JSON.stringify({ error: "All auth variations failed", winner: "none" }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // Normalize: extract array from whichever key Panda uses
     let normalized: unknown;
