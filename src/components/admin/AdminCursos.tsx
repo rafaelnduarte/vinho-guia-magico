@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { FolderOpen, Video, CheckCircle2, Clock, Download } from "lucide-react";
+import { FolderOpen, Video, CheckCircle2, Clock, Download, ArrowLeft } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -49,15 +49,11 @@ function formatDuration(seconds: number) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-function formatDate(dateStr?: string) {
-  if (!dateStr) return "—";
-  return new Date(dateStr).toLocaleDateString("pt-BR");
-}
-
 export default function AdminCursos() {
   const [selectedCurso, setSelectedCurso] = useState<Curso | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [togglingAulaId, setTogglingAulaId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   const { data: cursos, isLoading } = useQuery({
@@ -68,21 +64,10 @@ export default function AdminCursos() {
         .select("id, titulo, descricao, is_published, panda_folder_id, sort_order")
         .order("sort_order", { ascending: true });
       if (error) throw error;
-
-      // Fetch aula counts per curso
-      const { data: counts } = await supabase
-        .from("aulas")
-        .select("curso_id");
-      
+      const { data: counts } = await supabase.from("aulas").select("curso_id");
       const countMap: Record<string, number> = {};
-      (counts || []).forEach((a) => {
-        countMap[a.curso_id] = (countMap[a.curso_id] || 0) + 1;
-      });
-
-      return (data || []).map((c) => ({
-        ...c,
-        aulas_count: countMap[c.id] || 0,
-      })) as Curso[];
+      (counts || []).forEach((a) => { countMap[a.curso_id] = (countMap[a.curso_id] || 0) + 1; });
+      return (data || []).map((c) => ({ ...c, aulas_count: countMap[c.id] || 0 })) as Curso[];
     },
   });
 
@@ -122,33 +107,48 @@ export default function AdminCursos() {
     }
   }
 
-  async function handleTogglePublished(curso: Curso) {
+  async function handleToggleCurso(curso: Curso) {
     const newValue = !curso.is_published;
     setTogglingId(curso.id);
     try {
-      const { error } = await supabase
-        .from("cursos")
-        .update({ is_published: newValue })
-        .eq("id", curso.id);
+      const { error } = await supabase.from("cursos").update({ is_published: newValue }).eq("id", curso.id);
       if (error) throw error;
-
-      // If unpublishing, also unpublish all aulas
       if (!newValue) {
-        const { error: aulasError } = await supabase
-          .from("aulas")
-          .update({ is_published: false })
-          .eq("curso_id", curso.id);
+        const { error: aulasError } = await supabase.from("aulas").update({ is_published: false }).eq("curso_id", curso.id);
         if (aulasError) throw aulasError;
       }
-
       toast({ title: newValue ? "Curso publicado!" : "Curso despublicado (aulas também)." });
       queryClient.invalidateQueries({ queryKey: ["admin-cursos"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-aulas"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-aulas", curso.id] });
+      // Update local selectedCurso if it's the one being toggled
+      if (selectedCurso?.id === curso.id) {
+        setSelectedCurso({ ...curso, is_published: newValue });
+      }
     } catch (err: any) {
       toast({ title: "Erro ao atualizar", description: err.message, variant: "destructive" });
     } finally {
       setTogglingId(null);
     }
+  }
+
+  async function handleToggleAula(aula: Aula) {
+    const newValue = !aula.is_published;
+    setTogglingAulaId(aula.id);
+    try {
+      const { error } = await supabase.from("aulas").update({ is_published: newValue }).eq("id", aula.id);
+      if (error) throw error;
+      toast({ title: newValue ? "Aula publicada!" : "Aula despublicada." });
+      queryClient.invalidateQueries({ queryKey: ["admin-aulas", selectedCurso?.id] });
+    } catch (err: any) {
+      toast({ title: "Erro ao atualizar aula", description: err.message, variant: "destructive" });
+    } finally {
+      setTogglingAulaId(null);
+    }
+  }
+
+  function handleCloseModal() {
+    setSelectedCurso(null);
+    queryClient.invalidateQueries({ queryKey: ["admin-cursos"] });
   }
 
   const cursoList = cursos || [];
@@ -167,9 +167,7 @@ export default function AdminCursos() {
 
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-36 rounded-lg" />
-          ))}
+          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-36 rounded-lg" />)}
         </div>
       ) : cursoList.length === 0 ? (
         <p className="text-muted-foreground text-center py-12">Nenhum curso encontrado. Sincronize com o Panda.</p>
@@ -188,13 +186,12 @@ export default function AdminCursos() {
                     </Badge>
                   </div>
                 </div>
-
                 <div className="flex items-center justify-between">
                   <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
                     <Switch
                       checked={curso.is_published}
                       disabled={togglingId === curso.id}
-                      onCheckedChange={() => handleTogglePublished(curso)}
+                      onCheckedChange={() => handleToggleCurso(curso)}
                     />
                     Publicado
                   </label>
@@ -208,13 +205,7 @@ export default function AdminCursos() {
                     </Badge>
                   )}
                 </div>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full"
-                  onClick={() => setSelectedCurso(curso)}
-                >
+                <Button variant="outline" size="sm" className="w-full" onClick={() => setSelectedCurso(curso)}>
                   Ver Vídeos
                 </Button>
               </CardContent>
@@ -223,25 +214,36 @@ export default function AdminCursos() {
         </div>
       )}
 
-      <Dialog open={!!selectedCurso} onOpenChange={(open) => !open && setSelectedCurso(null)}>
+      <Dialog open={!!selectedCurso} onOpenChange={(open) => { if (!open) handleCloseModal(); }}>
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <FolderOpen className="h-5 w-5 text-primary" />
-              {selectedCurso?.titulo}
-              {aulas && (
-                <Badge variant="secondary" className="ml-2">
-                  {aulas.length} aulas
-                </Badge>
+            <div className="flex items-center gap-3 w-full">
+              <Button variant="ghost" size="icon" className="shrink-0" onClick={handleCloseModal}>
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <FolderOpen className="h-5 w-5 text-primary shrink-0" />
+                <DialogTitle className="truncate">{selectedCurso?.titulo}</DialogTitle>
+                {aulas && (
+                  <Badge variant="secondary" className="ml-1 shrink-0">{aulas.length} aulas</Badge>
+                )}
+              </div>
+              {selectedCurso && (
+                <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer shrink-0">
+                  <Switch
+                    checked={selectedCurso.is_published}
+                    disabled={togglingId === selectedCurso.id}
+                    onCheckedChange={() => handleToggleCurso(selectedCurso)}
+                  />
+                  Publicado
+                </label>
               )}
-            </DialogTitle>
+            </div>
           </DialogHeader>
 
           {aulasLoading ? (
             <div className="space-y-2">
-              {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-10 w-full" />
-              ))}
+              {[1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
             </div>
           ) : !aulas || aulas.length === 0 ? (
             <p className="text-muted-foreground text-center py-8">Nenhuma aula neste curso.</p>
@@ -252,8 +254,7 @@ export default function AdminCursos() {
                   <TableHead className="w-10">#</TableHead>
                   <TableHead>Título</TableHead>
                   <TableHead className="w-24">Duração</TableHead>
-                  <TableHead className="w-28">Status</TableHead>
-                  <TableHead className="w-28">Upload</TableHead>
+                  <TableHead className="w-28">Publicado</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -263,18 +264,11 @@ export default function AdminCursos() {
                     <TableCell className="font-medium">{aula.titulo || "Sem título"}</TableCell>
                     <TableCell>{aula.duracao_segundos ? formatDuration(aula.duracao_segundos) : "—"}</TableCell>
                     <TableCell>
-                      {aula.is_published ? (
-                        <Badge className="text-xs bg-green-600/20 text-green-400 border-green-600/30">
-                          <CheckCircle2 className="h-3 w-3 mr-1" /> Publicada
-                        </Badge>
-                      ) : (
-                        <Badge className="text-xs bg-yellow-600/20 text-yellow-400 border-yellow-600/30">
-                          <Clock className="h-3 w-3 mr-1" /> Pendente
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
-                      {formatDate(aula.created_at)}
+                      <Switch
+                        checked={aula.is_published}
+                        disabled={togglingAulaId === aula.id}
+                        onCheckedChange={() => handleToggleAula(aula)}
+                      />
                     </TableCell>
                   </TableRow>
                 ))}
