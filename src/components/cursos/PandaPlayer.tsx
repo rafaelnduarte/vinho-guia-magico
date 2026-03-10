@@ -1,8 +1,11 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface PandaPlayerProps {
   pandaVideoId: string;
   startAt?: number;
+  userId?: string;
+  aulaId?: string;
   onProgress?: (currentTime: number, duration: number) => void;
   onComplete?: () => void;
 }
@@ -10,15 +13,43 @@ interface PandaPlayerProps {
 export default function PandaPlayer({
   pandaVideoId,
   startAt = 0,
+  userId,
+  aulaId,
   onProgress,
   onComplete,
 }: PandaPlayerProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const completedRef = useRef(false);
+  const [pandaToken, setPandaToken] = useState<string | null>(null);
+  const [tokenLoading, setTokenLoading] = useState(true);
+
+  // Fetch signed JWT
+  useEffect(() => {
+    let cancelled = false;
+    setTokenLoading(true);
+    setPandaToken(null);
+
+    (async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("panda-token", {
+          body: { video_id: pandaVideoId, aula_id: aulaId },
+        });
+        if (!cancelled && data?.token) {
+          setPandaToken(data.token);
+        }
+        if (error) console.warn("panda-token error, falling back:", error);
+      } catch (e) {
+        console.warn("panda-token fetch failed, falling back:", e);
+      } finally {
+        if (!cancelled) setTokenLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [pandaVideoId, aulaId]);
 
   const handleMessage = useCallback(
     (event: MessageEvent) => {
-      // Only accept messages from Panda domains
       if (!event.origin.includes("pandavideo.com")) return;
 
       try {
@@ -54,12 +85,21 @@ export default function PandaPlayer({
     return () => window.removeEventListener("message", handleMessage);
   }, [handleMessage, pandaVideoId]);
 
+  if (tokenLoading) {
+    return (
+      <div className="relative w-full overflow-hidden rounded-xl bg-secondary flex items-center justify-center" style={{ aspectRatio: "16/9" }}>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
   const params = new URLSearchParams({
     v: pandaVideoId,
     autoplay: "false",
     loop: "false",
     playsinline: "true",
     ...(startAt > 0 ? { start: String(Math.floor(startAt)) } : {}),
+    ...(pandaToken ? { token: pandaToken } : {}),
   });
 
   const src = `https://player-vz-7b95acb0-d42.tv.pandavideo.com.br/embed/?${params.toString()}`;
