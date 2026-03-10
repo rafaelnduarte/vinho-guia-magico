@@ -130,7 +130,6 @@ export type Database = {
           duracao_segundos: number
           id: string
           is_published: boolean
-          modulo_id: string
           panda_quiz_id: string | null
           panda_video_id: string | null
           sort_order: number
@@ -144,7 +143,6 @@ export type Database = {
           duracao_segundos?: number
           id?: string
           is_published?: boolean
-          modulo_id: string
           panda_quiz_id?: string | null
           panda_video_id?: string | null
           sort_order?: number
@@ -158,7 +156,6 @@ export type Database = {
           duracao_segundos?: number
           id?: string
           is_published?: boolean
-          modulo_id?: string
           panda_quiz_id?: string | null
           panda_video_id?: string | null
           sort_order?: number
@@ -171,13 +168,6 @@ export type Database = {
             columns: ["curso_id"]
             isOneToOne: false
             referencedRelation: "cursos"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "aulas_modulo_id_fkey"
-            columns: ["modulo_id"]
-            isOneToOne: false
-            referencedRelation: "modulos"
             referencedColumns: ["id"]
           },
         ]
@@ -498,44 +488,6 @@ export type Database = {
         }
         Relationships: []
       }
-      modulos: {
-        Row: {
-          created_at: string
-          curso_id: string
-          descricao: string | null
-          id: string
-          sort_order: number
-          titulo: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          curso_id: string
-          descricao?: string | null
-          id?: string
-          sort_order?: number
-          titulo: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          curso_id?: string
-          descricao?: string | null
-          id?: string
-          sort_order?: number
-          titulo?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "modulos_curso_id_fkey"
-            columns: ["curso_id"]
-            isOneToOne: false
-            referencedRelation: "cursos"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       partners: {
         Row: {
           category: string
@@ -628,7 +580,6 @@ export type Database = {
           created_at: string
           curso_id: string
           id: string
-          modulo_id: string
           posicao_segundos: number
           updated_at: string
           user_id: string
@@ -640,7 +591,6 @@ export type Database = {
           created_at?: string
           curso_id: string
           id?: string
-          modulo_id: string
           posicao_segundos?: number
           updated_at?: string
           user_id: string
@@ -652,7 +602,6 @@ export type Database = {
           created_at?: string
           curso_id?: string
           id?: string
-          modulo_id?: string
           posicao_segundos?: number
           updated_at?: string
           user_id?: string
@@ -670,13 +619,6 @@ export type Database = {
             columns: ["curso_id"]
             isOneToOne: false
             referencedRelation: "cursos"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "progresso_modulo_id_fkey"
-            columns: ["modulo_id"]
-            isOneToOne: false
-            referencedRelation: "modulos"
             referencedColumns: ["id"]
           },
         ]

@@ -57,34 +57,13 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (curso) {
-        // Need a default modulo — find or create one
-        let { data: modulo } = await supabase
-          .from("modulos")
-          .select("id")
-          .eq("curso_id", curso.id)
-          .order("sort_order")
-          .limit(1)
-          .maybeSingle();
-
-        if (!modulo) {
-          const { data: newModulo } = await supabase
-            .from("modulos")
-            .insert({ curso_id: curso.id, titulo: "Módulo 1" })
-            .select("id")
-            .single();
-          modulo = newModulo;
-        }
-
-        if (modulo) {
-          await supabase.from("aulas").insert({
-            curso_id: curso.id,
-            modulo_id: modulo.id,
-            titulo: video.title || video.name || "Sem título",
-            panda_video_id: video.id,
-            duracao_segundos: Math.round((video.duration || 0)),
-            is_published: false,
-          });
-        }
+        await supabase.from("aulas").insert({
+          curso_id: curso.id,
+          titulo: video.title || video.name || "Sem título",
+          panda_video_id: video.id,
+          duracao_segundos: Math.round(video.duration || 0),
+          is_published: false,
+        });
       }
     } else if (eventType === "video.encoded" && payload.video) {
       const video = payload.video;
