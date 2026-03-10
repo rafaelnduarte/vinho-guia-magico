@@ -133,12 +133,36 @@ export default function AdminCursos() {
 
   async function handleToggleAula(aula: Aula) {
     const newValue = !aula.is_published;
+    const cursoBefore = selectedCurso?.is_published;
     setTogglingAulaId(aula.id);
     try {
       const { error } = await supabase.from("aulas").update({ is_published: newValue }).eq("id", aula.id);
       if (error) throw error;
-      toast({ title: newValue ? "Aula publicada!" : "Aula despublicada." });
+
+      // Re-fetch curso state (trigger may have changed it)
+      const { data: cursoRow } = await supabase
+        .from("cursos")
+        .select("is_published")
+        .eq("id", selectedCurso!.id)
+        .single();
+
+      const cursoAfter = cursoRow?.is_published ?? cursoBefore;
+      const cascaded = cursoAfter !== cursoBefore;
+
+      if (newValue && cascaded) {
+        toast({ title: "Aula publicada. Curso republicado automaticamente." });
+      } else if (!newValue && cascaded) {
+        toast({ title: "Aula despublicada. Curso despublicado automaticamente." });
+      } else {
+        toast({ title: newValue ? "Aula publicada!" : "Aula despublicada." });
+      }
+
+      if (selectedCurso && cursoAfter !== undefined) {
+        setSelectedCurso({ ...selectedCurso, is_published: cursoAfter });
+      }
+
       queryClient.invalidateQueries({ queryKey: ["admin-aulas", selectedCurso?.id] });
+      queryClient.invalidateQueries({ queryKey: ["admin-cursos"] });
     } catch (err: any) {
       toast({ title: "Erro ao atualizar aula", description: err.message, variant: "destructive" });
     } finally {
