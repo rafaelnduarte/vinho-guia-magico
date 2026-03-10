@@ -65,14 +65,43 @@ Deno.serve(async (req) => {
           is_published: false,
         });
       }
+    } else if (
+      eventType === "video.changeStatus" &&
+      payload.status === "CONVERTED" &&
+      payload.video_id
+    ) {
+      console.log('VIDEO.CHANGESTATUS RECEBIDO:', {
+        videoId: payload.video_id,
+        status: payload.status,
+        external_id: payload.video_external_id
+      });
+
+      const { error: updateError } = await supabase
+        .from("aulas")
+        .update({ is_published: true, updated_at: new Date().toISOString() })
+        .eq("panda_video_id", payload.video_id);
+
+      if (updateError) {
+        console.error('ERRO ao publicar aula:', updateError);
+      } else {
+        console.log('AULA PUBLICADA COM SUCESSO:', payload.video_id);
+      }
+
     } else if (eventType === "video.encoded" && payload.video) {
       const video = payload.video;
       if (video.id) {
-        await supabase
+        const { error: updateError } = await supabase
           .from("aulas")
           .update({ is_published: true })
           .eq("panda_video_id", video.id);
+
+        if (updateError) {
+          console.error('ERRO ao atualizar aula:', updateError);
+        } else {
+          console.log('AULA PUBLICADA (fallback):', video.id);
+        }
       }
+
     } else if (eventType === "video.deleted" && payload.video) {
       const video = payload.video;
       if (video.id) {
@@ -89,6 +118,8 @@ Deno.serve(async (req) => {
           .update({ is_published: false })
           .eq("panda_folder_id", folder.id);
       }
+    } else {
+      console.log('EVENTO NÃO MAPEADO:', eventType);
     }
 
     // Update log status
