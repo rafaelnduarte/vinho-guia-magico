@@ -82,7 +82,7 @@ Deno.serve(async (req) => {
     const folders = foldersData.folders ?? [];
 
     for (const folder of folders) {
-      // PASSO 1 — Upsert curso + fetch id separately
+      // PASSO 1 — Upsert curso + fetch id
       const { error: cursoUpsertErr } = await supabase
         .from("cursos")
         .upsert(
@@ -114,37 +114,7 @@ Deno.serve(async (req) => {
       results.folders_synced++;
       console.log(`cursoId: ${cursoId} (folder: "${folder.name}")`);
 
-      // PASSO 2 — Select-then-insert module
-      let { data: moduloData } = await supabase
-        .from("modulos")
-        .select("id")
-        .eq("curso_id", cursoId)
-        .order("sort_order", { ascending: true })
-        .limit(1)
-        .single();
-
-      if (!moduloData) {
-        const { data: novoModulo, error: moduloInsertErr } = await supabase
-          .from("modulos")
-          .insert({
-            curso_id: cursoId,
-            titulo: "Módulo 1",
-            sort_order: 1,
-          })
-          .select("id")
-          .single();
-
-        if (moduloInsertErr || !novoModulo) {
-          results.errors.push(`Module for ${folder.name}: ${moduloInsertErr?.message || "insert failed"}`);
-          continue;
-        }
-        moduloData = novoModulo;
-      }
-
-      const moduloId = moduloData.id;
-      console.log(`moduloId: ${moduloId}`);
-
-      // PASSO 3 — Fetch videos for this folder
+      // PASSO 2 — Fetch videos and upsert aulas directly
       const videosRes = await fetch(
         `${PANDA_BASE}/videos?folder_id=${folder.id}`,
         { headers: { Authorization: apiKey, Accept: "application/json" } }
@@ -161,7 +131,6 @@ Deno.serve(async (req) => {
           {
             panda_video_id: video.id,
             curso_id: cursoId,
-            modulo_id: moduloId,
             titulo: video.title || "Sem título",
             descricao: "",
             duracao_segundos: Math.floor(video.length || 0),
