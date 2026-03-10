@@ -1,76 +1,55 @@
 
 
-## Plano: Nova Página Inicial com Dois Carrosséis
+## Plano: White Label Panda Video Player
 
 ### Resumo
 
-Substituir todo o conteúdo da HomePage por duas seções de carrossel:
-1. **Banners gerenciáveis** — imagens promocionais administráveis pelo painel admin
-2. **Vinhos recentes** — os 10 vinhos mais novos, exibidos 3 por vez
+Criar sistema completo de visualização de cursos/aulas para membros, com player Panda Video embarcado via iframe (abordagem real do Panda), tracking de progresso e navegação entre aulas.
+
+**NÃO altere nenhuma outra tela ou componente** além dos listados abaixo.
 
 ---
 
-### Dimensão recomendada das imagens (Linha 1)
+### Arquitetura de Rotas
 
-As imagens dos banners devem ser enviadas em **1200 × 500 px** (proporção 12:5). Isso garante boa resolução em desktop e boa proporção em mobile. Formato: JPG ou WebP.
-
----
-
-### Mudanças necessárias
-
-#### 1. Nova tabela `home_banners` (migration)
-
-```sql
-CREATE TABLE public.home_banners (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  image_url text NOT NULL,
-  link_url text,
-  sort_order integer NOT NULL DEFAULT 0,
-  is_active boolean NOT NULL DEFAULT true,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
-
-ALTER TABLE public.home_banners ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Active members can view active banners"
-  ON public.home_banners FOR SELECT
-  TO authenticated
-  USING (is_active = true AND has_active_access(auth.uid()));
-
-CREATE POLICY "Admins can manage banners"
-  ON public.home_banners FOR ALL
-  TO authenticated
-  USING (has_role(auth.uid(), 'admin'::app_role));
+```text
+/cursos                           → Grid de cursos publicados
+/cursos/:cursoId                  → Lista de aulas do curso
+/cursos/:cursoId/aula/:aulaId     → Player + navegação
 ```
 
-#### 2. Nova aba "Banners" no Admin (`AdminPage.tsx`)
+### Mudanças
 
-- Criar componente `AdminBanners.tsx` com CRUD simples: listar banners, upload de imagem (bucket `wine-images` ou novo bucket), definir link opcional, reordenar, ativar/desativar.
-- Adicionar aba no `AdminPage.tsx`.
+#### 1. Novos Arquivos
 
-#### 3. Reescrever `HomePage.tsx`
+| Arquivo | Descrição |
+|---------|-----------|
+| `src/components/cursos/PandaPlayer.tsx` | Wrapper de iframe Panda 16:9 responsivo. Constrói URL com `panda_video_id` e query params. Escuta `postMessage` do iframe para progresso. |
+| `src/pages/CursosPage.tsx` | Grid de cursos com `is_published = true`. Cards com título, contagem de aulas, progresso do usuário. |
+| `src/pages/CursoDetailPage.tsx` | Lista de aulas publicadas do curso, ordenadas por `sort_order`. Mostra duração, status de conclusão. |
+| `src/pages/AulaPage.tsx` | Player Panda + barra de progresso + info da aula + botões Anterior/Próxima. Upsert de progresso na tabela `progresso` a cada 30s. Marca `concluido` quando >90%. |
 
-**Linha 1 — Carrossel de Banners:**
-- Usar `embla-carousel-react` (já instalado).
-- Buscar `home_banners` ordenados por `sort_order`.
-- Desktop/tablet: mostrar 3 slides visíveis por vez.
-- Mobile: mostrar 1 slide por vez.
-- Dots ou setas de navegação.
-- Cada imagem pode ter link opcional (clicável).
+#### 2. Arquivos Modificados
 
-**Linha 2 — Carrossel de Vinhos Recentes:**
-- Query: 10 vinhos mais recentes (`status = 'curadoria'`, ordenados por `created_at DESC`, `LIMIT 10`).
-- Reutilizar o componente `WineCard` existente.
-- Desktop/tablet: 3 cards visíveis por vez, com scroll lateral.
-- Mobile: 1 card por vez.
-- Setas de navegação.
+| Arquivo | Mudança |
+|---------|---------|
+| `src/App.tsx` | Adicionar 3 rotas protegidas: `/cursos`, `/cursos/:cursoId`, `/cursos/:cursoId/aula/:aulaId` |
+| `src/components/AppLayout.tsx` | Adicionar link "Cursos" no `memberLinks` (ícone `GraduationCap`, entre Curadoria e Ranking) |
 
-#### 4. Arquivos envolvidos
+#### 3. Sem Mudanças no Banco
 
-| Arquivo | Ação |
-|---------|------|
-| `src/pages/HomePage.tsx` | Reescrever completamente |
-| `src/components/admin/AdminBanners.tsx` | Criar (CRUD de banners) |
-| `src/pages/AdminPage.tsx` | Adicionar aba "Banners" |
-| Migration SQL | Criar tabela `home_banners` |
+Tabelas existentes (`cursos`, `aulas`, `progresso`) já possuem os campos necessários. RLS existente cobre acesso de membros a conteúdo publicado.
+
+### Detalhes do Player
+
+- Iframe apontando para `https://player-vz-*.pandavideo.com.br/embed/?v={panda_video_id}`
+- Query params: `autoplay=false`, `loop=false`, `playsinline=true`
+- Container responsivo 16:9 com fundo escuro e bordas arredondadas
+- Escuta eventos `postMessage` do iframe para capturar progresso
+
+### Tracking de Progresso
+
+- No mount: busca última posição do `progresso`, passa como `start` param
+- A cada 30s: upsert `posicao_segundos` e `percentual`
+- Ao atingir >90%: `concluido = true`, toast de parabéns, habilita botão "Próxima Aula"
 
