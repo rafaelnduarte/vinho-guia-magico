@@ -167,6 +167,8 @@ export default function AulaPage() {
         <PandaPlayer
           pandaVideoId={aula.panda_video_id}
           startAt={startAt}
+          userId={user?.id}
+          aulaId={aulaId}
           onProgress={handleProgress}
           onComplete={handleComplete}
         />
