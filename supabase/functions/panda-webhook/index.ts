@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
 
       const { error: updateError } = await supabase
         .from("aulas")
-        .update({ is_published: true, updated_at: new Date().toISOString() })
+        .update({ is_published: true, status: "completed", updated_at: new Date().toISOString() })
         .eq("panda_video_id", payload.video_id);
 
       if (updateError) {
