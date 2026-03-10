@@ -65,6 +65,33 @@ Deno.serve(async (req) => {
           is_published: false,
         });
       }
+
+      // Assign profile to new video
+      const profileId = Deno.env.get("PANDA_PROFILE_ID");
+      const pandaApiKey = Deno.env.get("PANDA_API_KEY");
+      if (profileId && pandaApiKey && video.id) {
+        try {
+          const profileRes = await fetch(
+            "https://api-v2.pandavideo.com/profiles/?type=set-videos",
+            {
+              method: "POST",
+              headers: {
+                Authorization: pandaApiKey,
+                Accept: "application/json",
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                profile_id: profileId,
+                video_ids: [video.id],
+              }),
+            }
+          );
+          const profileBody = await profileRes.text();
+          console.log(`Profile assigned to new video ${video.id}: status=${profileRes.status} body=${profileBody}`);
+        } catch (profileErr) {
+          console.error(`Profile assignment error for video ${video.id}:`, profileErr);
+        }
+      }
     } else if (
       eventType === "video.changeStatus" &&
       payload.status === "CONVERTED" &&
