@@ -157,6 +157,8 @@ Deno.serve(async (req) => {
 
       console.log(`videos a sincronizar: ${videos.length}`);
 
+      const syncedVideoIds: string[] = [];
+
       for (const [index, video] of videos.entries()) {
         console.log(`Syncing video [${index + 1}/${videos.length}]: "${video.title}" (id=${video.id})`);
 
@@ -181,7 +183,37 @@ Deno.serve(async (req) => {
           continue;
         }
         console.log(`Video "${video.title}" synced OK`);
+        syncedVideoIds.push(video.id);
         results.videos_synced++;
+      }
+
+      // Assign profile to all synced videos
+      const profileId = Deno.env.get("PANDA_PROFILE_ID");
+      if (profileId && syncedVideoIds.length > 0) {
+        try {
+          const profileRes = await fetch(
+            `${PANDA_BASE}/profiles/?type=set-videos`,
+            {
+              method: "POST",
+              headers: {
+                Authorization: apiKey,
+                Accept: "application/json",
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                profile_id: profileId,
+                video_ids: syncedVideoIds,
+              }),
+            }
+          );
+          const profileBody = await profileRes.text();
+          console.log(`Profile assignment for folder "${folder.name}": status=${profileRes.status} body=${profileBody}`);
+        } catch (profileErr) {
+          console.error(`Profile assignment error for folder "${folder.name}":`, profileErr);
+          results.errors.push(`Profile assignment ${folder.name}: ${profileErr.message}`);
+        }
+      } else if (!profileId) {
+        console.log("PANDA_PROFILE_ID not set, skipping profile assignment");
       }
     }
 
