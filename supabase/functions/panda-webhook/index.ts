@@ -81,8 +81,8 @@ Deno.serve(async (req) => {
                 "Content-Type": "application/json",
               },
               body: JSON.stringify({
-                profile_id: profileId,
-                video_ids: [video.id],
+                profile: profileId,
+                videos: [video.id],
               }),
             }
           );
