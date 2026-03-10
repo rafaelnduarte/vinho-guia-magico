@@ -11,3 +11,5 @@ project_id = "hrpnufesbjmaaiqgjwtn"
     verify_jwt = false
   [functions.panda-webhook]
     verify_jwt = false
+  [functions.panda-sync]
+    verify_jwt = false
