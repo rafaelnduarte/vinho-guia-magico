@@ -18,6 +18,9 @@ import SommelierPage from "@/pages/SommelierPage";
 import AdminPage from "@/pages/AdminPage";
 import MyAccountPage from "@/pages/MyAccountPage";
 import RankingPage from "@/pages/RankingPage";
+import CursosPage from "@/pages/CursosPage";
+import CursoDetailPage from "@/pages/CursoDetailPage";
+import AulaPage from "@/pages/AulaPage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
