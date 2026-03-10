@@ -1,76 +1,43 @@
 
 
-## Plano: Nova Página Inicial com Dois Carrosséis
+## Analise: Duas questões distintas
 
-### Resumo
+### 1. Profile Assignment — Erro 500 do Panda
 
-Substituir todo o conteúdo da HomePage por duas seções de carrossel:
-1. **Banners gerenciáveis** — imagens promocionais administráveis pelo painel admin
-2. **Vinhos recentes** — os 10 vinhos mais novos, exibidos 3 por vez
-
----
-
-### Dimensão recomendada das imagens (Linha 1)
-
-As imagens dos banners devem ser enviadas em **1200 × 500 px** (proporção 12:5). Isso garante boa resolução em desktop e boa proporção em mobile. Formato: JPG ou WebP.
-
----
-
-### Mudanças necessárias
-
-#### 1. Nova tabela `home_banners` (migration)
-
-```sql
-CREATE TABLE public.home_banners (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  image_url text NOT NULL,
-  link_url text,
-  sort_order integer NOT NULL DEFAULT 0,
-  is_active boolean NOT NULL DEFAULT true,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
-
-ALTER TABLE public.home_banners ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Active members can view active banners"
-  ON public.home_banners FOR SELECT
-  TO authenticated
-  USING (is_active = true AND has_active_access(auth.uid()));
-
-CREATE POLICY "Admins can manage banners"
-  ON public.home_banners FOR ALL
-  TO authenticated
-  USING (has_role(auth.uid(), 'admin'::app_role));
+Os logs mostram consistentemente:
+```
+status=500 body={"errCode":"InternalServerError","errMsg":"InternalError","detail":"Error to update videos profiles"}
 ```
 
-#### 2. Nova aba "Banners" no Admin (`AdminPage.tsx`)
+Os campos `profile` e `videos` estão corretos. O 500 é um erro interno do Panda. Possíveis causas:
+- O valor de `PANDA_PROFILE_ID` está incorreto ou o profile foi deletado no painel Panda
+- A API Key não tem permissão para esse profile
+- Bug temporário da API Panda
 
-- Criar componente `AdminBanners.tsx` com CRUD simples: listar banners, upload de imagem (bucket `wine-images` ou novo bucket), definir link opcional, reordenar, ativar/desativar.
-- Adicionar aba no `AdminPage.tsx`.
+**Ação necessária do seu lado**: Verificar no painel do Panda Video se o Profile ID configurado em `PANDA_PROFILE_ID` existe e está ativo. Listar os profiles disponíveis:
+```
+GET https://api-v2.pandavideo.com.br/profile/
+Authorization: <PANDA_API_KEY>
+```
 
-#### 3. Reescrever `HomePage.tsx`
+### 2. Vídeo falha ao carregar — Provável causa: Token JWT
 
-**Linha 1 — Carrossel de Banners:**
-- Usar `embla-carousel-react` (já instalado).
-- Buscar `home_banners` ordenados por `sort_order`.
-- Desktop/tablet: mostrar 3 slides visíveis por vez.
-- Mobile: mostrar 1 slide por vez.
-- Dots ou setas de navegação.
-- Cada imagem pode ter link opcional (clicável).
+Os logs do `panda-token` confirmam que o JWT é gerado com sucesso. Porém, o parâmetro `token` no player do Panda é especificamente para **Watermark Groups (DRM)**, não para autenticação genérica.
 
-**Linha 2 — Carrossel de Vinhos Recentes:**
-- Query: 10 vinhos mais recentes (`status = 'curadoria'`, ordenados por `created_at DESC`, `LIMIT 10`).
-- Reutilizar o componente `WineCard` existente.
-- Desktop/tablet: 3 cards visíveis por vez, com scroll lateral.
-- Mobile: 1 card por vez.
-- Setas de navegação.
+Se a conta não tem watermark habilitado, ou se o `PANDA_SECRET_KEY` não corresponde a um watermark group configurado, o player rejeita o token e mostra "This video encountered an error".
 
-#### 4. Arquivos envolvidos
+### Plano proposto
 
-| Arquivo | Ação |
-|---------|------|
-| `src/pages/HomePage.tsx` | Reescrever completamente |
-| `src/components/admin/AdminBanners.tsx` | Criar (CRUD de banners) |
-| `src/pages/AdminPage.tsx` | Adicionar aba "Banners" |
-| Migration SQL | Criar tabela `home_banners` |
+**Testar primeiro sem token**: Modificar o `PandaPlayer.tsx` para NÃO enviar o `token` na URL do iframe. Se os vídeos voltarem a funcionar, confirma que o token é a causa.
+
+| Arquivo | Mudança |
+|---------|---------|
+| `src/components/cursos/PandaPlayer.tsx` | Remover fetch do token e o parâmetro `token` da URL. Simplificar para carregar o iframe direto, sem JWT. Remover loading state do token. |
+
+O componente voltará a ser simples:
+```typescript
+const src = `https://player-vz-7b95acb0-d42.tv.pandavideo.com.br/embed/?v=${pandaVideoId}&autoplay=false&loop=false&playsinline=true${startAt > 0 ? `&start=${Math.floor(startAt)}` : ''}`;
+```
+
+Se os vídeos funcionarem sem token, o próximo passo seria configurar corretamente o Watermark Group no painel Panda e usar o secret correto desse grupo.
 
