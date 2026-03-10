@@ -1,76 +1,37 @@
 
 
-## Plano: Nova Página Inicial com Dois Carrosséis
+## Plano: Profile Assignment na Sincronização Panda
 
-### Resumo
+### Contexto
 
-Substituir todo o conteúdo da HomePage por duas seções de carrossel:
-1. **Banners gerenciáveis** — imagens promocionais administráveis pelo painel admin
-2. **Vinhos recentes** — os 10 vinhos mais novos, exibidos 3 por vez
+O problema relatado ("Este vídeo apresentou falha") ocorre quando vídeos no Panda não têm um profile atribuído. A solução é atribuir automaticamente o profile JDV a todos os vídeos durante a sincronização.
 
----
+### Pré-requisito: Secret `PANDA_PROFILE_ID`
 
-### Dimensão recomendada das imagens (Linha 1)
+O profile JDV precisa ser criado manualmente no painel do Panda Video (uma única vez). Após criação, o `profile_id` retornado será armazenado como secret do projeto para uso nas Edge Functions.
 
-As imagens dos banners devem ser enviadas em **1200 × 500 px** (proporção 12:5). Isso garante boa resolução em desktop e boa proporção em mobile. Formato: JPG ou WebP.
+### Mudanças
 
----
+#### 1. `supabase/functions/panda-sync/index.ts`
 
-### Mudanças necessárias
+Após sincronizar os vídeos de cada pasta, fazer um `POST` para `https://api-v2.pandavideo.com/profiles/?type=set-videos` atribuindo o profile a todos os `video_ids` sincronizados. Usa a env `PANDA_PROFILE_ID`. Se não configurada, pula a atribuição (não bloqueia sync). Loga resultado no console.
 
-#### 1. Nova tabela `home_banners` (migration)
+#### 2. `supabase/functions/panda-webhook/index.ts`
 
-```sql
-CREATE TABLE public.home_banners (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  image_url text NOT NULL,
-  link_url text,
-  sort_order integer NOT NULL DEFAULT 0,
-  is_active boolean NOT NULL DEFAULT true,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
+No handler de `video.created`, após inserir a aula, fazer `POST` para atribuir o profile ao vídeo recém-criado usando o mesmo endpoint.
 
-ALTER TABLE public.home_banners ENABLE ROW LEVEL SECURITY;
+### Arquivos modificados
 
-CREATE POLICY "Active members can view active banners"
-  ON public.home_banners FOR SELECT
-  TO authenticated
-  USING (is_active = true AND has_active_access(auth.uid()));
+| Arquivo | Mudança |
+|---------|---------|
+| `supabase/functions/panda-sync/index.ts` | Após loop de vídeos, bulk-assign profile via API |
+| `supabase/functions/panda-webhook/index.ts` | No `video.created`, assign profile ao vídeo |
 
-CREATE POLICY "Admins can manage banners"
-  ON public.home_banners FOR ALL
-  TO authenticated
-  USING (has_role(auth.uid(), 'admin'::app_role));
-```
+### Sem mudanças no banco
 
-#### 2. Nova aba "Banners" no Admin (`AdminPage.tsx`)
+Não é necessário criar tabela `panda_profiles` — o `profile_id` fica como secret. Não é necessário adicionar coluna `panda_profile_id` na tabela `aulas` — o profile é gerenciado no lado do Panda.
 
-- Criar componente `AdminBanners.tsx` com CRUD simples: listar banners, upload de imagem (bucket `wine-images` ou novo bucket), definir link opcional, reordenar, ativar/desativar.
-- Adicionar aba no `AdminPage.tsx`.
+### Sem mudanças no frontend
 
-#### 3. Reescrever `HomePage.tsx`
-
-**Linha 1 — Carrossel de Banners:**
-- Usar `embla-carousel-react` (já instalado).
-- Buscar `home_banners` ordenados por `sort_order`.
-- Desktop/tablet: mostrar 3 slides visíveis por vez.
-- Mobile: mostrar 1 slide por vez.
-- Dots ou setas de navegação.
-- Cada imagem pode ter link opcional (clicável).
-
-**Linha 2 — Carrossel de Vinhos Recentes:**
-- Query: 10 vinhos mais recentes (`status = 'curadoria'`, ordenados por `created_at DESC`, `LIMIT 10`).
-- Reutilizar o componente `WineCard` existente.
-- Desktop/tablet: 3 cards visíveis por vez, com scroll lateral.
-- Mobile: 1 card por vez.
-- Setas de navegação.
-
-#### 4. Arquivos envolvidos
-
-| Arquivo | Ação |
-|---------|------|
-| `src/pages/HomePage.tsx` | Reescrever completamente |
-| `src/components/admin/AdminBanners.tsx` | Criar (CRUD de banners) |
-| `src/pages/AdminPage.tsx` | Adicionar aba "Banners" |
-| Migration SQL | Criar tabela `home_banners` |
+Nenhuma outra tela ou componente será alterado.
 
