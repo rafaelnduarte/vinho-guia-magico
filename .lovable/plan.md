@@ -1,29 +1,76 @@
 
 
-## Bidirectional cascade publish/unpublish between cursos and aulas
+## Plano: Nova Página Inicial com Dois Carrosséis
 
-### 1. Database migration — Create trigger on `aulas`
+### Resumo
 
-Create `trg_aula_cascata_publicacao()` function + trigger on `aulas.is_published` UPDATE:
+Substituir todo o conteúdo da HomePage por duas seções de carrossel:
+1. **Banners gerenciáveis** — imagens promocionais administráveis pelo painel admin
+2. **Vinhos recentes** — os 10 vinhos mais novos, exibidos 3 por vez
 
-- **Publish direction**: When an aula goes `false → true`, if the parent curso is unpublished, auto-publish it. Log to `webhook_logs`.
-- **Unpublish direction**: When an aula goes `true → false`, count remaining published aulas. If zero, auto-unpublish the curso. Log to `webhook_logs`.
+---
 
-The function uses `SECURITY DEFINER` to bypass RLS. The existing `trg_cursos_is_published` trigger (curso unpublish → cascade all aulas to false) remains unchanged.
+### Dimensão recomendada das imagens (Linha 1)
 
-**Important**: The `webhook_logs` INSERT policy blocks client inserts (`WITH CHECK (false)`), but since this trigger runs as `SECURITY DEFINER`, it bypasses RLS and can insert.
+As imagens dos banners devem ser enviadas em **1200 × 500 px** (proporção 12:5). Isso garante boa resolução em desktop e boa proporção em mobile. Formato: JPG ou WebP.
 
-### 2. Frontend: `AdminCursos.tsx` — Update `handleToggleAula`
+---
 
-After toggling an aula, re-fetch the curso's current `is_published` state from the database (since the trigger may have changed it), then:
-- Update `selectedCurso` state to reflect the new value
-- Show contextual toast:
-  - "Aula publicada. Curso republicado automaticamente." (if curso was auto-published)
-  - "Aula despublicada. Curso despublicado automaticamente." (if curso was auto-unpublished)
-  - "Aula publicada!" / "Aula despublicada." (no cascade)
-- Invalidate both `admin-cursos` and `admin-aulas` queries
+### Mudanças necessárias
 
-### Files changed
-1. New SQL migration (trigger + function)
-2. `src/components/admin/AdminCursos.tsx` — update `handleToggleAula` logic
+#### 1. Nova tabela `home_banners` (migration)
+
+```sql
+CREATE TABLE public.home_banners (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  image_url text NOT NULL,
+  link_url text,
+  sort_order integer NOT NULL DEFAULT 0,
+  is_active boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.home_banners ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Active members can view active banners"
+  ON public.home_banners FOR SELECT
+  TO authenticated
+  USING (is_active = true AND has_active_access(auth.uid()));
+
+CREATE POLICY "Admins can manage banners"
+  ON public.home_banners FOR ALL
+  TO authenticated
+  USING (has_role(auth.uid(), 'admin'::app_role));
+```
+
+#### 2. Nova aba "Banners" no Admin (`AdminPage.tsx`)
+
+- Criar componente `AdminBanners.tsx` com CRUD simples: listar banners, upload de imagem (bucket `wine-images` ou novo bucket), definir link opcional, reordenar, ativar/desativar.
+- Adicionar aba no `AdminPage.tsx`.
+
+#### 3. Reescrever `HomePage.tsx`
+
+**Linha 1 — Carrossel de Banners:**
+- Usar `embla-carousel-react` (já instalado).
+- Buscar `home_banners` ordenados por `sort_order`.
+- Desktop/tablet: mostrar 3 slides visíveis por vez.
+- Mobile: mostrar 1 slide por vez.
+- Dots ou setas de navegação.
+- Cada imagem pode ter link opcional (clicável).
+
+**Linha 2 — Carrossel de Vinhos Recentes:**
+- Query: 10 vinhos mais recentes (`status = 'curadoria'`, ordenados por `created_at DESC`, `LIMIT 10`).
+- Reutilizar o componente `WineCard` existente.
+- Desktop/tablet: 3 cards visíveis por vez, com scroll lateral.
+- Mobile: 1 card por vez.
+- Setas de navegação.
+
+#### 4. Arquivos envolvidos
+
+| Arquivo | Ação |
+|---------|------|
+| `src/pages/HomePage.tsx` | Reescrever completamente |
+| `src/components/admin/AdminBanners.tsx` | Criar (CRUD de banners) |
+| `src/pages/AdminPage.tsx` | Adicionar aba "Banners" |
+| Migration SQL | Criar tabela `home_banners` |
 
