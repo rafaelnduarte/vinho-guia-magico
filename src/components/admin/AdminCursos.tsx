@@ -74,6 +74,8 @@ function StatusBadge({ status }: { status?: string }) {
 
 export default function AdminCursos() {
   const [selectedFolder, setSelectedFolder] = useState<PandaFolder | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const queryClient = useQueryClient();
 
   const { data: folders, isLoading: foldersLoading, refetch: refetchFolders } = useQuery({
     queryKey: ["panda-folders"],
