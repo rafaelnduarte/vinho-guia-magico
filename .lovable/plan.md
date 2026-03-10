@@ -1,49 +1,76 @@
 
 
-## Plano: Corrigir URL do endpoint de profile assignment
+## Plano: Nova Página Inicial com Dois Carrosséis
 
-### Problema
+### Resumo
 
-Os logs mostram erro 403 em todas as tentativas de atribuição de profile:
+Substituir todo o conteúdo da HomePage por duas seções de carrossel:
+1. **Banners gerenciáveis** — imagens promocionais administráveis pelo painel admin
+2. **Vinhos recentes** — os 10 vinhos mais novos, exibidos 3 por vez
+
+---
+
+### Dimensão recomendada das imagens (Linha 1)
+
+As imagens dos banners devem ser enviadas em **1200 × 500 px** (proporção 12:5). Isso garante boa resolução em desktop e boa proporção em mobile. Formato: JPG ou WebP.
+
+---
+
+### Mudanças necessárias
+
+#### 1. Nova tabela `home_banners` (migration)
+
+```sql
+CREATE TABLE public.home_banners (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  image_url text NOT NULL,
+  link_url text,
+  sort_order integer NOT NULL DEFAULT 0,
+  is_active boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.home_banners ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Active members can view active banners"
+  ON public.home_banners FOR SELECT
+  TO authenticated
+  USING (is_active = true AND has_active_access(auth.uid()));
+
+CREATE POLICY "Admins can manage banners"
+  ON public.home_banners FOR ALL
+  TO authenticated
+  USING (has_role(auth.uid(), 'admin'::app_role));
 ```
-"Authorization header requires 'Credential' parameter. Authorization header requires 'Signature' parameter..."
-```
 
-Este é um erro AWS — significa que a URL está resolvendo para um recurso S3/CloudFront em vez da API Panda.
+#### 2. Nova aba "Banners" no Admin (`AdminPage.tsx`)
 
-### Causa raiz
+- Criar componente `AdminBanners.tsx` com CRUD simples: listar banners, upload de imagem (bucket `wine-images` ou novo bucket), definir link opcional, reordenar, ativar/desativar.
+- Adicionar aba no `AdminPage.tsx`.
 
-Dois problemas na URL:
-1. **Domínio errado**: `api-v2.pandavideo.com` deveria ser `api-v2.pandavideo.com.br`
-2. **Path errado**: `/profiles/` (plural) deveria ser `/profile/` (singular)
+#### 3. Reescrever `HomePage.tsx`
 
-A URL correta segundo a documentação oficial do Panda é:
-`https://api-v2.pandavideo.com.br/profile/?type=set-videos`
+**Linha 1 — Carrossel de Banners:**
+- Usar `embla-carousel-react` (já instalado).
+- Buscar `home_banners` ordenados por `sort_order`.
+- Desktop/tablet: mostrar 3 slides visíveis por vez.
+- Mobile: mostrar 1 slide por vez.
+- Dots ou setas de navegação.
+- Cada imagem pode ter link opcional (clicável).
 
-Os outros endpoints (folders, videos) funcionam com `.com` porque provavelmente têm redirect, mas o `/profile/` não.
+**Linha 2 — Carrossel de Vinhos Recentes:**
+- Query: 10 vinhos mais recentes (`status = 'curadoria'`, ordenados por `created_at DESC`, `LIMIT 10`).
+- Reutilizar o componente `WineCard` existente.
+- Desktop/tablet: 3 cards visíveis por vez, com scroll lateral.
+- Mobile: 1 card por vez.
+- Setas de navegação.
 
-### Mudanças
+#### 4. Arquivos envolvidos
 
-| Arquivo | Mudança |
-|---------|---------|
-| `supabase/functions/panda-sync/index.ts` | Corrigir URL de `PANDA_BASE/profiles/` para `https://api-v2.pandavideo.com.br/profile/` |
-| `supabase/functions/panda-webhook/index.ts` | Mesma correção na URL do profile assignment |
-
-### Detalhes
-
-Linha 194-195 do `panda-sync`:
-```
-- `${PANDA_BASE}/profiles/?type=set-videos`
-+ `https://api-v2.pandavideo.com.br/profile/?type=set-videos`
-```
-
-Linha 74-75 do `panda-webhook`:
-```
-- "https://api-v2.pandavideo.com/profiles/?type=set-videos"
-+ "https://api-v2.pandavideo.com.br/profile/?type=set-videos"
-```
-
-### Sem mudanças no banco ou frontend
-
-Apenas correção de URL nas duas Edge Functions.
+| Arquivo | Ação |
+|---------|------|
+| `src/pages/HomePage.tsx` | Reescrever completamente |
+| `src/components/admin/AdminBanners.tsx` | Criar (CRUD de banners) |
+| `src/pages/AdminPage.tsx` | Adicionar aba "Banners" |
+| Migration SQL | Criar tabela `home_banners` |
 

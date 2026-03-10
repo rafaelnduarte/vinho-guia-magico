@@ -72,7 +72,7 @@ Deno.serve(async (req) => {
       if (profileId && pandaApiKey && video.id) {
         try {
           const profileRes = await fetch(
-            "https://api-v2.pandavideo.com/profiles/?type=set-videos",
+            "https://api-v2.pandavideo.com.br/profile/?type=set-videos",
             {
               method: "POST",
               headers: {
