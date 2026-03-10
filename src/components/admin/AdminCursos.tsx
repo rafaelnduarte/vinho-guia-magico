@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { FolderOpen, Video, CheckCircle2, Clock, Download, ArrowLeft } from "lucide-react";
+import { FolderOpen, Video, CheckCircle2, Clock, Download, ArrowLeft, RefreshCw, XCircle, Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +41,8 @@ interface Aula {
   panda_video_id: string | null;
   sort_order: number;
   created_at: string;
+  thumbnail_url: string | null;
+  status: string;
 }
 
 function formatDuration(seconds: number) {
@@ -49,9 +51,16 @@ function formatDuration(seconds: number) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+function StatusIcon({ status }: { status: string }) {
+  if (status === "completed") return <CheckCircle2 className="h-4 w-4 text-green-500" />;
+  if (status === "failed") return <XCircle className="h-4 w-4 text-destructive" />;
+  return <Loader2 className="h-4 w-4 text-yellow-500 animate-spin" />;
+}
+
 export default function AdminCursos() {
   const [selectedCurso, setSelectedCurso] = useState<Curso | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [syncingCurso, setSyncingCurso] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [togglingAulaId, setTogglingAulaId] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -77,7 +86,7 @@ export default function AdminCursos() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("aulas")
-        .select("id, titulo, duracao_segundos, is_published, panda_video_id, sort_order, created_at")
+        .select("id, titulo, duracao_segundos, is_published, panda_video_id, sort_order, created_at, thumbnail_url, status")
         .eq("curso_id", selectedCurso!.id)
         .order("sort_order", { ascending: true });
       if (error) throw error;
@@ -104,6 +113,37 @@ export default function AdminCursos() {
       toast({ title: "Erro na sincronização", description: err.message, variant: "destructive" });
     } finally {
       setSyncing(false);
+    }
+  }
+
+  async function handleSyncCurso() {
+    if (!selectedCurso?.panda_folder_id) return;
+    setSyncingCurso(true);
+    toast({ title: "Sincronizando vídeos do curso..." });
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const res = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/panda-sync`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ folder_id: selectedCurso.panda_folder_id }),
+        }
+      );
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || "Erro na sincronização");
+      toast({ title: `${result.videos_synced} vídeos sincronizados!` });
+      queryClient.invalidateQueries({ queryKey: ["admin-aulas", selectedCurso.id] });
+      queryClient.invalidateQueries({ queryKey: ["admin-cursos"] });
+    } catch (err: any) {
+      toast({ title: "Erro na sincronização", description: err.message, variant: "destructive" });
+    } finally {
+      setSyncingCurso(false);
     }
   }
 
@@ -138,7 +178,6 @@ export default function AdminCursos() {
       const { error } = await supabase.from("aulas").update({ is_published: newValue }).eq("id", aula.id);
       if (error) throw error;
 
-      // Re-fetch curso state (trigger may have changed it)
       const { data: cursoRow } = await supabase
         .from("cursos")
         .select("is_published")
@@ -251,6 +290,18 @@ export default function AdminCursos() {
                   <Badge variant="secondary" className="ml-1 shrink-0">{aulas.length} aulas</Badge>
                 )}
               </div>
+              {selectedCurso?.panda_folder_id && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0"
+                  onClick={handleSyncCurso}
+                  disabled={syncingCurso}
+                >
+                  <RefreshCw className={`h-4 w-4 mr-1 ${syncingCurso ? "animate-spin" : ""}`} />
+                  {syncingCurso ? "Sincronizando..." : "Sincronizar"}
+                </Button>
+              )}
               {selectedCurso && (
                 <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer shrink-0">
                   <Switch
@@ -277,6 +328,7 @@ export default function AdminCursos() {
                   <TableHead className="w-10">#</TableHead>
                   <TableHead>Título</TableHead>
                   <TableHead className="w-24">Duração</TableHead>
+                  <TableHead className="w-20">Status</TableHead>
                   <TableHead className="w-28">Publicado</TableHead>
                 </TableRow>
               </TableHeader>
@@ -286,6 +338,9 @@ export default function AdminCursos() {
                     <TableCell className="font-mono text-muted-foreground">{idx + 1}</TableCell>
                     <TableCell className="font-medium">{aula.titulo || "Sem título"}</TableCell>
                     <TableCell>{aula.duracao_segundos ? formatDuration(aula.duracao_segundos) : "—"}</TableCell>
+                    <TableCell>
+                      <StatusIcon status={aula.status || "processing"} />
+                    </TableCell>
                     <TableCell>
                       <Switch
                         checked={aula.is_published}
