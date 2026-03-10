@@ -1,0 +1,1 @@
+ALTER TABLE modulos ADD CONSTRAINT modulos_curso_id_titulo_key UNIQUE (curso_id, titulo);

@@ -113,14 +113,15 @@ Deno.serve(async (req) => {
             titulo: "Geral",
             sort_order: 0,
           },
-          { onConflict: "curso_id,titulo", ignoreDuplicates: true }
+          { onConflict: "curso_id,titulo" }
         )
         .select("id")
         .single();
 
-      // If upsert returned nothing (duplicate ignored), fetch existing
+      // Fallback: if upsert failed, try fetching existing
       let moduloId: string;
       if (moduloError || !moduloData) {
+        console.log(`Modulo upsert issue for ${folder.name}:`, moduloError?.message);
         const { data: existing } = await supabase
           .from("modulos")
           .select("id")
@@ -138,6 +139,8 @@ Deno.serve(async (req) => {
         moduloId = moduloData.id;
       }
 
+      console.log(`Folder "${folder.name}" → curso=${cursoId}, modulo=${moduloId}`);
+
       // 4. Fetch videos for this folder
       const videosRes = await fetch(
         `${PANDA_BASE}/videos?folder_id=${folder.id}`,
@@ -146,8 +149,12 @@ Deno.serve(async (req) => {
       const videosData = await videosRes.json();
       const videos = videosData.videos ?? [];
 
+      console.log(`Folder "${folder.name}": ${videos.length} videos found`);
+
       for (const video of videos) {
-        const { error: aulaError } = await supabase.from("aulas").upsert(
+        console.log(`Syncing video: "${video.title}" (id=${video.id}, status=${video.status})`);
+
+        const { data: aulaData, error: aulaError } = await supabase.from("aulas").upsert(
           {
             panda_video_id: video.id,
             curso_id: cursoId,
@@ -160,11 +167,13 @@ Deno.serve(async (req) => {
         );
 
         if (aulaError) {
+          console.log(`VIDEO ERROR for "${video.title}":`, aulaError.message, aulaError.details);
           results.errors.push(
             `Video ${video.title}: ${aulaError.message}`
           );
           continue;
         }
+        console.log(`Video "${video.title}" synced OK`);
         results.videos_synced++;
       }
     }
