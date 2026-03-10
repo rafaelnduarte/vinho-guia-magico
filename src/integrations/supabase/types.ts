@@ -133,6 +133,8 @@ export type Database = {
           panda_quiz_id: string | null
           panda_video_id: string | null
           sort_order: number
+          status: string
+          thumbnail_url: string | null
           titulo: string
           updated_at: string
         }
@@ -146,6 +148,8 @@ export type Database = {
           panda_quiz_id?: string | null
           panda_video_id?: string | null
           sort_order?: number
+          status?: string
+          thumbnail_url?: string | null
           titulo: string
           updated_at?: string
         }
@@ -159,6 +163,8 @@ export type Database = {
           panda_quiz_id?: string | null
           panda_video_id?: string | null
           sort_order?: number
+          status?: string
+          thumbnail_url?: string | null
           titulo?: string
           updated_at?: string
         }

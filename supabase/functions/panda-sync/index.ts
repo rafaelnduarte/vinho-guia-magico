@@ -10,6 +10,12 @@ const corsHeaders = {
 
 const PANDA_BASE = "https://api-v2.pandavideo.com";
 
+function mapPandaStatus(pandaStatus: string): string {
+  if (pandaStatus === "CONVERTED") return "completed";
+  if (pandaStatus === "FAILED" || pandaStatus === "ERROR") return "failed";
+  return "processing";
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -68,20 +74,47 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Check for optional folder_id in body (per-course sync)
+    let targetFolderId: string | null = null;
+    try {
+      const body = await req.json();
+      targetFolderId = body?.folder_id || null;
+    } catch {
+      // No body or invalid JSON — sync all folders
+    }
+
     const results = {
       folders_synced: 0,
       videos_synced: 0,
       errors: [] as string[],
     };
 
-    // 1. Fetch all folders from Panda
-    const foldersRes = await fetch(`${PANDA_BASE}/folders`, {
-      headers: { Authorization: apiKey, Accept: "application/json" },
-    });
-    const foldersData = await foldersRes.json();
-    const folders = foldersData.folders ?? [];
+    // Determine which folders to sync
+    let foldersToSync: Array<{ id: string; name: string }> = [];
 
-    for (const folder of folders) {
+    if (targetFolderId) {
+      // Per-course sync: just use that folder
+      // Fetch folder info from Panda to get name
+      const folderRes = await fetch(`${PANDA_BASE}/folders/${targetFolderId}`, {
+        headers: { Authorization: apiKey, Accept: "application/json" },
+      });
+      if (folderRes.ok) {
+        const folderData = await folderRes.json();
+        foldersToSync = [{ id: targetFolderId, name: folderData.name || targetFolderId }];
+      } else {
+        // Fallback: just use the ID
+        foldersToSync = [{ id: targetFolderId, name: targetFolderId }];
+      }
+    } else {
+      // Full sync: fetch all folders from Panda
+      const foldersRes = await fetch(`${PANDA_BASE}/folders`, {
+        headers: { Authorization: apiKey, Accept: "application/json" },
+      });
+      const foldersData = await foldersRes.json();
+      foldersToSync = foldersData.folders ?? [];
+    }
+
+    for (const folder of foldersToSync) {
       // PASSO 1 — Upsert curso + fetch id
       const { error: cursoUpsertErr } = await supabase
         .from("cursos")
@@ -114,7 +147,7 @@ Deno.serve(async (req) => {
       results.folders_synced++;
       console.log(`cursoId: ${cursoId} (folder: "${folder.name}")`);
 
-      // PASSO 2 — Fetch videos and upsert aulas directly
+      // PASSO 2 — Fetch videos and upsert aulas
       const videosRes = await fetch(
         `${PANDA_BASE}/videos?folder_id=${folder.id}`,
         { headers: { Authorization: apiKey, Accept: "application/json" } }
@@ -136,6 +169,8 @@ Deno.serve(async (req) => {
             duracao_segundos: Math.floor(video.length || 0),
             sort_order: index + 1,
             is_published: video.status === "CONVERTED",
+            thumbnail_url: video.thumbnail || video.thumbnail_url || null,
+            status: mapPandaStatus(video.status || ""),
           },
           { onConflict: "panda_video_id" }
         );

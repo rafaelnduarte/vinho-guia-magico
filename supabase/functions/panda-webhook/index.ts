@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
 
       const { error: updateError } = await supabase
         .from("aulas")
-        .update({ is_published: true, updated_at: new Date().toISOString() })
+        .update({ is_published: true, status: "completed", updated_at: new Date().toISOString() })
         .eq("panda_video_id", payload.video_id);
 
       if (updateError) {
@@ -92,7 +92,7 @@ Deno.serve(async (req) => {
       if (video.id) {
         const { error: updateError } = await supabase
           .from("aulas")
-          .update({ is_published: true })
+          .update({ is_published: true, status: "completed" })
           .eq("panda_video_id", video.id);
 
         if (updateError) {
