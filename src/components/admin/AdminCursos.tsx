@@ -128,15 +128,50 @@ export default function AdminCursos() {
   const syncedVideoIds = new Set((aulas || []).map((a) => a.panda_video_id).filter(Boolean));
   const folderList = Array.isArray(folders) ? folders : [];
 
+  async function handleSync() {
+    setSyncing(true);
+    toast({ title: "Sincronizando dados do Panda..." });
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const res = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/panda-sync`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || "Erro na sincronização");
+      toast({
+        title: `${result.folders_synced} pastas e ${result.videos_synced} vídeos sincronizados!`,
+      });
+      refetchFolders();
+      queryClient.invalidateQueries({ queryKey: ["admin-cursos-sync"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-aulas-sync"] });
+    } catch (err: any) {
+      toast({ title: "Erro na sincronização", description: err.message, variant: "destructive" });
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-foreground">
           CURSOS {folderList.length > 0 && `(${folderList.length})`}
         </h2>
-        <Button variant="outline" size="sm" onClick={() => refetchFolders()}>
-          <RefreshCw className="h-4 w-4 mr-1" /> Atualizar
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={handleSync} disabled={syncing}>
+            <Download className="h-4 w-4 mr-1" />
+            {syncing ? "Sincronizando..." : "Sincronizar com Panda"}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => refetchFolders()}>
+            <RefreshCw className="h-4 w-4 mr-1" /> Atualizar
+          </Button>
+        </div>
       </div>
 
       {foldersLoading ? (
