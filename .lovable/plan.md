@@ -1,76 +1,41 @@
 
 
-## Plano: Nova Página Inicial com Dois Carrosséis
+## Per-Course Sync and Status Column
 
-### Resumo
+Most of the infrastructure already exists (panda-sync, panda-webhook, AdminCursos modal). The main additions are:
 
-Substituir todo o conteúdo da HomePage por duas seções de carrossel:
-1. **Banners gerenciáveis** — imagens promocionais administráveis pelo painel admin
-2. **Vinhos recentes** — os 10 vinhos mais novos, exibidos 3 por vez
+### 1. Database Migration
 
----
+Add two columns to `aulas`:
+- `thumbnail_url TEXT` (nullable)
+- `status TEXT DEFAULT 'processing'` (values: `processing`, `completed`, `failed`)
 
-### Dimensão recomendada das imagens (Linha 1)
+Add index on `(curso_id, sort_order)` for efficient modal queries.
 
-As imagens dos banners devem ser enviadas em **1200 × 500 px** (proporção 12:5). Isso garante boa resolução em desktop e boa proporção em mobile. Formato: JPG ou WebP.
+### 2. Modify `panda-sync` Edge Function
 
----
+Accept an optional `folder_id` body parameter. If provided, sync only that folder's videos (skip the full folder loop). If not provided, sync all folders as before. Also populate `thumbnail_url` and map Panda `status` field (`CONVERTED` -> `completed`, else `processing`).
 
-### Mudanças necessárias
+### 3. Update `AdminCursos.tsx`
 
-#### 1. Nova tabela `home_banners` (migration)
+**Modal header**: Add a "Sincronizar" button next to the publish toggle. It calls `panda-sync` with the selected curso's `panda_folder_id`. Only shown when `selectedCurso.panda_folder_id` exists.
 
-```sql
-CREATE TABLE public.home_banners (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  image_url text NOT NULL,
-  link_url text,
-  sort_order integer NOT NULL DEFAULT 0,
-  is_active boolean NOT NULL DEFAULT true,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
+**Table**: Add a "Status" column showing icons:
+- `completed` -> green checkmark
+- `processing` -> yellow clock/spinner  
+- `failed` -> red X
 
-ALTER TABLE public.home_banners ENABLE ROW LEVEL SECURITY;
+**Aula interface**: Add `thumbnail_url` and `status` fields.
 
-CREATE POLICY "Active members can view active banners"
-  ON public.home_banners FOR SELECT
-  TO authenticated
-  USING (is_active = true AND has_active_access(auth.uid()));
+**New state**: `syncingCurso` boolean for the per-course sync loading state.
 
-CREATE POLICY "Admins can manage banners"
-  ON public.home_banners FOR ALL
-  TO authenticated
-  USING (has_role(auth.uid(), 'admin'::app_role));
-```
+### 4. Update `panda-webhook` Edge Function
 
-#### 2. Nova aba "Banners" no Admin (`AdminPage.tsx`)
+On `video.changeStatus` event, also update the new `status` column (`CONVERTED` -> `completed`, others mapped accordingly).
 
-- Criar componente `AdminBanners.tsx` com CRUD simples: listar banners, upload de imagem (bucket `wine-images` ou novo bucket), definir link opcional, reordenar, ativar/desativar.
-- Adicionar aba no `AdminPage.tsx`.
-
-#### 3. Reescrever `HomePage.tsx`
-
-**Linha 1 — Carrossel de Banners:**
-- Usar `embla-carousel-react` (já instalado).
-- Buscar `home_banners` ordenados por `sort_order`.
-- Desktop/tablet: mostrar 3 slides visíveis por vez.
-- Mobile: mostrar 1 slide por vez.
-- Dots ou setas de navegação.
-- Cada imagem pode ter link opcional (clicável).
-
-**Linha 2 — Carrossel de Vinhos Recentes:**
-- Query: 10 vinhos mais recentes (`status = 'curadoria'`, ordenados por `created_at DESC`, `LIMIT 10`).
-- Reutilizar o componente `WineCard` existente.
-- Desktop/tablet: 3 cards visíveis por vez, com scroll lateral.
-- Mobile: 1 card por vez.
-- Setas de navegação.
-
-#### 4. Arquivos envolvidos
-
-| Arquivo | Ação |
-|---------|------|
-| `src/pages/HomePage.tsx` | Reescrever completamente |
-| `src/components/admin/AdminBanners.tsx` | Criar (CRUD de banners) |
-| `src/pages/AdminPage.tsx` | Adicionar aba "Banners" |
-| Migration SQL | Criar tabela `home_banners` |
+### Files changed
+1. New SQL migration (add columns + index)
+2. `supabase/functions/panda-sync/index.ts` — accept optional `folder_id`
+3. `supabase/functions/panda-webhook/index.ts` — update `status` column
+4. `src/components/admin/AdminCursos.tsx` — sync button in modal + status column
 
