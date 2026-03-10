@@ -79,6 +79,7 @@ Deno.serve(async (req) => {
     });
 
     const rawData = await pandaRes.json();
+    console.log("STATUS:", pandaRes.status);
     console.log("RAW:", JSON.stringify(rawData));
     console.log("KEYS:", Object.keys(rawData));
 
