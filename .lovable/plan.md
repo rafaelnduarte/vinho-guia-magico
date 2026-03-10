@@ -1,34 +1,76 @@
 
 
-## Bidirectional Cascade — Complete Implementation
+## Plano: Nova Página Inicial com Dois Carrosséis
 
-### Problem
-Current triggers only handle: curso unpublish → aulas off, and aula toggle → curso auto-publish/unpublish. Missing: **curso publish → all aulas ON**.
+### Resumo
 
-Also, the frontend manually does the aula cascade in `handleToggleCurso` (line 116-118), which is redundant with triggers and should be removed.
+Substituir todo o conteúdo da HomePage por duas seções de carrossel:
+1. **Banners gerenciáveis** — imagens promocionais administráveis pelo painel admin
+2. **Vinhos recentes** — os 10 vinhos mais novos, exibidos 3 por vez
 
-### 1. Database Migration
+---
 
-Drop existing triggers/functions and create two new ones:
+### Dimensão recomendada das imagens (Linha 1)
 
-- **Drop**: `sync_curso_unpublish` function + its trigger, `trg_aula_cascata_publicacao` function + `trg_aulas_cascata_bidirecional` trigger
-- **Create `trg_curso_cascata_aulas()`**: On cursos UPDATE of is_published — publish all aulas when curso published, unpublish all when curso unpublished. Logs to webhook_logs.
-- **Create `trg_aula_cascata_curso()`**: On aulas UPDATE of is_published — auto-publish curso when first aula published, auto-unpublish when last aula unpublished. Logs to webhook_logs.
+As imagens dos banners devem ser enviadas em **1200 × 500 px** (proporção 12:5). Isso garante boa resolução em desktop e boa proporção em mobile. Formato: JPG ou WebP.
 
-Both use `SECURITY DEFINER` to bypass RLS for webhook_logs inserts. The WHERE clauses (`AND is_published = false/true`) prevent infinite trigger recursion.
+---
 
-### 2. Frontend: `AdminCursos.tsx`
+### Mudanças necessárias
 
-**`handleToggleCurso`** (lines 110-132):
-- Remove manual aula cascade code (lines 116-118) — triggers handle it now
-- Update toast messages:
-  - ON: "Curso publicado. Todas as aulas foram publicadas."
-  - OFF: "Curso despublicado. Todas as aulas foram despublicadas."
-- Invalidate `admin-aulas` query to refresh modal if open
+#### 1. Nova tabela `home_banners` (migration)
 
-**`handleToggleAula`** — no changes needed, already handles trigger-driven curso state changes.
+```sql
+CREATE TABLE public.home_banners (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  image_url text NOT NULL,
+  link_url text,
+  sort_order integer NOT NULL DEFAULT 0,
+  is_active boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
 
-### Files changed
-1. New SQL migration (drop old triggers/functions, create 2 new ones)
-2. `src/components/admin/AdminCursos.tsx` — simplify `handleToggleCurso`
+ALTER TABLE public.home_banners ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Active members can view active banners"
+  ON public.home_banners FOR SELECT
+  TO authenticated
+  USING (is_active = true AND has_active_access(auth.uid()));
+
+CREATE POLICY "Admins can manage banners"
+  ON public.home_banners FOR ALL
+  TO authenticated
+  USING (has_role(auth.uid(), 'admin'::app_role));
+```
+
+#### 2. Nova aba "Banners" no Admin (`AdminPage.tsx`)
+
+- Criar componente `AdminBanners.tsx` com CRUD simples: listar banners, upload de imagem (bucket `wine-images` ou novo bucket), definir link opcional, reordenar, ativar/desativar.
+- Adicionar aba no `AdminPage.tsx`.
+
+#### 3. Reescrever `HomePage.tsx`
+
+**Linha 1 — Carrossel de Banners:**
+- Usar `embla-carousel-react` (já instalado).
+- Buscar `home_banners` ordenados por `sort_order`.
+- Desktop/tablet: mostrar 3 slides visíveis por vez.
+- Mobile: mostrar 1 slide por vez.
+- Dots ou setas de navegação.
+- Cada imagem pode ter link opcional (clicável).
+
+**Linha 2 — Carrossel de Vinhos Recentes:**
+- Query: 10 vinhos mais recentes (`status = 'curadoria'`, ordenados por `created_at DESC`, `LIMIT 10`).
+- Reutilizar o componente `WineCard` existente.
+- Desktop/tablet: 3 cards visíveis por vez, com scroll lateral.
+- Mobile: 1 card por vez.
+- Setas de navegação.
+
+#### 4. Arquivos envolvidos
+
+| Arquivo | Ação |
+|---------|------|
+| `src/pages/HomePage.tsx` | Reescrever completamente |
+| `src/components/admin/AdminBanners.tsx` | Criar (CRUD de banners) |
+| `src/pages/AdminPage.tsx` | Adicionar aba "Banners" |
+| Migration SQL | Criar tabela `home_banners` |
 

@@ -113,14 +113,13 @@ export default function AdminCursos() {
     try {
       const { error } = await supabase.from("cursos").update({ is_published: newValue }).eq("id", curso.id);
       if (error) throw error;
-      if (!newValue) {
-        const { error: aulasError } = await supabase.from("aulas").update({ is_published: false }).eq("curso_id", curso.id);
-        if (aulasError) throw aulasError;
-      }
-      toast({ title: newValue ? "Curso publicado!" : "Curso despublicado (aulas também)." });
+      toast({
+        title: newValue
+          ? "Curso publicado. Todas as aulas foram publicadas."
+          : "Curso despublicado. Todas as aulas foram despublicadas.",
+      });
       queryClient.invalidateQueries({ queryKey: ["admin-cursos"] });
       queryClient.invalidateQueries({ queryKey: ["admin-aulas", curso.id] });
-      // Update local selectedCurso if it's the one being toggled
       if (selectedCurso?.id === curso.id) {
         setSelectedCurso({ ...curso, is_published: newValue });
       }
