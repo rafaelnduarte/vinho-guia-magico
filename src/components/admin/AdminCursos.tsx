@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { FolderOpen, Video, RefreshCw, CheckCircle2, Clock, Download } from "lucide-react";
+import { FolderOpen, Video, CheckCircle2, Clock, Download } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -22,21 +23,24 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-interface PandaFolder {
+interface Curso {
   id: string;
-  name: string;
-  videos_count?: string | number;
-  created_at?: string;
+  titulo: string;
+  descricao: string | null;
+  is_published: boolean;
+  panda_folder_id: string | null;
+  sort_order: number;
+  aulas_count?: number;
 }
 
-interface PandaVideo {
+interface Aula {
   id: string;
-  title?: string;
-  length?: number;
-  status?: string;
-  thumbnail?: string;
-  video_player?: string;
-  created_at?: string;
+  titulo: string;
+  duracao_segundos: number;
+  is_published: boolean;
+  panda_video_id: string | null;
+  sort_order: number;
+  created_at: string;
 }
 
 function formatDuration(seconds: number) {
@@ -50,83 +54,51 @@ function formatDate(dateStr?: string) {
   return new Date(dateStr).toLocaleDateString("pt-BR");
 }
 
-function StatusBadge({ status }: { status?: string }) {
-  if (status === "CONVERTED") {
-    return (
-      <Badge className="text-xs bg-green-600/20 text-green-400 border-green-600/30">
-        <CheckCircle2 className="h-3 w-3 mr-1" /> Pronto
-      </Badge>
-    );
-  }
-  if (status === "PROCESSING") {
-    return (
-      <Badge className="text-xs bg-yellow-600/20 text-yellow-400 border-yellow-600/30">
-        <Clock className="h-3 w-3 mr-1" /> Processando
-      </Badge>
-    );
-  }
-  return (
-    <Badge variant="destructive" className="text-xs">
-      {status || "—"}
-    </Badge>
-  );
-}
-
 export default function AdminCursos() {
-  const [selectedFolder, setSelectedFolder] = useState<PandaFolder | null>(null);
+  const [selectedCurso, setSelectedCurso] = useState<Curso | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
-  const { data: folders, isLoading: foldersLoading, refetch: refetchFolders } = useQuery({
-    queryKey: ["panda-folders"],
+  const { data: cursos, isLoading } = useQuery({
+    queryKey: ["admin-cursos"],
     queryFn: async () => {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData?.session?.access_token;
-      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-      const res = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/panda-proxy?resource=folders`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (!res.ok) throw new Error("Erro ao buscar pastas");
-      return (await res.json()) as PandaFolder[];
+      const { data, error } = await supabase
+        .from("cursos")
+        .select("id, titulo, descricao, is_published, panda_folder_id, sort_order")
+        .order("sort_order", { ascending: true });
+      if (error) throw error;
+
+      // Fetch aula counts per curso
+      const { data: counts } = await supabase
+        .from("aulas")
+        .select("curso_id");
+      
+      const countMap: Record<string, number> = {};
+      (counts || []).forEach((a) => {
+        countMap[a.curso_id] = (countMap[a.curso_id] || 0) + 1;
+      });
+
+      return (data || []).map((c) => ({
+        ...c,
+        aulas_count: countMap[c.id] || 0,
+      })) as Curso[];
     },
   });
 
-  const { data: cursos } = useQuery({
-    queryKey: ["admin-cursos-sync"],
+  const { data: aulas, isLoading: aulasLoading } = useQuery({
+    queryKey: ["admin-aulas", selectedCurso?.id],
+    enabled: !!selectedCurso,
     queryFn: async () => {
-      const { data } = await supabase.from("cursos").select("id, panda_folder_id");
-      return data || [];
+      const { data, error } = await supabase
+        .from("aulas")
+        .select("id, titulo, duracao_segundos, is_published, panda_video_id, sort_order, created_at")
+        .eq("curso_id", selectedCurso!.id)
+        .order("sort_order", { ascending: true });
+      if (error) throw error;
+      return (data || []) as Aula[];
     },
   });
-
-  const { data: videos, isLoading: videosLoading } = useQuery({
-    queryKey: ["panda-videos", selectedFolder?.id],
-    enabled: !!selectedFolder,
-    queryFn: async () => {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData?.session?.access_token;
-      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-      const res = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/panda-proxy?resource=videos&folder_id=${selectedFolder!.id}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (!res.ok) throw new Error("Erro ao buscar vídeos");
-      return (await res.json()) as PandaVideo[];
-    },
-  });
-
-  const { data: aulas } = useQuery({
-    queryKey: ["admin-aulas-sync"],
-    queryFn: async () => {
-      const { data } = await supabase.from("aulas").select("id, panda_video_id");
-      return data || [];
-    },
-  });
-
-  const syncedFolderIds = new Set((cursos || []).map((c) => c.panda_folder_id).filter(Boolean));
-  const syncedVideoIds = new Set((aulas || []).map((a) => a.panda_video_id).filter(Boolean));
-  const folderList = Array.isArray(folders) ? folders : [];
 
   async function handleSync() {
     setSyncing(true);
@@ -137,19 +109,12 @@ export default function AdminCursos() {
       const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
       const res = await fetch(
         `https://${projectId}.supabase.co/functions/v1/panda-sync`,
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-        }
+        { method: "POST", headers: { Authorization: `Bearer ${token}` } }
       );
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || "Erro na sincronização");
-      toast({
-        title: `${result.folders_synced} pastas e ${result.videos_synced} vídeos sincronizados!`,
-      });
-      refetchFolders();
-      queryClient.invalidateQueries({ queryKey: ["admin-cursos-sync"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-aulas-sync"] });
+      toast({ title: `${result.folders_synced} cursos e ${result.videos_synced} aulas sincronizados!` });
+      queryClient.invalidateQueries({ queryKey: ["admin-cursos"] });
     } catch (err: any) {
       toast({ title: "Erro na sincronização", description: err.message, variant: "destructive" });
     } finally {
@@ -157,97 +122,129 @@ export default function AdminCursos() {
     }
   }
 
+  async function handleTogglePublished(curso: Curso) {
+    const newValue = !curso.is_published;
+    setTogglingId(curso.id);
+    try {
+      const { error } = await supabase
+        .from("cursos")
+        .update({ is_published: newValue })
+        .eq("id", curso.id);
+      if (error) throw error;
+
+      // If unpublishing, also unpublish all aulas
+      if (!newValue) {
+        const { error: aulasError } = await supabase
+          .from("aulas")
+          .update({ is_published: false })
+          .eq("curso_id", curso.id);
+        if (aulasError) throw aulasError;
+      }
+
+      toast({ title: newValue ? "Curso publicado!" : "Curso despublicado (aulas também)." });
+      queryClient.invalidateQueries({ queryKey: ["admin-cursos"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-aulas"] });
+    } catch (err: any) {
+      toast({ title: "Erro ao atualizar", description: err.message, variant: "destructive" });
+    } finally {
+      setTogglingId(null);
+    }
+  }
+
+  const cursoList = cursos || [];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-foreground">
-          CURSOS {folderList.length > 0 && `(${folderList.length})`}
+          CURSOS {cursoList.length > 0 && `(${cursoList.length})`}
         </h2>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleSync} disabled={syncing}>
-            <Download className="h-4 w-4 mr-1" />
-            {syncing ? "Sincronizando..." : "Sincronizar com Panda"}
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => refetchFolders()}>
-            <RefreshCw className="h-4 w-4 mr-1" /> Atualizar
-          </Button>
-        </div>
+        <Button variant="outline" size="sm" onClick={handleSync} disabled={syncing}>
+          <Download className="h-4 w-4 mr-1" />
+          {syncing ? "Sincronizando..." : "Sincronizar com Panda"}
+        </Button>
       </div>
 
-      {foldersLoading ? (
+      {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => (
             <Skeleton key={i} className="h-36 rounded-lg" />
           ))}
         </div>
-      ) : folderList.length === 0 ? (
-        <p className="text-muted-foreground text-center py-12">Nenhuma pasta encontrada no Panda Video.</p>
+      ) : cursoList.length === 0 ? (
+        <p className="text-muted-foreground text-center py-12">Nenhum curso encontrado. Sincronize com o Panda.</p>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {folderList.map((folder) => {
-            const isSynced = syncedFolderIds.has(folder.id);
-            const count = parseInt(String(folder.videos_count ?? "0"), 10);
-            return (
-              <Card key={folder.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="p-5 space-y-3">
-                  <div className="flex items-start gap-3">
-                    <FolderOpen className="h-6 w-6 text-primary shrink-0 mt-0.5" />
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-foreground truncate">{folder.name}</p>
-                      <div className="flex items-center gap-2 mt-1.5">
-                        <Badge variant="secondary" className="text-xs">
-                          <Video className="h-3 w-3 mr-1" />
-                          {count} vídeos
-                        </Badge>
-                        {isSynced ? (
-                          <Badge className="text-xs bg-green-600/20 text-green-400 border-green-600/30">
-                            <CheckCircle2 className="h-3 w-3 mr-1" /> Sincronizado
-                          </Badge>
-                        ) : (
-                          <Badge className="text-xs bg-yellow-600/20 text-yellow-400 border-yellow-600/30">
-                            <Clock className="h-3 w-3 mr-1" /> Pendente
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
+          {cursoList.map((curso) => (
+            <Card key={curso.id} className="hover:shadow-md transition-shadow">
+              <CardContent className="p-5 space-y-3">
+                <div className="flex items-start gap-3">
+                  <FolderOpen className="h-6 w-6 text-primary shrink-0 mt-0.5" />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-foreground truncate">{curso.titulo}</p>
+                    <Badge variant="secondary" className="text-xs mt-1.5">
+                      <Video className="h-3 w-3 mr-1" />
+                      {curso.aulas_count} aulas
+                    </Badge>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => setSelectedFolder(folder)}
-                  >
-                    Ver Vídeos
-                  </Button>
-                </CardContent>
-              </Card>
-            );
-          })}
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+                    <Switch
+                      checked={curso.is_published}
+                      disabled={togglingId === curso.id}
+                      onCheckedChange={() => handleTogglePublished(curso)}
+                    />
+                    Publicado
+                  </label>
+                  {curso.is_published ? (
+                    <Badge className="text-xs bg-green-600/20 text-green-400 border-green-600/30">
+                      <CheckCircle2 className="h-3 w-3 mr-1" /> Ativo
+                    </Badge>
+                  ) : (
+                    <Badge className="text-xs bg-yellow-600/20 text-yellow-400 border-yellow-600/30">
+                      <Clock className="h-3 w-3 mr-1" /> Rascunho
+                    </Badge>
+                  )}
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => setSelectedCurso(curso)}
+                >
+                  Ver Vídeos
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       )}
 
-      <Dialog open={!!selectedFolder} onOpenChange={(open) => !open && setSelectedFolder(null)}>
+      <Dialog open={!!selectedCurso} onOpenChange={(open) => !open && setSelectedCurso(null)}>
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FolderOpen className="h-5 w-5 text-primary" />
-              {selectedFolder?.name}
-              {videos && (
+              {selectedCurso?.titulo}
+              {aulas && (
                 <Badge variant="secondary" className="ml-2">
-                  {Array.isArray(videos) ? videos.length : 0} vídeos
+                  {aulas.length} aulas
                 </Badge>
               )}
             </DialogTitle>
           </DialogHeader>
 
-          {videosLoading ? (
+          {aulasLoading ? (
             <div className="space-y-2">
               {[1, 2, 3].map((i) => (
                 <Skeleton key={i} className="h-10 w-full" />
               ))}
             </div>
-          ) : !Array.isArray(videos) || videos.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">Nenhum vídeo nesta pasta.</p>
+          ) : !aulas || aulas.length === 0 ? (
+            <p className="text-muted-foreground text-center py-8">Nenhuma aula neste curso.</p>
           ) : (
             <Table>
               <TableHeader>
@@ -256,38 +253,31 @@ export default function AdminCursos() {
                   <TableHead>Título</TableHead>
                   <TableHead className="w-24">Duração</TableHead>
                   <TableHead className="w-28">Status</TableHead>
-                  <TableHead className="w-28">Sync</TableHead>
                   <TableHead className="w-28">Upload</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {videos.map((video, idx) => {
-                  const isSynced = syncedVideoIds.has(video.id);
-                  return (
-                    <TableRow key={video.id}>
-                      <TableCell className="font-mono text-muted-foreground">{idx + 1}</TableCell>
-                      <TableCell className="font-medium">{video.title || "Sem título"}</TableCell>
-                      <TableCell>{video.length ? formatDuration(video.length) : "—"}</TableCell>
-                      <TableCell>
-                        <StatusBadge status={video.status} />
-                      </TableCell>
-                      <TableCell>
-                        {isSynced ? (
-                          <Badge className="text-xs bg-green-600/20 text-green-400 border-green-600/30">
-                            <CheckCircle2 className="h-3 w-3 mr-1" /> Sim
-                          </Badge>
-                        ) : (
-                          <Badge className="text-xs bg-yellow-600/20 text-yellow-400 border-yellow-600/30">
-                            <Clock className="h-3 w-3 mr-1" /> Não
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-xs">
-                        {formatDate(video.created_at)}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                {aulas.map((aula, idx) => (
+                  <TableRow key={aula.id}>
+                    <TableCell className="font-mono text-muted-foreground">{idx + 1}</TableCell>
+                    <TableCell className="font-medium">{aula.titulo || "Sem título"}</TableCell>
+                    <TableCell>{aula.duracao_segundos ? formatDuration(aula.duracao_segundos) : "—"}</TableCell>
+                    <TableCell>
+                      {aula.is_published ? (
+                        <Badge className="text-xs bg-green-600/20 text-green-400 border-green-600/30">
+                          <CheckCircle2 className="h-3 w-3 mr-1" /> Publicada
+                        </Badge>
+                      ) : (
+                        <Badge className="text-xs bg-yellow-600/20 text-yellow-400 border-yellow-600/30">
+                          <Clock className="h-3 w-3 mr-1" /> Pendente
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-xs">
+                      {formatDate(aula.created_at)}
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           )}
