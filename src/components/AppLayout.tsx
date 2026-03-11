@@ -51,8 +51,23 @@ export default function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [cursosOpen, setCursosOpen] = useState(location.pathname.startsWith("/cursos"));
   const { trackPageView } = useAnalytics();
   const lastTrackedPath = useRef("");
+
+  // Fetch published cursos for sidebar
+  const { data: sidebarCursos } = useQuery({
+    queryKey: ["cursos", "sidebar"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("cursos")
+        .select("id, titulo")
+        .eq("is_published", true)
+        .order("sort_order");
+      return data ?? [];
+    },
+    staleTime: 300_000,
+  });
 
   // User widget data
   const [profileName, setProfileName] = useState<string | null>(null);
