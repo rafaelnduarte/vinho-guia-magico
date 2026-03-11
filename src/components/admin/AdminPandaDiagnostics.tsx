@@ -59,6 +59,26 @@ export default function AdminPandaDiagnostics() {
   const [setupLoading, setSetupLoading] = useState(false);
   const [setupResult, setSetupResult] = useState<any>(null);
   const [setupError, setSetupError] = useState<string | null>(null);
+  const [groupInfoLoading, setGroupInfoLoading] = useState(false);
+  const [groupInfo, setGroupInfo] = useState<any>(null);
+  const [groupInfoError, setGroupInfoError] = useState<string | null>(null);
+
+  const fetchGroupInfo = async () => {
+    setGroupInfoLoading(true);
+    setGroupInfoError(null);
+    setGroupInfo(null);
+
+    const { data, error: fnErr } = await supabase.functions.invoke("panda-diagnostics", {
+      body: { action: "group_info" },
+    });
+
+    setGroupInfoLoading(false);
+    if (fnErr) {
+      setGroupInfoError(fnErr.message);
+    } else {
+      setGroupInfo(data);
+    }
+  };
 
   const runSetupWatermark = async () => {
     setSetupLoading(true);
