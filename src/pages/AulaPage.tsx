@@ -53,6 +53,8 @@ export default function AulaPage() {
     setCompleted(false);
     setCurrentTime(0);
     setDuration(0);
+    setPrevAulaId(null);
+    setNextAulaId(null);
     lastSaveRef.current = 0;
 
     const fetchAll = async () => {
@@ -83,6 +85,10 @@ export default function AulaPage() {
         const siblings = (siblingsRes.data as { id: string; titulo: string }[])
           .sort((a, b) => a.titulo.localeCompare(b.titulo, 'pt-BR', { numeric: true }));
         const idx = siblings.findIndex((s) => s.id === aulaId);
+        console.log('[NAV] Siblings ordenados:', siblings.map(s => s.titulo));
+        console.log('[NAV] Aula atual:', aulaId, 'Index:', idx);
+        if (idx > 0) console.log('[NAV] Anterior:', siblings[idx - 1].titulo);
+        if (idx < siblings.length - 1) console.log('[NAV] Próxima:', siblings[idx + 1].titulo);
         setPrevAulaId(idx > 0 ? siblings[idx - 1].id : null);
         setNextAulaId(idx < siblings.length - 1 ? siblings[idx + 1].id : null);
       }
