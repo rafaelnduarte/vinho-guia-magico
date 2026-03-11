@@ -59,6 +59,31 @@ Deno.serve(async (req) => {
 
     const PANDA_API_KEY = Deno.env.get("PANDA_API_KEY")!;
 
+    // Handle assign_drm action — associate video with DRM group
+    if (action === "assign_drm") {
+      const vid = body.video_id;
+      const groupId = Deno.env.get("PANDA_WATERMARK_GROUP_ID");
+      if (!vid || !groupId) {
+        return new Response(JSON.stringify({ success: false, error: "video_id and PANDA_WATERMARK_GROUP_ID required" }), { status: 200, headers: corsHeaders });
+      }
+
+      console.log(`[PANDA-DIAG] Assigning video ${vid} to DRM group ${groupId}`);
+      const res = await fetch(`${PANDA_BASE}/videos/${vid}`, {
+        method: "PUT",
+        headers: { "Authorization": PANDA_API_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({ drm_group_id: groupId }),
+      });
+
+      const resText = await res.text();
+      if (!res.ok) {
+        console.error(`[PANDA-DIAG] assign_drm failed: ${res.status} ${resText}`);
+        return new Response(JSON.stringify({ success: false, error: `Panda API error ${res.status}`, detail: resText }), { status: 200, headers: corsHeaders });
+      }
+
+      console.log(`[PANDA-DIAG] assign_drm success for video ${vid}`);
+      return new Response(JSON.stringify({ success: true, video_id: vid, group_id: groupId, response: resText.substring(0, 500) }), { status: 200, headers: corsHeaders });
+    }
+
     // Handle group_info action
     if (action === "group_info") {
       const groupId = Deno.env.get("PANDA_WATERMARK_GROUP_ID");
