@@ -103,7 +103,7 @@ export default function CursoDetailPage() {
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-foreground truncate">{aula.titulo}</p>
+                <p className="font-medium text-foreground truncate">{sanitizarTitulo(aula.titulo)}</p>
                 {aula.descricao && (
                   <p className="text-xs text-muted-foreground truncate mt-0.5">{aula.descricao}</p>
                 )}
