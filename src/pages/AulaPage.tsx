@@ -209,7 +209,7 @@ export default function AulaPage() {
 
       {/* Aula info */}
       <div className="rounded-lg border border-border bg-card p-4 space-y-1">
-        <h2 className="font-display text-lg text-foreground">{aula.titulo}</h2>
+        <h2 className="font-display text-lg text-foreground">{sanitizarTitulo(aula.titulo)}</h2>
         {aula.descricao && <p className="text-sm text-muted-foreground">{aula.descricao}</p>}
       </div>
 
