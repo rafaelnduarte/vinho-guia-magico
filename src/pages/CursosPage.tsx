@@ -28,7 +28,7 @@ export default function CursosPage() {
         .from("cursos")
         .select("id, titulo, descricao, nivel")
         .eq("is_published", true)
-        .order("sort_order");
+        .order("titulo", { ascending: true });
 
       if (!cursosData) {
         setLoading(false);
