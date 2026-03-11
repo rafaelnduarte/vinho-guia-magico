@@ -149,6 +149,57 @@ export default function AdminPandaDiagnostics() {
 
   return (
     <div className="space-y-6">
+      {/* Setup Watermark Card */}
+      <Card className="border-primary/30">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            🔐 Setup Watermark Group (DRM)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Executa uma única vez para criar o Watermark Group no Panda, habilitar DRM e gerar o Private Token.
+            Os valores retornados devem ser salvos como secrets.
+          </p>
+          <Button onClick={runSetupWatermark} disabled={setupLoading} variant="default">
+            {setupLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Stethoscope className="h-4 w-4 mr-1" />}
+            Executar Setup Watermark
+          </Button>
+
+          {setupError && (
+            <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+              ❌ {setupError}
+            </div>
+          )}
+
+          {setupResult && (
+            <div className="space-y-3">
+              <div className={`rounded-md p-4 text-sm ${setupResult.success ? "bg-green-500/10 text-green-700 dark:text-green-400" : "bg-destructive/10 text-destructive"}`}>
+                <p className="font-medium">{setupResult.success ? "✅ Setup completo!" : "❌ Setup falhou"}</p>
+              </div>
+              {setupResult.group_id && (
+                <div className="rounded-md bg-muted p-3 space-y-2">
+                  <p className="text-xs font-medium">Copie estes valores para adicionar como secrets:</p>
+                  <div className="text-xs font-mono">
+                    <p><span className="font-bold">PANDA_WATERMARK_GROUP_ID:</span> {setupResult.group_id}</p>
+                    <p><span className="font-bold">PANDA_WATERMARK_PRIVATE_TOKEN:</span> {setupResult.private_token || "N/A"}</p>
+                  </div>
+                  {setupResult.next_steps && (
+                    <ul className="text-xs text-muted-foreground list-disc pl-4 mt-2">
+                      {setupResult.next_steps.map((s: string, i: number) => <li key={i}>{s}</li>)}
+                    </ul>
+                  )}
+                </div>
+              )}
+              <details className="text-xs">
+                <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Ver JSON completo</summary>
+                <pre className="mt-2 overflow-auto rounded-md bg-muted p-3 max-h-40">{JSON.stringify(setupResult, null, 2)}</pre>
+              </details>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Diagnostic Card */}
       <Card>
         <CardHeader>
