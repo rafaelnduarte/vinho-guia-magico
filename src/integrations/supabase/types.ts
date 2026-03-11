@@ -629,6 +629,36 @@ export type Database = {
           },
         ]
       }
+      recovery_logs: {
+        Row: {
+          action: string
+          created_at: string
+          error_message: string | null
+          id: string
+          new_video_id: string | null
+          status: string
+          video_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          new_video_id?: string | null
+          status?: string
+          video_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          new_video_id?: string | null
+          status?: string
+          video_id?: string
+        }
+        Relationships: []
+      }
       seals: {
         Row: {
           category: string
