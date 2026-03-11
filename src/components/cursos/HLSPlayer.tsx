@@ -6,6 +6,7 @@ interface HLSPlayerProps {
   startAt?: number;
   onProgress?: (currentTime: number, duration: number) => void;
   onComplete?: () => void;
+  jwt?: string | null;
 }
 
 export default function HLSPlayer({
