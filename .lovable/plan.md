@@ -1,76 +1,93 @@
 
 
-## Plano: Nova Página Inicial com Dois Carrosséis
+# Plano: Reescrita completa do `plan.md` como Source of Truth
 
-### Resumo
+## Objetivo
 
-Substituir todo o conteúdo da HomePage por duas seções de carrossel:
-1. **Banners gerenciáveis** — imagens promocionais administráveis pelo painel admin
-2. **Vinhos recentes** — os 10 vinhos mais novos, exibidos 3 por vez
+Substituir o conteúdo atual do `.lovable/plan.md` (que contém apenas o plano dos banners da homepage) por um documento técnico completo e definitivo, cobrindo toda a arquitetura do projeto.
 
----
+## Estrutura do novo `plan.md`
 
-### Dimensão recomendada das imagens (Linha 1)
+O documento terá ~7 seções, baseadas na auditoria do código atual:
 
-As imagens dos banners devem ser enviadas em **1200 × 500 px** (proporção 12:5). Isso garante boa resolução em desktop e boa proporção em mobile. Formato: JPG ou WebP.
+### 1. Tech Stack
+- React 18 + Vite + TypeScript + Tailwind CSS + shadcn/ui
+- Lovable Cloud (Supabase nativo) — Auth, Database com RLS, Storage, Edge Functions
+- TanStack Query v5, react-router-dom v6, embla-carousel-react
+- Fonts: Open Sans (body), Lore (headings), Space Mono (mono)
 
----
+### 2. Database Schema (27 tabelas/views)
+Documentação compacta de todas as tabelas com propósito e campos-chave:
+- **Core**: profiles, user_roles, memberships
+- **Curadoria**: wines, wine_votes, wine_comments, wine_seals, seals, thomas_notes
+- **Cursos**: cursos, aulas, matriculas, progresso, downloads
+- **AI/Chat**: chat_sessions, chat_messages, chat_feedback, ai_pricing_config, ai_knowledge_base, usage_ledger
+- **Infra**: analytics_events, webhook_events, webhook_logs, home_banners, partners
+- **Views**: profiles_public, chat_messages_safe
 
-### Mudanças necessárias
+Incluir: funções SQL críticas (`has_active_access`, `has_role`, `handle_new_user`, `get_rankings`, triggers de cascata curso/aula), enum `app_role`.
 
-#### 1. Nova tabela `home_banners` (migration)
+### 3. Security & Auth
+- RLS RESTRICTIVE em todas as tabelas; função `has_active_access` como gate principal
+- Roles via tabela `user_roles` (nunca em profiles); enum `admin | member`
+- Membership types: `comunidade | radar` (visual only, não afeta permissão)
+- AuthContext com dual-loading (session + membership) para evitar flash de tela de bloqueio
+- Views `profiles_public` e `chat_messages_safe`: **P0** — adicionar RLS restritivo
+- Secrets: toda chave privada em Edge Functions, nunca no client
 
-```sql
-CREATE TABLE public.home_banners (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  image_url text NOT NULL,
-  link_url text,
-  sort_order integer NOT NULL DEFAULT 0,
-  is_active boolean NOT NULL DEFAULT true,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
+### 4. Edge Functions (12 funções)
+Catálogo com propósito e secrets usados:
+| Função | Propósito | Secrets |
+|--------|-----------|---------|
+| auth-email-hook | Emails transacionais customizados | — |
+| hubla-webhook | Ativação/cancelamento de memberships | HUBLA_WEBHOOK_SECRET |
+| sommelier-chat | Chat AI com Gemini/GPT | LOVABLE_API_KEY |
+| panda-sync | Sincronização de cursos/aulas com Panda | PANDA_API_KEY, PANDA_PROFILE_ID |
+| panda-webhook | Eventos automáticos do Panda | PANDA_WEBHOOK_SECRET, PANDA_API_KEY, PANDA_PROFILE_ID |
+| panda-token | (desativado) Geração de JWT para player | PANDA_SECRET_KEY |
+| panda-proxy | Proxy para API Panda | PANDA_API_KEY |
+| admin-members | Listagem paginada de membros | — |
+| parse-knowledge-file | Parse de arquivos para knowledge base | — |
+| migrate-drive-urls / rehost-drive-file | Migração de URLs do Drive | — |
 
-ALTER TABLE public.home_banners ENABLE ROW LEVEL SECURITY;
+### 5. Data Layer & Performance
+- **Diretriz Anti-Overfetch (P0)**: CuradoriaPage carrega ALL wines client-side. Migrar para paginação server-side via `.range()` ou RPC, selecionando apenas campos necessários com `.select("id,name,producer,...")`
+- **Query Keys**: padronizar como arrays descritivos `["wines", "curadoria", { page, filters }]`
+- **staleTime**: dados estáticos (selos, parceiros) = 5min; dados dinâmicos (votos, comentários) = 30s; config (ai_pricing) = 10min
+- **Storage buckets**: wine-images (public), partner-logos (public), wine-audio (public), email-assets (public), knowledge-files (private)
 
-CREATE POLICY "Active members can view active banners"
-  ON public.home_banners FOR SELECT
-  TO authenticated
-  USING (is_active = true AND has_active_access(auth.uid()));
+### 6. Design System
+- CSS tokens via variáveis HSL em `index.css` (light/dark)
+- Tokens semânticos: `--wine`, `--gold`, `--cream`, `--highlight`
+- Tipografia: `font-sans` (Open Sans), `font-serif`/`font-display` (Lore), `font-mono` (Space Mono)
+- Headings usam Lore via `@layer base` rule
+- Regra: Zero Magic Numbers — usar tokens do tema ou classes utilitárias Tailwind
+- Componentes: shadcn/ui com customizações mínimas; classe `.glass` para cards translúcidos
 
-CREATE POLICY "Admins can manage banners"
-  ON public.home_banners FOR ALL
-  TO authenticated
-  USING (has_role(auth.uid(), 'admin'::app_role));
-```
+### 7. Roadmap de Estabilização
 
-#### 2. Nova aba "Banners" no Admin (`AdminPage.tsx`)
+**P0 — Curto Prazo:**
+- [ ] Paginação server-side na CuradoriaPage (eliminar overfetch)
+- [ ] RLS nas views `profiles_public` e `chat_messages_safe`
+- [ ] Validar trigger `handle_new_user` — contingência via Edge Function se falhar
+- [ ] Verificar `PANDA_PROFILE_ID` no painel Panda (erro 500 persistente)
 
-- Criar componente `AdminBanners.tsx` com CRUD simples: listar banners, upload de imagem (bucket `wine-images` ou novo bucket), definir link opcional, reordenar, ativar/desativar.
-- Adicionar aba no `AdminPage.tsx`.
+**P1 — Médio Prazo:**
+- [ ] Centralizar Query Keys em arquivo dedicado (`src/lib/queryKeys.ts`)
+- [ ] Error Boundaries globais (wrap no App.tsx)
+- [ ] Configurar staleTime padrão no QueryClient
+- [ ] DNS do subdomínio `notify.jovemdovinho.com.br` para branding de emails
 
-#### 3. Reescrever `HomePage.tsx`
+**P2 — Longo Prazo:**
+- [ ] Suite de testes Vitest (hooks, utils, componentes críticos)
+- [ ] Dashboard de monitoramento de webhook_logs
+- [ ] Otimização de webhook processing (batch operations no hubla-webhook)
 
-**Linha 1 — Carrossel de Banners:**
-- Usar `embla-carousel-react` (já instalado).
-- Buscar `home_banners` ordenados por `sort_order`.
-- Desktop/tablet: mostrar 3 slides visíveis por vez.
-- Mobile: mostrar 1 slide por vez.
-- Dots ou setas de navegação.
-- Cada imagem pode ter link opcional (clicável).
-
-**Linha 2 — Carrossel de Vinhos Recentes:**
-- Query: 10 vinhos mais recentes (`status = 'curadoria'`, ordenados por `created_at DESC`, `LIMIT 10`).
-- Reutilizar o componente `WineCard` existente.
-- Desktop/tablet: 3 cards visíveis por vez, com scroll lateral.
-- Mobile: 1 card por vez.
-- Setas de navegação.
-
-#### 4. Arquivos envolvidos
+## Arquivo afetado
 
 | Arquivo | Ação |
 |---------|------|
-| `src/pages/HomePage.tsx` | Reescrever completamente |
-| `src/components/admin/AdminBanners.tsx` | Criar (CRUD de banners) |
-| `src/pages/AdminPage.tsx` | Adicionar aba "Banners" |
-| Migration SQL | Criar tabela `home_banners` |
+| `.lovable/plan.md` | Reescrita completa |
+
+Nenhuma mudança em código, banco ou Edge Functions — apenas documentação.
 
