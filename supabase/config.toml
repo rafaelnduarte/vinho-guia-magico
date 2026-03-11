@@ -15,3 +15,5 @@ project_id = "hrpnufesbjmaaiqgjwtn"
     verify_jwt = false
   [functions.panda-token]
     verify_jwt = false
+  [functions.setup-watermark]
+    verify_jwt = false
