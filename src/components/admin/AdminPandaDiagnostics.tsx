@@ -62,6 +62,8 @@ export default function AdminPandaDiagnostics() {
   const [groupInfoLoading, setGroupInfoLoading] = useState(false);
   const [groupInfo, setGroupInfo] = useState<any>(null);
   const [groupInfoError, setGroupInfoError] = useState<string | null>(null);
+  const [assignDrmLoading, setAssignDrmLoading] = useState(false);
+  const [assignDrmResult, setAssignDrmResult] = useState<any>(null);
 
   const fetchGroupInfo = async () => {
     setGroupInfoLoading(true);
@@ -77,6 +79,22 @@ export default function AdminPandaDiagnostics() {
       setGroupInfoError(fnErr.message);
     } else {
       setGroupInfo(data);
+    }
+  };
+
+  const assignDrm = async (vid: string) => {
+    setAssignDrmLoading(true);
+    setAssignDrmResult(null);
+
+    const { data, error: fnErr } = await supabase.functions.invoke("panda-diagnostics", {
+      body: { action: "assign_drm", video_id: vid },
+    });
+
+    setAssignDrmLoading(false);
+    if (fnErr) {
+      setAssignDrmResult({ success: false, error: fnErr.message });
+    } else {
+      setAssignDrmResult(data);
     }
   };
 
@@ -324,6 +342,38 @@ export default function AdminPandaDiagnostics() {
                   </Card>
                 ))}
               </div>
+
+              {/* Assign to DRM Group */}
+              <Card className="border-primary/30">
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-sm">🔗 Associar vídeo ao DRM Group</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Sem associação ao grupo DRM, o Panda limita a reprodução a 6 segundos.
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => assignDrm(videoId.trim())}
+                    disabled={assignDrmLoading || !videoId.trim()}
+                  >
+                    {assignDrmLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                    Assign to DRM Group
+                  </Button>
+                  {assignDrmResult && (
+                    <div className={`rounded-md p-3 text-sm ${assignDrmResult.success ? "bg-green-500/10 text-green-700 dark:text-green-400" : "bg-destructive/10 text-destructive"}`}>
+                      <p className="font-medium">{assignDrmResult.success ? "✅ Vídeo associado ao grupo DRM" : `❌ ${assignDrmResult.error}`}</p>
+                      {assignDrmResult.response && (
+                        <details className="text-xs mt-1">
+                          <summary className="cursor-pointer">Detalhes</summary>
+                          <pre className="mt-1 overflow-auto">{assignDrmResult.response}</pre>
+                        </details>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
 
               {/* Recovery Actions */}
               {result.issues_count > 0 && (
