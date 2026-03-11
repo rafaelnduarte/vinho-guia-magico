@@ -17,6 +17,10 @@ interface AulaData {
   sort_order: number;
 }
 
+function sanitizarTitulo(titulo: string): string {
+  return titulo.replace(/\.(mp4|mkv|avi|mov|flv|webm|m4v)$/i, "").trim();
+}
+
 function formatTime(s: number) {
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
@@ -49,6 +53,8 @@ export default function AulaPage() {
     setCompleted(false);
     setCurrentTime(0);
     setDuration(0);
+    setPrevAulaId(null);
+    setNextAulaId(null);
     lastSaveRef.current = 0;
 
     const fetchAll = async () => {
@@ -79,6 +85,10 @@ export default function AulaPage() {
         const siblings = (siblingsRes.data as { id: string; titulo: string }[])
           .sort((a, b) => a.titulo.localeCompare(b.titulo, 'pt-BR', { numeric: true }));
         const idx = siblings.findIndex((s) => s.id === aulaId);
+        console.log('[NAV] Siblings ordenados:', siblings.map(s => s.titulo));
+        console.log('[NAV] Aula atual:', aulaId, 'Index:', idx);
+        if (idx > 0) console.log('[NAV] Anterior:', siblings[idx - 1].titulo);
+        if (idx < siblings.length - 1) console.log('[NAV] Próxima:', siblings[idx + 1].titulo);
         setPrevAulaId(idx > 0 ? siblings[idx - 1].id : null);
         setNextAulaId(idx < siblings.length - 1 ? siblings[idx + 1].id : null);
       }
@@ -199,7 +209,7 @@ export default function AulaPage() {
 
       {/* Aula info */}
       <div className="rounded-lg border border-border bg-card p-4 space-y-1">
-        <h2 className="font-display text-lg text-foreground">{aula.titulo}</h2>
+        <h2 className="font-display text-lg text-foreground">{sanitizarTitulo(aula.titulo)}</h2>
         {aula.descricao && <p className="text-sm text-muted-foreground">{aula.descricao}</p>}
       </div>
 
