@@ -220,7 +220,43 @@ export default function AdminPandaDiagnostics() {
         </CardContent>
       </Card>
 
-      {/* Diagnostic Card */}
+
+      {/* DRM Group Info Card */}
+      <Card className="border-primary/30">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            🔍 DRM Group Info
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Consulta o DRM Group no Panda para verificar se o grupo existe, tem secret válido e quais vídeos estão associados.
+          </p>
+          <Button onClick={fetchGroupInfo} disabled={groupInfoLoading} variant="outline">
+            {groupInfoLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Stethoscope className="h-4 w-4 mr-1" />}
+            Consultar DRM Group
+          </Button>
+
+          {groupInfoError && (
+            <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+              ❌ {groupInfoError}
+            </div>
+          )}
+
+          {groupInfo && (
+            <div className="space-y-3">
+              <div className={`rounded-md p-4 text-sm ${groupInfo.error ? "bg-destructive/10 text-destructive" : "bg-green-500/10 text-green-700 dark:text-green-400"}`}>
+                <p className="font-medium">{groupInfo.error ? `❌ ${groupInfo.error}` : "✅ DRM Group encontrado"}</p>
+              </div>
+              <details className="text-xs">
+                <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Ver JSON completo</summary>
+                <pre className="mt-2 overflow-auto rounded-md bg-muted p-3 max-h-40">{JSON.stringify(groupInfo, null, 2)}</pre>
+              </details>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
