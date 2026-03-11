@@ -56,15 +56,14 @@ Deno.serve(async (req) => {
       "Content-Type": "application/json",
     };
 
-    // STEP 1: Create Watermark/DRM Group
-    // Correct endpoint: POST /drm/videos (per Panda API docs)
+    // STEP 1: Create DRM/Watermark Group
     console.log("[WATERMARK] Step 1: Creating DRM watermark group...");
     const groupRes = await fetch(`${PANDA_API_BASE}/drm/videos`, {
       method: "POST",
       headers: pandaHeaders,
       body: JSON.stringify({
-        video_ids: [],
-        folder_ids: [],
+        name: "VinhoGuiaMagico_DRM",
+        active: true,
         percent_ts: 0.5,
       }),
     });
@@ -83,8 +82,33 @@ Deno.serve(async (req) => {
     const groupId = group.id || group.drm_group_id || group.group_id;
     console.log("[WATERMARK] Step 1 SUCCESS: Group created:", JSON.stringify(group));
 
-    // STEP 2: List/verify the group was created
-    console.log("[WATERMARK] Step 2: Verifying group...");
+    // STEP 2: Create a private token for this group
+    console.log("[WATERMARK] Step 2: Creating private token...");
+    const tokenKey = `system_key_${Date.now()}`;
+    const tokenRes = await fetch(`${PANDA_API_BASE}/drm/tokens`, {
+      method: "POST",
+      headers: pandaHeaders,
+      body: JSON.stringify({
+        drm_group_id: groupId,
+        jwt: true,
+        key: tokenKey,
+        string1: user.email || "admin",
+      }),
+    });
+
+    let tokenData = null;
+    let tokenError = null;
+    if (!tokenRes.ok) {
+      const errText = await tokenRes.text();
+      console.error("[WATERMARK] Create token failed:", tokenRes.status, errText);
+      tokenError = `Create token failed: ${tokenRes.status} - ${errText}`;
+    } else {
+      tokenData = await tokenRes.json();
+      console.log("[WATERMARK] Step 2 SUCCESS: Token created:", JSON.stringify(tokenData));
+    }
+
+    // STEP 3: List groups for verification
+    console.log("[WATERMARK] Step 3: Listing groups for verification...");
     const listRes = await fetch(`${PANDA_API_BASE}/drm/videos/`, {
       method: "GET",
       headers: pandaHeaders,
@@ -93,21 +117,26 @@ Deno.serve(async (req) => {
     let groups = null;
     if (listRes.ok) {
       groups = await listRes.json();
-      console.log("[WATERMARK] Step 2 SUCCESS: Groups listed:", JSON.stringify(groups).slice(0, 500));
+      console.log("[WATERMARK] Step 3 SUCCESS: Groups listed:", JSON.stringify(groups).slice(0, 500));
     } else {
-      console.warn("[WATERMARK] Step 2: List failed (non-fatal):", listRes.status);
+      console.warn("[WATERMARK] Step 3: List failed (non-fatal):", listRes.status);
     }
+
+    const privateTokenKey = tokenData?.key || tokenData?.private_token || tokenKey;
 
     return new Response(
       JSON.stringify({
         success: true,
         group_id: groupId,
+        key: privateTokenKey,
         group_raw: group,
+        token_raw: tokenData,
+        token_error: tokenError,
         all_groups: groups,
         next_steps: [
           `1. Add secret PANDA_WATERMARK_GROUP_ID = ${groupId}`,
-          "2. Link your videos/folders to this DRM group",
-          "3. Generate private tokens for JWT playback",
+          `2. Add secret PANDA_WATERMARK_PRIVATE_TOKEN = ${privateTokenKey}`,
+          "3. Videos in this group will require JWT for playback",
         ],
       }),
       { status: 200, headers: corsHeaders }

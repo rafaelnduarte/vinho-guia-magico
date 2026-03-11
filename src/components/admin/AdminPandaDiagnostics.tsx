@@ -182,7 +182,7 @@ export default function AdminPandaDiagnostics() {
                   <p className="text-xs font-medium">Copie estes valores para adicionar como secrets:</p>
                   <div className="text-xs font-mono">
                     <p><span className="font-bold">PANDA_WATERMARK_GROUP_ID:</span> {setupResult.group_id}</p>
-                    <p><span className="font-bold">PANDA_WATERMARK_PRIVATE_TOKEN:</span> {setupResult.private_token || "N/A"}</p>
+                    <p><span className="font-bold">PANDA_WATERMARK_PRIVATE_TOKEN:</span> {setupResult.key || setupResult.private_token || "N/A"}</p>
                   </div>
                   {setupResult.next_steps && (
                     <ul className="text-xs text-muted-foreground list-disc pl-4 mt-2">
