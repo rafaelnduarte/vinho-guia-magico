@@ -14,6 +14,7 @@ export default function HLSPlayer({
   startAt = 0,
   onProgress,
   onComplete,
+  jwt,
 }: HLSPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<any>(null);
@@ -21,7 +22,8 @@ export default function HLSPlayer({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const hlsUrl = `https://b-vz-7b95acb0-d42.tv.pandavideo.com.br/${pandaVideoId}/playlist.m3u8`;
+  const baseHlsUrl = `https://b-vz-7b95acb0-d42.tv.pandavideo.com.br/${pandaVideoId}/playlist.m3u8`;
+  const hlsUrl = jwt ? `${baseHlsUrl}?token=${jwt}` : baseHlsUrl;
 
   const handleTimeUpdate = useCallback(() => {
     const video = videoRef.current;

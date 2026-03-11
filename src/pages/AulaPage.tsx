@@ -179,6 +179,7 @@ export default function AulaPage() {
           startAt={startAt}
           userId={user?.id}
           aulaId={aulaId}
+          cursoId={cursoId}
           onProgress={handleProgress}
           onComplete={handleComplete}
         />
