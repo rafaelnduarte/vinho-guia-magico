@@ -76,7 +76,8 @@ export default function AulaPage() {
       setCompleted(progressoRes.data?.concluido ?? false);
 
       if (siblingsRes.data && aulaRes.data) {
-        const siblings = siblingsRes.data;
+        const siblings = (siblingsRes.data as { id: string; titulo: string }[])
+          .sort((a, b) => a.titulo.localeCompare(b.titulo, 'pt-BR', { numeric: true }));
         const idx = siblings.findIndex((s) => s.id === aulaId);
         setPrevAulaId(idx > 0 ? siblings[idx - 1].id : null);
         setNextAulaId(idx < siblings.length - 1 ? siblings[idx + 1].id : null);
