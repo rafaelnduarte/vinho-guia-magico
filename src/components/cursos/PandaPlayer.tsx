@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback, lazy, Suspense } from "react";
 import { Loader2, AlertTriangle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 const HLSPlayer = lazy(() => import("./HLSPlayer"));
 
@@ -8,6 +9,7 @@ interface PandaPlayerProps {
   startAt?: number;
   userId?: string;
   aulaId?: string;
+  cursoId?: string;
   onProgress?: (currentTime: number, duration: number) => void;
   onComplete?: () => void;
 }
@@ -17,6 +19,7 @@ const FALLBACK_TIMEOUT_MS = 15_000;
 export default function PandaPlayer({
   pandaVideoId,
   startAt = 0,
+  aulaId,
   onProgress,
   onComplete,
 }: PandaPlayerProps) {
@@ -25,6 +28,36 @@ export default function PandaPlayer({
   const receivedMessageRef = useRef(false);
   const [useHLS, setUseHLS] = useState(false);
   const [iframeLoading, setIframeLoading] = useState(true);
+  const [jwt, setJwt] = useState<string | null>(null);
+  const [jwtLoading, setJwtLoading] = useState(true);
+
+  // Fetch JWT from panda-token edge function
+  useEffect(() => {
+    let cancelled = false;
+    setJwt(null);
+    setJwtLoading(true);
+
+    const fetchToken = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("panda-token", {
+          body: { video_id: pandaVideoId, aula_id: aulaId || null },
+        });
+        if (!cancelled && data?.token) {
+          setJwt(data.token);
+        }
+        if (error) {
+          console.warn("[PANDA] JWT fetch failed, continuing without token:", error);
+        }
+      } catch (err) {
+        console.warn("[PANDA] JWT fetch error, continuing without token:", err);
+      } finally {
+        if (!cancelled) setJwtLoading(false);
+      }
+    };
+
+    fetchToken();
+    return () => { cancelled = true; };
+  }, [pandaVideoId, aulaId]);
 
   // Listen for postMessage from Panda iframe
   const handleMessage = useCallback(
@@ -34,7 +67,6 @@ export default function PandaPlayer({
       try {
         const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
 
-        // Mark that we received at least one message — player is alive
         receivedMessageRef.current = true;
         setIframeLoading(false);
 
@@ -56,7 +88,6 @@ export default function PandaPlayer({
           }
         }
 
-        // Detect Panda error events
         if (
           data?.message === "panda_error" ||
           data?.event === "panda_error" ||
@@ -80,7 +111,6 @@ export default function PandaPlayer({
 
     window.addEventListener("message", handleMessage);
 
-    // Timeout: if no postMessage received after FALLBACK_TIMEOUT_MS, switch to HLS
     const timer = setTimeout(() => {
       if (!receivedMessageRef.current) {
         console.warn("[PANDA] No postMessage received after", FALLBACK_TIMEOUT_MS, "ms — activating HLS fallback");
@@ -93,6 +123,15 @@ export default function PandaPlayer({
       clearTimeout(timer);
     };
   }, [handleMessage, pandaVideoId]);
+
+  // Wait for JWT before rendering
+  if (jwtLoading) {
+    return (
+      <div className="relative w-full overflow-hidden rounded-xl bg-secondary flex items-center justify-center" style={{ aspectRatio: "16/9" }}>
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   // HLS fallback mode
   if (useHLS) {
@@ -113,6 +152,7 @@ export default function PandaPlayer({
             startAt={startAt}
             onProgress={onProgress}
             onComplete={onComplete}
+            jwt={jwt}
           />
         </Suspense>
         <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-1.5">
@@ -130,6 +170,7 @@ export default function PandaPlayer({
     loop: "false",
     playsinline: "true",
     ...(startAt > 0 ? { start: String(Math.floor(startAt)) } : {}),
+    ...(jwt ? { token: jwt } : {}),
   });
 
   const src = `https://player-vz-7b95acb0-d42.tv.pandavideo.com.br/embed/?${params.toString()}`;
