@@ -64,6 +64,9 @@ export default function AdminPage() {
         <TabsContent value="cursos">
           <AdminCursos />
         </TabsContent>
+        <TabsContent value="diagnostics">
+          <AdminPandaDiagnostics />
+        </TabsContent>
       </Tabs>
     </div>
   );
