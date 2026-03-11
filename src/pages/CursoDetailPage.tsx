@@ -57,10 +57,12 @@ export default function CursoDetailPage() {
       );
 
       setAulas(
-        (aulasRes.data ?? []).map((a) => ({
-          ...a,
-          concluido: completedSet.has(a.id),
-        }))
+        (aulasRes.data ?? [])
+          .map((a) => ({
+            ...a,
+            concluido: completedSet.has(a.id),
+          }))
+          .sort((a, b) => a.titulo.localeCompare(b.titulo, 'pt-BR', { numeric: true }))
       );
       setLoading(false);
     };
