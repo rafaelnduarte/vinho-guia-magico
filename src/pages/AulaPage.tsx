@@ -60,10 +60,10 @@ export default function AulaPage() {
           .maybeSingle(),
         supabase
           .from("aulas")
-          .select("id, sort_order")
+          .select("id, titulo")
           .eq("curso_id", cursoId)
           .eq("is_published", true)
-          .order("sort_order"),
+          .order("titulo", { ascending: true }),
         supabase
           .from("progresso")
           .select("posicao_segundos, concluido")
