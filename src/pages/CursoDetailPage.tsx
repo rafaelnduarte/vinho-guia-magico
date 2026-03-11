@@ -14,6 +14,10 @@ interface Aula {
   concluido: boolean;
 }
 
+function sanitizarTitulo(titulo: string): string {
+  return titulo.replace(/\.(mp4|mkv|avi|mov|flv|webm|m4v)$/i, "").trim();
+}
+
 function formatDuration(s: number) {
   const m = Math.floor(s / 60);
   const sec = s % 60;
@@ -39,7 +43,7 @@ export default function CursoDetailPage() {
           .select("id, titulo, descricao, duracao_segundos, sort_order")
           .eq("curso_id", cursoId)
           .eq("is_published", true)
-          .order("sort_order"),
+          .order("titulo", { ascending: true }),
         supabase
           .from("progresso")
           .select("aula_id, concluido")
@@ -99,7 +103,7 @@ export default function CursoDetailPage() {
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-foreground truncate">{aula.titulo}</p>
+                <p className="font-medium text-foreground truncate">{sanitizarTitulo(aula.titulo)}</p>
                 {aula.descricao && (
                   <p className="text-xs text-muted-foreground truncate mt-0.5">{aula.descricao}</p>
                 )}
