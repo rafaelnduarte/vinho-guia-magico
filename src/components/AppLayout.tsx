@@ -211,6 +211,44 @@ export default function AppLayout() {
               </NavLink>
             ))}
 
+            {/* Expandable Cursos section */}
+            <div>
+              <button
+                onClick={() => setCursosOpen(!cursosOpen)}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors w-full",
+                  location.pathname.startsWith("/cursos")
+                    ? "bg-sidebar-accent text-sidebar-primary"
+                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                )}
+              >
+                <GraduationCap className="h-4 w-4" />
+                Cursos
+                <ChevronDown className={cn("h-3.5 w-3.5 ml-auto transition-transform", cursosOpen && "rotate-180")} />
+              </button>
+              {cursosOpen && sidebarCursos && sidebarCursos.length > 0 && (
+                <div className="ml-4 mt-1 space-y-0.5 border-l border-sidebar-border pl-3">
+                  {sidebarCursos.map((curso) => (
+                    <NavLink
+                      key={curso.id}
+                      to={`/cursos/${curso.id}`}
+                      className={({ isActive }) =>
+                        cn(
+                          "flex items-center gap-2 px-2 py-1.5 rounded-md text-xs font-medium transition-colors",
+                          isActive
+                            ? "bg-sidebar-accent text-sidebar-primary"
+                            : "text-sidebar-foreground/60 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                        )
+                      }
+                    >
+                      <BookOpen className="h-3 w-3 shrink-0" />
+                      <span className="truncate">{curso.titulo}</span>
+                    </NavLink>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {role === "admin" && (
               <NavLink
                 to="/admin"
