@@ -56,6 +56,26 @@ export default function AdminPandaDiagnostics() {
   const [recoveryLoading, setRecoveryLoading] = useState<string | null>(null);
   const [recoveryResult, setRecoveryResult] = useState<any>(null);
   const [reuploadUrl, setReuploadUrl] = useState("");
+  const [setupLoading, setSetupLoading] = useState(false);
+  const [setupResult, setSetupResult] = useState<any>(null);
+  const [setupError, setSetupError] = useState<string | null>(null);
+
+  const runSetupWatermark = async () => {
+    setSetupLoading(true);
+    setSetupError(null);
+    setSetupResult(null);
+
+    const { data, error: fnErr } = await supabase.functions.invoke("setup-watermark", {
+      method: "POST",
+    });
+
+    setSetupLoading(false);
+    if (fnErr) {
+      setSetupError(fnErr.message);
+    } else {
+      setSetupResult(data);
+    }
+  };
 
   // Fetch recovery logs
   const { data: recoveryLogs, refetch: refetchLogs } = useQuery({
