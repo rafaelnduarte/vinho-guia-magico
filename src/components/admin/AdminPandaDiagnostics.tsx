@@ -82,6 +82,22 @@ export default function AdminPandaDiagnostics() {
     }
   };
 
+  const assignDrm = async (vid: string) => {
+    setAssignDrmLoading(true);
+    setAssignDrmResult(null);
+
+    const { data, error: fnErr } = await supabase.functions.invoke("panda-diagnostics", {
+      body: { action: "assign_drm", video_id: vid },
+    });
+
+    setAssignDrmLoading(false);
+    if (fnErr) {
+      setAssignDrmResult({ success: false, error: fnErr.message });
+    } else {
+      setAssignDrmResult(data);
+    }
+  };
+
   const runSetupWatermark = async () => {
     setSetupLoading(true);
     setSetupError(null);
