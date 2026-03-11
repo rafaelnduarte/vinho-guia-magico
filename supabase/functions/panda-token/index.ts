@@ -1,5 +1,4 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import * as jose from "https://deno.land/x/jose@v5.2.0/index.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,47 +9,6 @@ const corsHeaders = {
 };
 
 const PANDA_API_BASE = "https://api-v2.pandavideo.com.br";
-
-// Cache the group secret for 1 hour to avoid repeated API calls
-let cachedSecret: string | null = null;
-let cachedSecretExpiry = 0;
-
-async function getGroupSecret(groupId: string, apiKey: string): Promise<string | null> {
-  const now = Date.now();
-  if (cachedSecret && now < cachedSecretExpiry) {
-    return cachedSecret;
-  }
-
-  console.log(`[PANDA-TOKEN] Fetching DRM group secret for group ${groupId}`);
-  const res = await fetch(`${PANDA_API_BASE}/drm/videos/${groupId}`, {
-    method: "GET",
-    headers: {
-      "Authorization": apiKey,
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!res.ok) {
-    const errText = await res.text();
-    console.error(`[PANDA-TOKEN] Failed to fetch group info: ${res.status}`, errText);
-    return null;
-  }
-
-  const groupData = await res.json();
-  const secret = groupData.secret || groupData.private_token || groupData.key;
-
-  if (!secret) {
-    console.error("[PANDA-TOKEN] Group data has no secret/private_token/key field:", JSON.stringify(groupData));
-    return null;
-  }
-
-  // Cache for 1 hour
-  cachedSecret = secret;
-  cachedSecretExpiry = now + 3600 * 1000;
-
-  console.log(`[PANDA-TOKEN] Group secret fetched and cached successfully`);
-  return secret;
-}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -81,48 +39,49 @@ Deno.serve(async (req) => {
     }
 
     const PANDA_API_KEY = Deno.env.get("PANDA_API_KEY");
-    const groupId = Deno.env.get("PANDA_WATERMARK_GROUP_ID");
+    const DRM_GROUP_ID = Deno.env.get("PANDA_WATERMARK_GROUP_ID");
 
-    if (!PANDA_API_KEY || !groupId) {
+    if (!PANDA_API_KEY || !DRM_GROUP_ID) {
       console.error("[PANDA-TOKEN] Missing config: PANDA_API_KEY or PANDA_WATERMARK_GROUP_ID");
       return new Response(JSON.stringify({ token: null }), { status: 200, headers: corsHeaders });
     }
 
-    // Try to get the group secret (from cache or API)
-    let secret = await getGroupSecret(groupId, PANDA_API_KEY);
+    // Generate expiration timestamp (1 hour from now)
+    const exp = Math.floor(Date.now() / 1000) + 3600;
 
-    // Fallback: use PANDA_WATERMARK_PRIVATE_TOKEN if API doesn't return a secret
-    if (!secret) {
-      const privateToken = Deno.env.get("PANDA_WATERMARK_PRIVATE_TOKEN");
-      if (privateToken) {
-        console.log("[PANDA-TOKEN] Using PANDA_WATERMARK_PRIVATE_TOKEN as fallback secret");
-        secret = privateToken;
+    // Fetch official JWT from Panda DRM API
+    console.log(`[PANDA-TOKEN] Fetching official DRM JWT for group ${DRM_GROUP_ID}, video ${video_id}, user ${user.id}`);
+
+    const res = await fetch(
+      `${PANDA_API_BASE}/drm/videos/${DRM_GROUP_ID}/jwt?expiredAtJwt=${exp}`,
+      {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${PANDA_API_KEY}`,
+          "Content-Type": "application/json",
+        },
       }
-    }
+    );
 
-    if (!secret) {
-      console.error("[PANDA-TOKEN] No secret available for JWT signing");
+    if (!res.ok) {
+      const txt = await res.text();
+      console.error(`[PANDA-TOKEN] Error fetching DRM JWT: ${res.status}`, txt);
       return new Response(JSON.stringify({ token: null }), { status: 200, headers: corsHeaders });
     }
 
-    // Sign JWT locally using the group secret (official Panda approach)
-    console.log(`[PANDA-TOKEN] Signing JWT locally for video ${video_id}, user ${user.id}`);
+    const data = await res.json();
+    const token = data.jwt || data.token || null;
 
-    const encodedSecret = new TextEncoder().encode(secret);
-    const token = await new jose.SignJWT({
-      drm_group_id: groupId,
-      string1: user.email || "member",
-    })
-      .setProtectedHeader({ alg: "HS256" })
-      .setIssuedAt()
-      .setExpirationTime("1h")
-      .sign(encodedSecret);
+    if (!token) {
+      console.error("[PANDA-TOKEN] Response has no jwt/token field:", JSON.stringify(data));
+      return new Response(JSON.stringify({ token: null }), { status: 200, headers: corsHeaders });
+    }
 
-    console.log(`[PANDA-TOKEN] JWT signed successfully for video ${video_id}, user ${user.id}`);
+    console.log(`[PANDA-TOKEN] Official JWT fetched successfully for video ${video_id}, user ${user.id}`);
 
     return new Response(JSON.stringify({ token }), { status: 200, headers: corsHeaders });
   } catch (err) {
-    console.error("[PANDA-TOKEN] Error:", err.message);
+    console.error("[PANDA-TOKEN] Error:", (err as Error).message);
     return new Response(JSON.stringify({ token: null }), { status: 200, headers: corsHeaders });
   }
 });
