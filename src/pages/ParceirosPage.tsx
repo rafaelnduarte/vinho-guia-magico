@@ -94,6 +94,19 @@ export default function ParceirosPage() {
             );
           })}
         </div>
+
+        {/* Disclaimer */}
+        <div className="mt-12 rounded-xl border border-border bg-card p-6 space-y-3">
+          <h3 className="font-display text-lg text-foreground font-semibold">
+            Meu cupom não está funcionando. O que houve?
+          </h3>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Verifique se o vinho escolhido já não está em promoção pela importadora, pois os cupons de desconto podem não ser acumulativos com outras promoções ativas!
+          </p>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Se ainda tiver alguma dúvida, recomendamos entrar em contato com o suporte da própria loja para confirmar a disponibilidade do vinho!
+          </p>
+        </div>
       )}
     </div>
   );
