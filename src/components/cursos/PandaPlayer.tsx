@@ -1,4 +1,7 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, lazy, Suspense } from "react";
+import { Loader2, AlertTriangle } from "lucide-react";
+
+const HLSPlayer = lazy(() => import("./HLSPlayer"));
 
 interface PandaPlayerProps {
   pandaVideoId: string;
@@ -9,6 +12,8 @@ interface PandaPlayerProps {
   onComplete?: () => void;
 }
 
+const FALLBACK_TIMEOUT_MS = 15_000;
+
 export default function PandaPlayer({
   pandaVideoId,
   startAt = 0,
@@ -17,13 +22,21 @@ export default function PandaPlayer({
 }: PandaPlayerProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const completedRef = useRef(false);
+  const receivedMessageRef = useRef(false);
+  const [useHLS, setUseHLS] = useState(false);
+  const [iframeLoading, setIframeLoading] = useState(true);
 
+  // Listen for postMessage from Panda iframe
   const handleMessage = useCallback(
     (event: MessageEvent) => {
       if (!event.origin.includes("pandavideo.com")) return;
 
       try {
         const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+
+        // Mark that we received at least one message — player is alive
+        receivedMessageRef.current = true;
+        setIframeLoading(false);
 
         if (data?.message === "panda_timeupdate" || data?.event === "panda_timeupdate") {
           const currentTime = data.currentTime ?? data.seconds ?? 0;
@@ -42,6 +55,16 @@ export default function PandaPlayer({
             onComplete?.();
           }
         }
+
+        // Detect Panda error events
+        if (
+          data?.message === "panda_error" ||
+          data?.event === "panda_error" ||
+          data?.message === "panda_playerError"
+        ) {
+          console.warn("[PANDA] Player error event received, switching to HLS fallback");
+          setUseHLS(true);
+        }
       } catch {
         // Ignore non-JSON messages
       }
@@ -51,10 +74,56 @@ export default function PandaPlayer({
 
   useEffect(() => {
     completedRef.current = false;
+    receivedMessageRef.current = false;
+    setUseHLS(false);
+    setIframeLoading(true);
+
     window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
+
+    // Timeout: if no postMessage received after FALLBACK_TIMEOUT_MS, switch to HLS
+    const timer = setTimeout(() => {
+      if (!receivedMessageRef.current) {
+        console.warn("[PANDA] No postMessage received after", FALLBACK_TIMEOUT_MS, "ms — activating HLS fallback");
+        setUseHLS(true);
+      }
+    }, FALLBACK_TIMEOUT_MS);
+
+    return () => {
+      window.removeEventListener("message", handleMessage);
+      clearTimeout(timer);
+    };
   }, [handleMessage, pandaVideoId]);
 
+  // HLS fallback mode
+  if (useHLS) {
+    return (
+      <div className="space-y-2">
+        <Suspense
+          fallback={
+            <div
+              className="relative w-full overflow-hidden rounded-xl bg-secondary flex items-center justify-center"
+              style={{ aspectRatio: "16/9" }}
+            >
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          }
+        >
+          <HLSPlayer
+            pandaVideoId={pandaVideoId}
+            startAt={startAt}
+            onProgress={onProgress}
+            onComplete={onComplete}
+          />
+        </Suspense>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-1.5">
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+          <span>Reprodução em modo alternativo (HLS). Se o problema persistir, o vídeo pode estar em processamento.</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Standard Panda iframe
   const params = new URLSearchParams({
     v: pandaVideoId,
     autoplay: "false",
@@ -67,6 +136,11 @@ export default function PandaPlayer({
 
   return (
     <div className="relative w-full overflow-hidden rounded-xl bg-secondary" style={{ aspectRatio: "16/9" }}>
+      {iframeLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-secondary z-10">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      )}
       <iframe
         ref={iframeRef}
         src={src}
