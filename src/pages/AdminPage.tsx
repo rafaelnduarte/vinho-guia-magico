@@ -10,6 +10,7 @@ import AdminTutorials from "@/components/admin/AdminTutorials";
 import AdminChat from "@/components/admin/AdminChat";
 import AdminBanners from "@/components/admin/AdminBanners";
 import AdminCursos from "@/components/admin/AdminCursos";
+import AdminPandaDiagnostics from "@/components/admin/AdminPandaDiagnostics";
 
 
 export default function AdminPage() {
@@ -32,6 +33,7 @@ export default function AdminPage() {
             <TabsTrigger value="tutorials" className="text-xs sm:text-sm px-3 py-2">Tutoriais</TabsTrigger>
             <TabsTrigger value="chat" className="text-xs sm:text-sm px-3 py-2">Jovem AI</TabsTrigger>
             <TabsTrigger value="cursos" className="text-xs sm:text-sm px-3 py-2">Cursos</TabsTrigger>
+            <TabsTrigger value="diagnostics" className="text-xs sm:text-sm px-3 py-2">Diagnóstico</TabsTrigger>
           </TabsList>
         </div>
 
@@ -61,6 +63,9 @@ export default function AdminPage() {
         </TabsContent>
         <TabsContent value="cursos">
           <AdminCursos />
+        </TabsContent>
+        <TabsContent value="diagnostics">
+          <AdminPandaDiagnostics />
         </TabsContent>
       </Tabs>
     </div>
