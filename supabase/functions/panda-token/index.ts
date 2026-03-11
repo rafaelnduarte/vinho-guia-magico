@@ -44,36 +44,33 @@ Deno.serve(async (req) => {
 
     if (!PANDA_API_KEY || !groupId || !privateToken) {
       console.error("[PANDA-TOKEN] Missing config: PANDA_API_KEY, PANDA_WATERMARK_GROUP_ID, or PANDA_WATERMARK_PRIVATE_TOKEN");
-      // Return empty token so player falls back to non-JWT playback
       return new Response(JSON.stringify({ token: null }), { status: 200, headers: corsHeaders });
     }
 
-    // Generate JWT via Panda Watermark API
-    console.log(`[PANDA-TOKEN] Requesting Watermark JWT for video ${video_id}, user ${user.id}`);
+    // Generate JWT via Panda DRM API - GET /drm/videos/{groupId}/jwt
+    console.log(`[PANDA-TOKEN] Requesting DRM JWT for video ${video_id}, user ${user.id}`);
 
-    const jwtRes = await fetch(`${PANDA_API_BASE}/watermark/jwt/${groupId}`, {
-      method: "POST",
+    const expiredAt = Date.now() + 3600 * 1000; // 1 hour from now
+    const jwtUrl = `${PANDA_API_BASE}/drm/videos/${groupId}/jwt?expiredAtJwt=${expiredAt}`;
+
+    const jwtRes = await fetch(jwtUrl, {
+      method: "GET",
       headers: {
         "Authorization": PANDA_API_KEY,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        private_token: privateToken,
-        expires_in: 3600, // 1 hour
-      }),
     });
 
     if (!jwtRes.ok) {
       const errText = await jwtRes.text();
-      console.error(`[PANDA-TOKEN] Watermark JWT failed: ${jwtRes.status}`, errText);
-      // Return null token so player continues without JWT
+      console.error(`[PANDA-TOKEN] DRM JWT failed: ${jwtRes.status}`, errText);
       return new Response(JSON.stringify({ token: null }), { status: 200, headers: corsHeaders });
     }
 
     const jwtData = await jwtRes.json();
     const jwt = jwtData.jwt || jwtData.token;
 
-    console.log(`[PANDA-TOKEN] Watermark JWT generated for video ${video_id}, user ${user.id}`);
+    console.log(`[PANDA-TOKEN] DRM JWT generated for video ${video_id}, user ${user.id}`);
 
     return new Response(JSON.stringify({ token: jwt }), { status: 200, headers: corsHeaders });
   } catch (err) {
