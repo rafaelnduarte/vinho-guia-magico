@@ -76,24 +76,38 @@ export default function ParceirosPage() {
       {isLoading ? (
         <div className="text-center text-muted-foreground py-12">Carregando parceiros...</div>
       ) : (
-        <div className="space-y-12">
-          {categoryKeys.map((cat) => {
-            const items = grouped[cat];
-            if (!items || items.length === 0) return null;
-            return (
-              <section key={cat}>
-                <h2 className="font-display text-2xl text-foreground mb-6 pb-2 border-b border-border">
-                  {CATEGORY_LABELS[cat] ?? cat.charAt(0).toUpperCase() + cat.slice(1)}
-                </h2>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {items.map((partner) => (
-                    <PartnerCard key={partner.id} partner={partner} />
-                  ))}
-                </div>
-              </section>
-            );
-          })}
-        </div>
+        <>
+          <div className="space-y-12">
+            {categoryKeys.map((cat) => {
+              const items = grouped[cat];
+              if (!items || items.length === 0) return null;
+              return (
+                <section key={cat}>
+                  <h2 className="font-display text-2xl text-foreground mb-6 pb-2 border-b border-border">
+                    {CATEGORY_LABELS[cat] ?? cat.charAt(0).toUpperCase() + cat.slice(1)}
+                  </h2>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {items.map((partner) => (
+                      <PartnerCard key={partner.id} partner={partner} />
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+
+          <div className="mt-12 rounded-xl border border-border bg-card p-6 space-y-3">
+            <h3 className="font-display text-lg text-foreground font-semibold">
+              Meu cupom não está funcionando. O que houve?
+            </h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Verifique se o vinho escolhido já não está em promoção pela importadora, pois os cupons de desconto podem não ser acumulativos com outras promoções ativas!
+            </p>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Se ainda tiver alguma dúvida, recomendamos entrar em contato com o suporte da própria loja para confirmar a disponibilidade do vinho!
+            </p>
+          </div>
+        </>
       )}
     </div>
   );
