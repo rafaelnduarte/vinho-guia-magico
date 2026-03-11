@@ -39,7 +39,7 @@ export default function CursoDetailPage() {
           .select("id, titulo, descricao, duracao_segundos, sort_order")
           .eq("curso_id", cursoId)
           .eq("is_published", true)
-          .order("sort_order"),
+          .order("titulo", { ascending: true }),
         supabase
           .from("progresso")
           .select("aula_id, concluido")
