@@ -14,6 +14,10 @@ interface Aula {
   concluido: boolean;
 }
 
+function sanitizarTitulo(titulo: string): string {
+  return titulo.replace(/\.(mp4|mkv|avi|mov|flv|webm|m4v)$/i, "").trim();
+}
+
 function formatDuration(s: number) {
   const m = Math.floor(s / 60);
   const sec = s % 60;
