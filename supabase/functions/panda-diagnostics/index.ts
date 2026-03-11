@@ -54,7 +54,45 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { video_id } = await req.json();
+    const body = await req.json();
+    const { video_id, action } = body;
+
+    const PANDA_API_KEY = Deno.env.get("PANDA_API_KEY")!;
+
+    // Handle group_info action
+    if (action === "group_info") {
+      const groupId = Deno.env.get("PANDA_WATERMARK_GROUP_ID");
+      if (!groupId) {
+        return new Response(JSON.stringify({ error: "PANDA_WATERMARK_GROUP_ID not configured" }), { status: 200, headers: corsHeaders });
+      }
+
+      const res = await fetch(`${PANDA_BASE}/drm/videos/${groupId}`, {
+        method: "GET",
+        headers: { "Authorization": PANDA_API_KEY, "Content-Type": "application/json" },
+      });
+
+      const resText = await res.text();
+      if (!res.ok) {
+        return new Response(JSON.stringify({ error: `Panda API error ${res.status}`, detail: resText, group_id: groupId }), { status: 200, headers: corsHeaders });
+      }
+
+      try {
+        const groupData = JSON.parse(resText);
+        return new Response(JSON.stringify({
+          group_id: groupId,
+          name: groupData.name,
+          active: groupData.active,
+          has_secret: !!groupData.secret,
+          secret_preview: groupData.secret ? groupData.secret.substring(0, 8) + "..." : null,
+          video_count: groupData.videos?.length || 0,
+          videos: (groupData.videos || []).slice(0, 10).map((v: any) => ({ id: v.id || v, title: v.title })),
+          raw_keys: Object.keys(groupData),
+        }), { status: 200, headers: corsHeaders });
+      } catch {
+        return new Response(JSON.stringify({ error: "Failed to parse group response", raw: resText.substring(0, 500) }), { status: 200, headers: corsHeaders });
+      }
+    }
+
     if (!video_id) {
       return new Response(
         JSON.stringify({ error: "video_id é obrigatório" }),
