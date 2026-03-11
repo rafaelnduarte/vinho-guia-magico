@@ -7,11 +7,10 @@ import { useToast } from "@/hooks/use-toast";
 import ReactMarkdown from "react-markdown";
 import {
   Wine, Send, Loader2, Sparkles, AlertTriangle,
-  MessageSquare, Plus, ChevronLeft, Zap, BookOpen, Search, X
+  MessageSquare, Plus, ChevronLeft, Search, X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
@@ -44,7 +43,6 @@ export default function SommelierPage() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [mode, setMode] = useState<"economico" | "detalhado">("economico");
   const [usageBrl, setUsageBrl] = useState(0);
   const [capBrl, setCapBrl] = useState(10);
   const [warning, setWarning] = useState<string | null>(null);
@@ -170,9 +168,6 @@ export default function SommelierPage() {
     const msgText = (text || input).trim();
     if (!msgText || isLoading) return;
 
-    const usagePercent = (usageBrl / capBrl) * 100;
-    const effectiveMode = usagePercent >= 90 ? "ultra_economico" : mode;
-
     setInput("");
     const userMsg: ChatMessage = { role: "user", content: msgText };
     setMessages(prev => [...prev, userMsg]);
@@ -180,7 +175,7 @@ export default function SommelierPage() {
 
     try {
       const { data, error } = await supabase.functions.invoke("sommelier-chat", {
-        body: { message: msgText, session_id: sessionId, mode: effectiveMode },
+        body: { message: msgText, session_id: sessionId },
       });
 
       if (error) throw error;
@@ -223,12 +218,66 @@ export default function SommelierPage() {
       refetchUsage();
     } catch (e: any) {
       console.error(e);
+      // On error, check if the server already saved the response (user may have navigated away and come back)
+      if (sessionId) {
+        const { data: latestMessages } = await supabase
+          .from("chat_messages")
+          .select("id, role, content, created_at")
+          .eq("session_id", sessionId)
+          .order("created_at", { ascending: true });
+        if (latestMessages && latestMessages.length > 0) {
+          const lastMsg = latestMessages[latestMessages.length - 1];
+          if (lastMsg.role === "assistant") {
+            // Server processed successfully, just reload
+            setMessages(
+              latestMessages
+                .filter((m: any) => m.role !== "system")
+                .map((m: any) => ({ id: m.id, role: m.role, content: m.content, created_at: m.created_at }))
+            );
+            setIsLoading(false);
+            return;
+          }
+        }
+      }
       toast({ title: "Erro", description: e.message || "Falha ao enviar mensagem", variant: "destructive" });
       setMessages(prev => prev.slice(0, -1)); // remove optimistic user msg
     } finally {
       setIsLoading(false);
     }
   };
+
+  // Poll for assistant response if loading takes too long (handles tab switching)
+  useEffect(() => {
+    if (!isLoading || !sessionId) return;
+
+    const pollInterval = setInterval(async () => {
+      const { data: latestMessages } = await supabase
+        .from("chat_messages")
+        .select("id, role, content, created_at")
+        .eq("session_id", sessionId)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      if (latestMessages && latestMessages.length > 0 && latestMessages[0].role === "assistant") {
+        // Server has the response, reload all messages
+        const { data: allMsgs } = await supabase
+          .from("chat_messages")
+          .select("id, role, content, created_at")
+          .eq("session_id", sessionId)
+          .order("created_at", { ascending: true });
+        
+        setMessages(
+          (allMsgs ?? [])
+            .filter((m: any) => m.role !== "system")
+            .map((m: any) => ({ id: m.id, role: m.role, content: m.content, created_at: m.created_at }))
+        );
+        setIsLoading(false);
+        refetchUsage();
+      }
+    }, 5000); // Poll every 5 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [isLoading, sessionId, refetchUsage]);
 
   // Convert BRL to credits (1 credit = R$0.10)
   const usageCredits = Math.round(usageBrl * 10);
@@ -430,7 +479,7 @@ export default function SommelierPage() {
                 <div className="flex justify-center">
                   <div className="bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2 text-xs text-destructive flex items-center gap-2">
                     <AlertTriangle className="h-3 w-3" />
-                    Seus créditos estão acabando. Considere usar o modo curto.
+                    Seus créditos estão acabando.
                   </div>
                 </div>
               )}
@@ -442,28 +491,6 @@ export default function SommelierPage() {
           {/* Input area */}
           <div className="px-4 py-3 border-t border-border bg-card shrink-0">
             <div className="max-w-2xl mx-auto">
-              {/* Mode toggle */}
-              <div className="flex items-center gap-2 mb-2">
-                <button
-                  onClick={() => setMode("economico")}
-                  className={cn(
-                    "flex items-center gap-1 text-xs px-2 py-1 rounded-md transition-colors",
-                    mode === "economico" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Zap className="h-3 w-3" /> Curto
-                </button>
-                <button
-                  onClick={() => setMode("detalhado")}
-                  className={cn(
-                    "flex items-center gap-1 text-xs px-2 py-1 rounded-md transition-colors",
-                    mode === "detalhado" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <BookOpen className="h-3 w-3" /> Detalhado
-                </button>
-              </div>
-
               <div className="flex gap-2 items-end">
                 <textarea
                   ref={inputRef}
