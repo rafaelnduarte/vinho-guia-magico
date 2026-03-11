@@ -17,6 +17,10 @@ interface AulaData {
   sort_order: number;
 }
 
+function sanitizarTitulo(titulo: string): string {
+  return titulo.replace(/\.(mp4|mkv|avi|mov|flv|webm|m4v)$/i, "").trim();
+}
+
 function formatTime(s: number) {
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
