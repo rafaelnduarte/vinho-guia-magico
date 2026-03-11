@@ -56,84 +56,64 @@ Deno.serve(async (req) => {
       "Content-Type": "application/json",
     };
 
-    // STEP 1: Create Watermark Group
-    console.log("[WATERMARK] Creating watermark group...");
-    const groupRes = await fetch(`${PANDA_API_BASE}/watermark/group`, {
+    // STEP 1: Create Watermark/DRM Group
+    // Correct endpoint: POST /drm/videos (per Panda API docs)
+    console.log("[WATERMARK] Step 1: Creating DRM watermark group...");
+    const groupRes = await fetch(`${PANDA_API_BASE}/drm/videos`, {
       method: "POST",
       headers: pandaHeaders,
       body: JSON.stringify({
-        name: "Jovem_do_Vinho_Cursos",
-        description: "DRM group for wine courses",
+        video_ids: [],
+        folder_ids: [],
+        percent_ts: 0.5,
       }),
     });
 
     if (!groupRes.ok) {
       const errText = await groupRes.text();
       console.error("[WATERMARK] Create group failed:", groupRes.status, errText);
-      return new Response(JSON.stringify({ error: `Create group failed: ${groupRes.status}`, details: errText }), { status: 500, headers: corsHeaders });
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: `Create DRM group failed: ${groupRes.status}`, 
+        details: errText 
+      }), { status: 500, headers: corsHeaders });
     }
 
     const group = await groupRes.json();
-    const groupId = group.id || group.group_id;
-    console.log("[WATERMARK] Group created:", groupId);
+    const groupId = group.id || group.drm_group_id || group.group_id;
+    console.log("[WATERMARK] Step 1 SUCCESS: Group created:", JSON.stringify(group));
 
-    // STEP 2: Enable DRM on group
-    console.log("[WATERMARK] Enabling DRM...");
-    const enableRes = await fetch(`${PANDA_API_BASE}/watermark/group/${groupId}/enable`, {
-      method: "POST",
+    // STEP 2: List/verify the group was created
+    console.log("[WATERMARK] Step 2: Verifying group...");
+    const listRes = await fetch(`${PANDA_API_BASE}/drm/videos/`, {
+      method: "GET",
       headers: pandaHeaders,
-      body: JSON.stringify({ enable: true, drm_enabled: true }),
     });
 
-    if (!enableRes.ok) {
-      const errText = await enableRes.text();
-      console.warn("[WATERMARK] Enable DRM response:", enableRes.status, errText);
-      // Non-fatal: some Panda plans may not support this endpoint
+    let groups = null;
+    if (listRes.ok) {
+      groups = await listRes.json();
+      console.log("[WATERMARK] Step 2 SUCCESS: Groups listed:", JSON.stringify(groups).slice(0, 500));
     } else {
-      console.log("[WATERMARK] DRM enabled");
-    }
-
-    // STEP 3: Create a shared private token
-    console.log("[WATERMARK] Creating private token...");
-    const tokenRes = await fetch(`${PANDA_API_BASE}/watermark/private-tokens`, {
-      method: "POST",
-      headers: pandaHeaders,
-      body: JSON.stringify({
-        group_id: groupId,
-        token: `jdv_shared_${Date.now()}`,
-        expire_in_days: 365,
-      }),
-    });
-
-    let privateToken = null;
-    if (!tokenRes.ok) {
-      const errText = await tokenRes.text();
-      console.warn("[WATERMARK] Create private token response:", tokenRes.status, errText);
-      // Non-fatal: token can be created manually
-    } else {
-      const tokenData = await tokenRes.json();
-      privateToken = tokenData.token || tokenData.private_token;
-      console.log("[WATERMARK] Private token created");
+      console.warn("[WATERMARK] Step 2: List failed (non-fatal):", listRes.status);
     }
 
     return new Response(
       JSON.stringify({
         success: true,
         group_id: groupId,
-        private_token: privateToken,
+        group_raw: group,
+        all_groups: groups,
         next_steps: [
           `1. Add secret PANDA_WATERMARK_GROUP_ID = ${groupId}`,
-          privateToken
-            ? `2. Add secret PANDA_WATERMARK_PRIVATE_TOKEN = ${privateToken}`
-            : "2. Create private token manually in Panda Dashboard and add as secret PANDA_WATERMARK_PRIVATE_TOKEN",
-          "3. Link your videos to this watermark group in Panda Dashboard",
-          "4. Test video playback",
+          "2. Link your videos/folders to this DRM group",
+          "3. Generate private tokens for JWT playback",
         ],
       }),
       { status: 200, headers: corsHeaders }
     );
   } catch (err) {
     console.error("[WATERMARK] Error:", err.message);
-    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
+    return new Response(JSON.stringify({ success: false, error: err.message }), { status: 500, headers: corsHeaders });
   }
 });
