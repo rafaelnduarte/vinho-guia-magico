@@ -2,6 +2,7 @@ import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { useEffect, useRef, useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Home,
   Wine,
@@ -16,6 +17,8 @@ import {
   Trophy,
   Target,
   GraduationCap,
+  ChevronDown,
+  BookOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -27,7 +30,6 @@ import { supabase } from "@/integrations/supabase/client";
 const memberLinks = [
   { to: "/home", label: "Home", icon: Home },
   { to: "/curadoria", label: "Curadoria", icon: Wine },
-  { to: "/cursos", label: "Cursos", icon: GraduationCap },
   { to: "/ranking", label: "Ranking", icon: Trophy },
   { to: "/sommelier", label: "Jovem AI", icon: Sparkles },
   { to: "/parceiros", label: "Parceiros", icon: Handshake },
@@ -49,8 +51,23 @@ export default function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [cursosOpen, setCursosOpen] = useState(location.pathname.startsWith("/cursos"));
   const { trackPageView } = useAnalytics();
   const lastTrackedPath = useRef("");
+
+  // Fetch published cursos for sidebar
+  const { data: sidebarCursos } = useQuery({
+    queryKey: ["cursos", "sidebar"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("cursos")
+        .select("id, titulo")
+        .eq("is_published", true)
+        .order("sort_order");
+      return data ?? [];
+    },
+    staleTime: 300_000,
+  });
 
   // User widget data
   const [profileName, setProfileName] = useState<string | null>(null);
@@ -194,6 +211,44 @@ export default function AppLayout() {
               </NavLink>
             ))}
 
+            {/* Expandable Cursos section */}
+            <div>
+              <button
+                onClick={() => setCursosOpen(!cursosOpen)}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors w-full",
+                  location.pathname.startsWith("/cursos")
+                    ? "bg-sidebar-accent text-sidebar-primary"
+                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                )}
+              >
+                <GraduationCap className="h-4 w-4" />
+                Cursos
+                <ChevronDown className={cn("h-3.5 w-3.5 ml-auto transition-transform", cursosOpen && "rotate-180")} />
+              </button>
+              {cursosOpen && sidebarCursos && sidebarCursos.length > 0 && (
+                <div className="ml-4 mt-1 space-y-0.5 border-l border-sidebar-border pl-3">
+                  {sidebarCursos.map((curso) => (
+                    <NavLink
+                      key={curso.id}
+                      to={`/cursos/${curso.id}`}
+                      className={({ isActive }) =>
+                        cn(
+                          "flex items-center gap-2 px-2 py-1.5 rounded-md text-xs font-medium transition-colors",
+                          isActive
+                            ? "bg-sidebar-accent text-sidebar-primary"
+                            : "text-sidebar-foreground/60 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                        )
+                      }
+                    >
+                      <BookOpen className="h-3 w-3 shrink-0" />
+                      <span className="truncate">{curso.titulo}</span>
+                    </NavLink>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {role === "admin" && (
               <NavLink
                 to="/admin"
@@ -261,6 +316,46 @@ export default function AppLayout() {
                   {link.label}
                 </NavLink>
               ))}
+
+              {/* Expandable Cursos - mobile */}
+              <div>
+                <button
+                  onClick={() => setCursosOpen(!cursosOpen)}
+                  className={cn(
+                    "flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium transition-colors w-full",
+                    location.pathname.startsWith("/cursos")
+                      ? "bg-primary text-primary-foreground"
+                      : "text-foreground hover:bg-muted"
+                  )}
+                >
+                  <GraduationCap className="h-5 w-5" />
+                  Cursos
+                  <ChevronDown className={cn("h-4 w-4 ml-auto transition-transform", cursosOpen && "rotate-180")} />
+                </button>
+                {cursosOpen && sidebarCursos && sidebarCursos.length > 0 && (
+                  <div className="ml-6 mt-1 space-y-1 border-l border-border pl-3">
+                    {sidebarCursos.map((curso) => (
+                      <NavLink
+                        key={curso.id}
+                        to={`/cursos/${curso.id}`}
+                        onClick={() => setMobileOpen(false)}
+                        className={({ isActive }) =>
+                          cn(
+                            "flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                            isActive
+                              ? "bg-primary text-primary-foreground"
+                              : "text-foreground/70 hover:bg-muted"
+                          )
+                        }
+                      >
+                        <BookOpen className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">{curso.titulo}</span>
+                      </NavLink>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {role === "admin" && (
                 <NavLink
                   to="/admin"

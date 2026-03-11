@@ -71,7 +71,7 @@ export default function AdminCursos() {
       const { data, error } = await supabase
         .from("cursos")
         .select("id, titulo, descricao, is_published, panda_folder_id, sort_order, created_at")
-        .order("created_at", { ascending: true });
+        .order("sort_order", { ascending: true });
       if (error) throw error;
       const { data: counts } = await supabase.from("aulas").select("curso_id");
       const countMap: Record<string, number> = {};
