@@ -372,26 +372,8 @@ export default function AdminPandaDiagnostics() {
                       )}
                     </div>
                   )}
-                  <Card key={key} className="border">
-                    <CardContent className="p-4 space-y-1">
-                      <div className="flex items-center gap-2">
-                        {statusIcon(val.status)}
-                        <span className="font-medium text-sm capitalize">
-                          {key.replace(/_/g, " ")}
-                        </span>
-                      </div>
-                      {Object.entries(val)
-                        .filter(([k]) => k !== "status")
-                        .map(([k, v]) => (
-                          <p key={k} className="text-xs text-muted-foreground">
-                            <span className="font-medium">{k}:</span>{" "}
-                            {Array.isArray(v) ? (v as string[]).join(", ") || "—" : String(v ?? "—")}
-                          </p>
-                        ))}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                </CardContent>
+              </Card>
 
               {/* Recovery Actions */}
               {result.issues_count > 0 && (
