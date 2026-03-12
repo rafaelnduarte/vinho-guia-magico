@@ -9,6 +9,7 @@ const corsHeaders = {
 };
 
 const PANDA_BASE = "https://api-v2.pandavideo.com.br";
+const PANDA_V1 = "https://api.pandavideo.com";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
