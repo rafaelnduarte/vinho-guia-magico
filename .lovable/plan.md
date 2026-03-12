@@ -1,247 +1,82 @@
-# Jovem do Vinho — Technical Source of Truth
 
-> Última atualização: 2026-03-11
+Plano definitivo para corrigir o DRM/JWT/Player Panda no JDV (sem alterar outras áreas)
 
----
+1) Diagnóstico do estado atual (já verificado no código)
+- `panda-token` já não usa JWT local, mas ainda está focado em `/drm/videos/{groupId}/jwt` e em estratégia de compatibilidade antiga.
+- `PandaPlayer` já usa `jwt=` corretamente, porém:
+  - não valida `config.json` antes de carregar o player,
+  - ainda entra em fallback HLS automático mesmo em cenários de token/DRM inválido.
+- Já existe ação `assign_drm` no diagnóstico, mas apenas por vídeo individual (não “todos os vídeos”).
 
-## 1. Tech Stack
+2) Ajustes de backend (edge functions)
 
-| Camada | Tecnologia |
-|--------|-----------|
-| Framework | React 18 + Vite + TypeScript |
-| Estilização | Tailwind CSS 3 + tailwindcss-animate + shadcn/ui |
-| State / Data | TanStack Query v5, react-hook-form + zod |
-| Routing | react-router-dom v6 |
-| Backend | Lovable Cloud (Supabase nativo) — Auth, Database (RLS), Storage, Edge Functions |
-| Animação | framer-motion (quando necessário), embla-carousel-react |
-| Fonts | Open Sans (body), Lore Bold/Regular (headings), Space Mono (mono) |
-| Markdown | react-markdown |
-| Charts | recharts |
+2.1 `supabase/functions/panda-token/index.ts` (reescrita completa da lógica)
+- Manter autenticação do usuário (como já está).
+- Remover qualquer resquício de assinatura local (confirmado: não há hoje, manter assim).
+- Implementar fluxo oficial priorizando endpoint de Watermark Group:
+  - Tentativa principal:
+    - `GET https://api.pandavideo.com/watermark/groups/{DRM_GROUP_ID}/jwt?expiredAtJwt={exp}`
+    - `Authorization: Bearer {PANDA_API_KEY}`
+  - Compatibilidade automática (apenas se falha de autorização/rota):
+    - sem `Bearer`
+    - rota equivalente `/drm/videos/{groupId}/jwt`
+    - fallback de host (`api-v2...`) se necessário
+- Retorno padrão:
+  - sucesso: `{ token: data.jwt }`
+  - falha: `{ token: null }`
+- Logs objetivos por tentativa (status + endpoint) para rastreio.
 
----
+2.2 `supabase/functions/panda-diagnostics/index.ts`
+- Fortalecer `assign_drm` para usar padrão compatível de auth (Bearer + fallback) e hosts compatíveis.
+- Adicionar ação nova `assign_drm_all`:
+  - buscar todos `panda_video_id` válidos em `aulas` (via service role),
+  - fazer `PUT /videos/{id}` com `{ drm_group_id: <group_secret> }`,
+  - retornar resumo: total, sucesso, falhas, ids com erro.
+- (Opcional no mesmo endpoint) adicionar ação `check_config` para validar `config.json` server-side por vídeo + jwt, evitando limitação de CORS no browser.
 
-## 2. Database Schema
+3) Ajustes de frontend admin
 
-### 2.1 Core
+3.1 `src/components/admin/AdminPandaDiagnostics.tsx`
+- Manter botão atual de associação por vídeo.
+- Adicionar botão “Associar TODOS ao DRM Group” (dispara `assign_drm_all`).
+- Exibir relatório claro de sucesso/falhas por lote.
+- (Se implementar `check_config`) adicionar ação de validação de `config.json` no próprio painel.
 
-| Tabela | Propósito | Campos-chave |
-|--------|-----------|-------------|
-| `profiles` | Dados públicos do usuário | user_id, full_name, avatar_url, must_change_password, onboarding_completed, last_seen_at |
-| `user_roles` | Roles separados (nunca em profiles) | user_id, role (enum `app_role`: admin, member) |
-| `memberships` | Assinaturas ativas/inativas | user_id, status, source (hubla/manual), membership_type (comunidade/radar), external_id |
+4) Ajustes de player (bloquear fluxo inválido)
 
-### 2.2 Curadoria
+4.1 `src/components/cursos/PandaPlayer.tsx`
+- Manter `jwt=` (já correto).
+- Antes de renderizar iframe, validar `config.json`:
+  - construir URL de config com o `videoId` e `jwt`,
+  - exigir HTTP 200 para liberar render do player.
+- Se config falhar:
+  - mostrar erro explícito de DRM/JWT (não mascarar como “vídeo em processamento”),
+  - tentar reobter token 1x e revalidar config.
+- Ajustar fallback:
+  - não cair automaticamente para HLS quando o erro for de autorização/config (404/401/403),
+  - usar fallback HLS apenas em falhas técnicas de reprodução após config válido.
 
-| Tabela | Propósito |
-|--------|-----------|
-| `wines` | Catálogo de vinhos (status: curadoria, acervo, rascunho) |
-| `wine_votes` | Votos dos membros em vinhos |
-| `wine_comments` | Comentários dos membros |
-| `wine_seals` | Relação N:N entre wines e seals |
-| `seals` | Selos de categorização (ex: Clássico, Natureba) |
-| `thomas_notes` | Notas do curador (opinion/pairing, visibility: public/private) |
+5) Escopo e segurança
+- Sem mudanças de banco/migração.
+- Sem mudanças em autenticação global.
+- Sem mexer em outras features fora do fluxo Panda.
+- Sem JWT local, sem `jose`, sem `jsonwebtoken`.
 
-### 2.3 Cursos
+6) Validação obrigatória (fim-a-fim)
+- Pré-condição: usuário logado no preview (atualmente está em `/login`).
+- Teste técnico:
+  1. Abrir uma aula com `panda_video_id`.
+  2. Confirmar request `config.tv.pandavideo.com.br/.../{VIDEO_ID}.json` com status 200.
+  3. Reproduzir além de 6 segundos (confirmar playback contínuo).
+  4. No admin, executar “Associar TODOS” e validar resumo sem falhas críticas.
+- Critérios de aceite:
+  - `config.json` = 200,
+  - reprodução integral sem corte de 6s,
+  - token retornado pelo Panda (não local),
+  - vídeo(s) associados ao grupo DRM.
 
-| Tabela | Propósito |
-|--------|-----------|
-| `cursos` | Cursos/trilhas (panda_folder_id para sync) |
-| `aulas` | Aulas dentro de cursos (panda_video_id, panda_quiz_id) |
-| `matriculas` | Inscrição do usuário em curso |
-| `progresso` | Posição de playback e conclusão por aula |
-| `downloads` | Downloads de materiais (panda_download_url) |
-
-### 2.4 AI / Chat
-
-| Tabela | Propósito |
-|--------|-----------|
-| `chat_sessions` | Sessões do Sommelier AI por usuário |
-| `chat_messages` | Mensagens (role, tokens_in/out, cost_usd/brl, mode) |
-| `chat_feedback` | Feedback (rating, comment) por mensagem |
-| `ai_pricing_config` | Config singleton: modelo, limites, system prompt |
-| `ai_knowledge_base` | Base de conhecimento para RAG (título, conteúdo, file_url) |
-| `usage_ledger` | Consolidado mensal de uso por usuário |
-
-### 2.5 Infra
-
-| Tabela | Propósito |
-|--------|-----------|
-| `analytics_events` | Eventos de analytics client-side |
-| `webhook_events` | Payloads de webhooks recebidos (idempotência via event_id) |
-| `webhook_logs` | Log detalhado de processamento |
-| `home_banners` | Banners da homepage (image_url, link_url, sort_order) |
-| `partners` | Parceiros com descontos (logo, cupom, categoria) |
-
-### 2.6 Views
-
-| View | Propósito | ⚠️ Status |
-|------|-----------|-----------|
-| `profiles_public` | user_id, full_name, avatar_url (sem PII) | **P0**: adicionar RLS restritivo |
-| `chat_messages_safe` | Mensagens sem campos de custo | **P0**: adicionar RLS restritivo |
-
-### 2.7 Funções SQL Críticas
-
-| Função | Tipo | Propósito |
-|--------|------|-----------|
-| `has_active_access(uuid)` | SECURITY DEFINER | Gate principal: admin OR membership ativa |
-| `has_role(uuid, app_role)` | SECURITY DEFINER | Verifica role específico |
-| `handle_new_user()` | TRIGGER (auth.users INSERT) | Cria profile + role `member` automaticamente |
-| `get_rankings(period)` | RPC | Ranking de membros por votos+comentários |
-| `get_wine_rankings(period)` | RPC | Ranking de vinhos por engajamento |
-| `list_members_paginated(...)` | RPC | Listagem paginada para admin |
-| `trg_curso_cascata_aulas()` | TRIGGER | Publish/unpublish cascata curso→aulas |
-| `trg_aula_cascata_curso()` | TRIGGER | Auto-publish/unpublish curso quando aulas mudam |
-| `update_updated_at_column()` | TRIGGER | Atualiza updated_at automaticamente |
-
-### 2.8 Enum
-
-```sql
-app_role: 'admin' | 'member'
-```
-
----
-
-## 3. Security & Auth
-
-### Princípios
-
-- **RLS RESTRICTIVE** em todas as tabelas — nenhuma tabela sem política
-- `has_active_access()` como gate principal para leitura de conteúdo
-- Roles **sempre** na tabela `user_roles`, nunca em profiles
-- Membership types (`comunidade`/`radar`) são visuais — não afetam permissão de acesso
-- Toda chave privada reside exclusivamente em Edge Functions (secrets), nunca no client
-- AuthContext implementa dual-loading (session + membership) para evitar flash de bloqueio
-
-### Fluxo de Autenticação
-
-1. Hubla webhook → `hubla-webhook` Edge Function → cria user + membership + role
-2. Senha inicial = email do usuário → `must_change_password = true`
-3. Primeiro login → ForceChangePasswordPage → troca senha
-4. Após troca → OnboardingDialog → `onboarding_completed = true`
-5. Navegação normal com `ProtectedRoute` verificando `has_active_access`
-
-### Storage Buckets
-
-| Bucket | Público | Uso |
-|--------|---------|-----|
-| wine-images | ✅ | Fotos de vinhos |
-| partner-logos | ✅ | Logos de parceiros |
-| wine-audio | ✅ | Áudios de curadoria |
-| email-assets | ✅ | Assets de templates de email |
-| knowledge-files | ❌ | Arquivos da base de conhecimento AI |
-
----
-
-## 4. Edge Functions
-
-| Função | JWT | Propósito | Secrets |
-|--------|-----|-----------|---------|
-| `auth-email-hook` | ❌ | Emails transacionais customizados (signup, recovery, etc) | — |
-| `hubla-webhook` | ❌ | Ativação/cancelamento de memberships via Hubla | HUBLA_WEBHOOK_SECRET |
-| `sommelier-chat` | ❌ | Chat AI (Sommelier) com RAG + controle de custo | LOVABLE_API_KEY |
-| `panda-sync` | ❌ | Sincronização de cursos/aulas com Panda Video | PANDA_API_KEY, PANDA_PROFILE_ID |
-| `panda-webhook` | ❌ | Eventos automáticos do Panda (encoding done, etc) | PANDA_WEBHOOK_SECRET, PANDA_API_KEY, PANDA_PROFILE_ID |
-| `panda-token` | ❌ | ⚠️ Desativado — geração de JWT para player (watermark groups) | PANDA_SECRET_KEY |
-| `panda-proxy` | ❌ | Proxy seguro para API Panda (listagem de folders/videos) | PANDA_API_KEY |
-| `admin-members` | ✅ | Listagem paginada de membros (usa service_role) | — |
-| `parse-knowledge-file` | ✅ | Parse de PDFs/TXT para knowledge base via AI | LOVABLE_API_KEY |
-| `migrate-drive-urls` | ✅ | Migração batch de URLs do Google Drive | — |
-| `rehost-drive-file` | ✅ | Re-hospedagem individual de arquivo do Drive | — |
-
-### Secrets Configurados
-
-HUBLA_WEBHOOK_SECRET, PANDA_WEBHOOK_SECRET, PANDA_API_KEY, PANDA_PROFILE_ID, PANDA_SECRET_KEY, N8N_WEBHOOK_URL, LOVABLE_API_KEY (+ auto: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_DB_URL, SUPABASE_PUBLISHABLE_KEY)
-
----
-
-## 5. Data Layer & Performance
-
-### Diretriz Anti-Overfetch (P0)
-
-A `CuradoriaPage` atualmente carrega TODOS os vinhos client-side. **DEVE** ser migrada para:
-- Paginação server-side via `.range(from, to)` ou RPC dedicada
-- Seleção de campos mínimos: `.select("id, name, producer, country, type, grape, image_url, status, rating, vintage, created_at")`
-- Filtros aplicados na query, não no client
-
-### Query Keys (Padrão)
-
-```typescript
-// Padrão: ["domínio", "escopo", { params }]
-["wines", "curadoria", { page: 1, status: "curadoria", type: "tinto" }]
-["wines", "detail", wineId]
-["cursos", "list"]
-["rankings", "users", { period: "month" }]
-["banners", "home"]
-```
-
-### staleTime Recomendado
-
-| Tipo de dado | staleTime |
-|-------------|-----------|
-| Selos, parceiros, cursos | 5 min (300_000) |
-| Vinhos (lista), banners | 2 min (120_000) |
-| Votos, comentários | 30s (30_000) |
-| AI config, usage | 10 min (600_000) |
-| Rankings | 1 min (60_000) |
-
----
-
-## 6. Design System
-
-### Tokens CSS (HSL em `index.css`)
-
-```
---background, --foreground          // Base
---card, --card-foreground           // Cards
---primary, --primary-foreground     // Ações principais
---secondary, --secondary-foreground // Ações secundárias
---muted, --muted-foreground         // Texto sutil
---accent, --accent-foreground       // Destaque
---destructive                       // Erros
---wine                              // Cor principal do tema (vinho)
---gold                              // Destaques dourados
---cream                             // Fundos suaves
---highlight                         // Alertas/badges
-```
-
-### Tipografia
-
-| Token | Fonte | Uso |
-|-------|-------|-----|
-| `font-sans` | Open Sans | Corpo de texto |
-| `font-serif` / `font-display` | Lore | Títulos, headings (via `@layer base`) |
-| `font-mono` | Space Mono | Código, dados técnicos |
-
-### Regras
-
-- **Zero Magic Numbers**: toda cor, espaçamento e tipografia via tokens do tema ou classes Tailwind
-- Componentes shadcn/ui com customizações mínimas
-- Classe `.glass` para cards com efeito translúcido
-- Cores sempre via variáveis semânticas, nunca hardcoded (`bg-primary`, não `bg-[#722F37]`)
-
----
-
-## 7. Roadmap de Estabilização
-
-### P0 — Curto Prazo (Crítico)
-
-- [ ] Paginação server-side na CuradoriaPage (eliminar overfetch)
-- [ ] RLS restritivo nas views `profiles_public` e `chat_messages_safe`
-- [ ] Validar trigger `handle_new_user` — contingência via Edge Function se falhar
-- [ ] Verificar `PANDA_PROFILE_ID` no painel Panda (erro 500 persistente na API)
-- [ ] Resolver playback do player Panda (token removido, testar sem autenticação)
-
-### P1 — Médio Prazo
-
-- [ ] Centralizar Query Keys em `src/lib/queryKeys.ts`
-- [ ] Error Boundaries globais (wrap no App.tsx)
-- [ ] Configurar staleTime padrão no QueryClient provider
-- [ ] DNS do subdomínio `notify.jovemdovinho.com.br` para branding de emails
-- [ ] Implementar contingência para `handle_new_user` via Edge Function
-
-### P2 — Longo Prazo
-
-- [ ] Suite de testes Vitest (hooks, utils, componentes críticos)
-- [ ] Dashboard de monitoramento de webhook_logs no admin
-- [ ] Otimização de webhook processing (batch operations no hubla-webhook)
-- [ ] Implementar watermark groups no Panda para re-ativar token JWT
+Detalhes técnicos (resumo)
+- Endpoint preferencial JWT: `/watermark/groups/{groupId}/jwt`.
+- Endpoint equivalente de compatibilidade: `/drm/videos/{groupId}/jwt`.
+- Query de expiração: `Math.floor(Date.now()/1000) + 3600`.
+- Param do player: `jwt` (somente esse).
