@@ -8,83 +8,66 @@ const corsHeaders = {
   "Content-Type": "application/json",
 };
 
-const PANDA_API_BASE = "https://api-v2.pandavideo.com.br";
+interface Attempt {
+  label: string;
+  url: string;
+  auth: string;
+}
 
-async function fetchDrmJwt(groupId: string, apiKey: string, exp: number): Promise<{ token: string | null; error?: string }> {
-  const url = `${PANDA_API_BASE}/drm/videos/${groupId}/jwt?expiredAtJwt=${exp}`;
-
-  // Attempt 1: Bearer prefix (per Panda docs)
-  console.log(`[PANDA-TOKEN] Attempt 1: Bearer prefix`);
-  const res1 = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
+async function fetchOfficialJwt(groupId: string, apiKey: string, exp: number): Promise<{ token: string | null; error?: string }> {
+  const attempts: Attempt[] = [
+    {
+      label: "watermark/groups Bearer",
+      url: `https://api.pandavideo.com/watermark/groups/${groupId}/jwt?expiredAtJwt=${exp}`,
+      auth: `Bearer ${apiKey}`,
     },
-  });
-
-  if (res1.ok) {
-    const data = await res1.json();
-    const token = data.jwt || data.token || null;
-    if (token) {
-      console.log(`[PANDA-TOKEN] Success with Bearer prefix`);
-      return { token };
-    }
-    console.error(`[PANDA-TOKEN] Bearer OK but no jwt field:`, JSON.stringify(data));
-    return { token: null, error: "No jwt field in response" };
-  }
-
-  const err1 = await res1.text();
-  console.warn(`[PANDA-TOKEN] Bearer failed: ${res1.status} ${err1}`);
-
-  // Attempt 2: No prefix (format used by panda-sync/panda-diagnostics that works)
-  console.log(`[PANDA-TOKEN] Attempt 2: No prefix (compatible mode)`);
-  const res2 = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Authorization": apiKey,
-      "Content-Type": "application/json",
+    {
+      label: "watermark/groups no-prefix",
+      url: `https://api.pandavideo.com/watermark/groups/${groupId}/jwt?expiredAtJwt=${exp}`,
+      auth: apiKey,
     },
-  });
-
-  if (res2.ok) {
-    const data = await res2.json();
-    const token = data.jwt || data.token || null;
-    if (token) {
-      console.log(`[PANDA-TOKEN] Success without Bearer prefix`);
-      return { token };
-    }
-    console.error(`[PANDA-TOKEN] No-prefix OK but no jwt field:`, JSON.stringify(data));
-    return { token: null, error: "No jwt field in response" };
-  }
-
-  const err2 = await res2.text();
-  console.error(`[PANDA-TOKEN] No-prefix also failed: ${res2.status} ${err2}`);
-
-  // Attempt 3: Try alternative base URL without -v2
-  const altUrl = `https://api.pandavideo.com/drm/videos/${groupId}/jwt?expiredAtJwt=${exp}`;
-  console.log(`[PANDA-TOKEN] Attempt 3: Alternative base URL (api.pandavideo.com)`);
-  const res3 = await fetch(altUrl, {
-    method: "GET",
-    headers: {
-      "Authorization": apiKey,
-      "Content-Type": "application/json",
+    {
+      label: "drm/videos Bearer (api-v2)",
+      url: `https://api-v2.pandavideo.com.br/drm/videos/${groupId}/jwt?expiredAtJwt=${exp}`,
+      auth: `Bearer ${apiKey}`,
     },
-  });
+    {
+      label: "drm/videos no-prefix (api-v2)",
+      url: `https://api-v2.pandavideo.com.br/drm/videos/${groupId}/jwt?expiredAtJwt=${exp}`,
+      auth: apiKey,
+    },
+  ];
 
-  if (res3.ok) {
-    const data = await res3.json();
-    const token = data.jwt || data.token || null;
-    if (token) {
-      console.log(`[PANDA-TOKEN] Success with alt base URL`);
-      return { token };
+  for (const attempt of attempts) {
+    console.log(`[PANDA-TOKEN] Trying: ${attempt.label}`);
+    try {
+      const res = await fetch(attempt.url, {
+        method: "GET",
+        headers: {
+          Authorization: attempt.auth,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        console.warn(`[PANDA-TOKEN] ${attempt.label} failed: ${res.status} ${errText.substring(0, 200)}`);
+        continue;
+      }
+
+      const data = await res.json();
+      const token = data.jwt || data.token || null;
+      if (token) {
+        console.log(`[PANDA-TOKEN] ✅ Success via ${attempt.label}`);
+        return { token };
+      }
+      console.warn(`[PANDA-TOKEN] ${attempt.label} OK but no jwt field:`, JSON.stringify(data).substring(0, 200));
+    } catch (err) {
+      console.error(`[PANDA-TOKEN] ${attempt.label} exception:`, (err as Error).message);
     }
   }
 
-  const err3 = await res3.text();
-  console.error(`[PANDA-TOKEN] Alt URL also failed: ${res3.status} ${err3}`);
-
-  return { token: null, error: `All attempts failed. Last: ${res3.status}` };
+  return { token: null, error: "All attempts failed" };
 }
 
 Deno.serve(async (req) => {
@@ -119,20 +102,18 @@ Deno.serve(async (req) => {
     const DRM_GROUP_ID = Deno.env.get("PANDA_WATERMARK_GROUP_ID");
 
     if (!PANDA_API_KEY || !DRM_GROUP_ID) {
-      console.error("[PANDA-TOKEN] Missing config: PANDA_API_KEY or PANDA_WATERMARK_GROUP_ID");
+      console.error("[PANDA-TOKEN] Missing PANDA_API_KEY or PANDA_WATERMARK_GROUP_ID");
       return new Response(JSON.stringify({ token: null }), { status: 200, headers: corsHeaders });
     }
 
     const exp = Math.floor(Date.now() / 1000) + 3600;
 
-    console.log(`[PANDA-TOKEN] Fetching DRM JWT for group ${DRM_GROUP_ID}, video ${video_id}, user ${user.id}`);
+    console.log(`[PANDA-TOKEN] Fetching official JWT for group=${DRM_GROUP_ID}, video=${video_id}, user=${user.id}`);
 
-    const result = await fetchDrmJwt(DRM_GROUP_ID, PANDA_API_KEY, exp);
+    const result = await fetchOfficialJwt(DRM_GROUP_ID, PANDA_API_KEY, exp);
 
-    if (result.token) {
-      console.log(`[PANDA-TOKEN] JWT obtained successfully for video ${video_id}`);
-    } else {
-      console.error(`[PANDA-TOKEN] Failed to obtain JWT: ${result.error}`);
+    if (!result.token) {
+      console.error(`[PANDA-TOKEN] Failed: ${result.error}`);
     }
 
     return new Response(JSON.stringify({ token: result.token }), { status: 200, headers: corsHeaders });

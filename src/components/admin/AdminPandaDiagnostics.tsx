@@ -64,6 +64,8 @@ export default function AdminPandaDiagnostics() {
   const [groupInfoError, setGroupInfoError] = useState<string | null>(null);
   const [assignDrmLoading, setAssignDrmLoading] = useState(false);
   const [assignDrmResult, setAssignDrmResult] = useState<any>(null);
+  const [assignAllLoading, setAssignAllLoading] = useState(false);
+  const [assignAllResult, setAssignAllResult] = useState<any>(null);
 
   const fetchGroupInfo = async () => {
     setGroupInfoLoading(true);
