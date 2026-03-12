@@ -256,6 +256,47 @@ export default function AdminPandaDiagnostics() {
         </CardContent>
       </Card>
 
+      {/* Bulk Assign ALL to DRM Group */}
+      <Card className="border-primary/30">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            🔗 Associar TODOS ao DRM Group
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Associa TODOS os vídeos cadastrados nas aulas ao DRM/Watermark Group. 
+            Sem esta associação, o Panda limita a reprodução a 6 segundos.
+          </p>
+          <Button onClick={assignAllDrm} disabled={assignAllLoading} variant="default">
+            {assignAllLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+            Associar TODOS os vídeos ao DRM Group
+          </Button>
+
+          {assignAllResult && (
+            <div className="space-y-2">
+              <div className={`rounded-md p-4 text-sm ${assignAllResult.success ? "bg-green-500/10 text-green-700 dark:text-green-400" : "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400"}`}>
+                <p className="font-medium">
+                  {assignAllResult.success ? "✅ Todos associados com sucesso!" : `⚠️ Concluído com ${assignAllResult.failed} falha(s)`}
+                </p>
+                <p className="mt-1 text-xs">
+                  Total: {assignAllResult.total} | Sucesso: {assignAllResult.success_count ?? assignAllResult.success} | Falhas: {assignAllResult.failed}
+                </p>
+              </div>
+              {assignAllResult.errors?.length > 0 && (
+                <details className="text-xs">
+                  <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                    Ver falhas ({assignAllResult.errors.length})
+                  </summary>
+                  <pre className="mt-2 overflow-auto rounded-md bg-muted p-3 max-h-40">
+                    {JSON.stringify(assignAllResult.errors, null, 2)}
+                  </pre>
+                </details>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* DRM Group Info Card */}
       <Card className="border-primary/30">
