@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { encode as base64url } from "https://deno.land/std@0.208.0/encoding/base64url.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,66 +9,27 @@ const corsHeaders = {
   "Content-Type": "application/json",
 };
 
-interface Attempt {
-  label: string;
-  url: string;
-  auth: string;
-}
+// Minimal JWT HS256 signer (no external lib needed)
+async function signJwt(payload: Record<string, unknown>, secret: string, expiresIn: number): Promise<string> {
+  const header = { alg: "HS256", typ: "JWT" };
+  const now = Math.floor(Date.now() / 1000);
+  const fullPayload = { ...payload, iat: now, exp: now + expiresIn };
 
-async function fetchOfficialJwt(groupId: string, apiKey: string, exp: number): Promise<{ token: string | null; error?: string }> {
-  const attempts: Attempt[] = [
-    {
-      label: "watermark/groups Bearer",
-      url: `https://api.pandavideo.com/watermark/groups/${groupId}/jwt?expiredAtJwt=${exp}`,
-      auth: `Bearer ${apiKey}`,
-    },
-    {
-      label: "watermark/groups no-prefix",
-      url: `https://api.pandavideo.com/watermark/groups/${groupId}/jwt?expiredAtJwt=${exp}`,
-      auth: apiKey,
-    },
-    {
-      label: "drm/videos Bearer (api-v2)",
-      url: `https://api-v2.pandavideo.com.br/drm/videos/${groupId}/jwt?expiredAtJwt=${exp}`,
-      auth: `Bearer ${apiKey}`,
-    },
-    {
-      label: "drm/videos no-prefix (api-v2)",
-      url: `https://api-v2.pandavideo.com.br/drm/videos/${groupId}/jwt?expiredAtJwt=${exp}`,
-      auth: apiKey,
-    },
-  ];
+  const enc = new TextEncoder();
+  const headerB64 = base64url(enc.encode(JSON.stringify(header)));
+  const payloadB64 = base64url(enc.encode(JSON.stringify(fullPayload)));
 
-  for (const attempt of attempts) {
-    console.log(`[PANDA-TOKEN] Trying: ${attempt.label}`);
-    try {
-      const res = await fetch(attempt.url, {
-        method: "GET",
-        headers: {
-          Authorization: attempt.auth,
-          "Content-Type": "application/json",
-        },
-      });
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, enc.encode(`${headerB64}.${payloadB64}`));
+  const sigB64 = base64url(new Uint8Array(signature));
 
-      if (!res.ok) {
-        const errText = await res.text();
-        console.warn(`[PANDA-TOKEN] ${attempt.label} failed: ${res.status} ${errText.substring(0, 200)}`);
-        continue;
-      }
-
-      const data = await res.json();
-      const token = data.jwt || data.token || null;
-      if (token) {
-        console.log(`[PANDA-TOKEN] ✅ Success via ${attempt.label}`);
-        return { token };
-      }
-      console.warn(`[PANDA-TOKEN] ${attempt.label} OK but no jwt field:`, JSON.stringify(data).substring(0, 200));
-    } catch (err) {
-      console.error(`[PANDA-TOKEN] ${attempt.label} exception:`, (err as Error).message);
-    }
-  }
-
-  return { token: null, error: "All attempts failed" };
+  return `${headerB64}.${payloadB64}.${sigB64}`;
 }
 
 Deno.serve(async (req) => {
@@ -93,7 +55,7 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
     }
 
-    // Verify active membership using service role client
+    // Verify active membership
     const adminClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -111,25 +73,36 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "video_id is required" }), { status: 400, headers: corsHeaders });
     }
 
-    const PANDA_API_KEY = Deno.env.get("PANDA_API_KEY");
     const DRM_GROUP_ID = Deno.env.get("PANDA_WATERMARK_GROUP_ID");
+    const DRM_SECRET = Deno.env.get("PANDA_WATERMARK_PRIVATE_TOKEN");
 
-    if (!PANDA_API_KEY || !DRM_GROUP_ID) {
-      console.error("[PANDA-TOKEN] Missing PANDA_API_KEY or PANDA_WATERMARK_GROUP_ID");
+    if (!DRM_GROUP_ID || !DRM_SECRET) {
+      console.error("[PANDA-TOKEN] Missing PANDA_WATERMARK_GROUP_ID or PANDA_WATERMARK_PRIVATE_TOKEN");
       return new Response(JSON.stringify({ token: null }), { status: 200, headers: corsHeaders });
     }
 
-    const exp = Math.floor(Date.now() / 1000) + 3600;
+    // Get user profile for watermark strings
+    const { data: profile } = await adminClient
+      .from("profiles")
+      .select("full_name")
+      .eq("user_id", user.id)
+      .single();
 
-    console.log(`[PANDA-TOKEN] Fetching official JWT for group=${DRM_GROUP_ID}, video=${video_id}, user=${user.id}`);
+    const userName = profile?.full_name || user.email || "Membro";
 
-    const result = await fetchOfficialJwt(DRM_GROUP_ID, PANDA_API_KEY, exp);
+    // Sign JWT locally per Panda docs
+    const jwtPayload = {
+      drm_group_id: DRM_GROUP_ID,
+      string1: "Jovem do Vinho",
+      string2: userName,
+      string3: user.email || "",
+    };
 
-    if (!result.token) {
-      console.error(`[PANDA-TOKEN] Failed: ${result.error}`);
-    }
+    const token = await signJwt(jwtPayload, DRM_SECRET, 3600); // 1 hour
 
-    return new Response(JSON.stringify({ token: result.token }), { status: 200, headers: corsHeaders });
+    console.log(`[PANDA-TOKEN] ✅ JWT signed locally for user=${user.id}, video=${video_id}`);
+
+    return new Response(JSON.stringify({ token }), { status: 200, headers: corsHeaders });
   } catch (err) {
     console.error("[PANDA-TOKEN] Error:", (err as Error).message);
     return new Response(JSON.stringify({ token: null }), { status: 200, headers: corsHeaders });
