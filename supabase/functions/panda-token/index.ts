@@ -1,5 +1,4 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { encode as base64url } from "https://deno.land/std@0.208.0/encoding/base64url.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,29 +7,6 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Content-Type": "application/json",
 };
-
-// Minimal JWT HS256 signer (no external lib needed)
-async function signJwt(payload: Record<string, unknown>, secret: string, expiresIn: number): Promise<string> {
-  const header = { alg: "HS256", typ: "JWT" };
-  const now = Math.floor(Date.now() / 1000);
-  const fullPayload = { ...payload, iat: now, exp: now + expiresIn };
-
-  const enc = new TextEncoder();
-  const headerB64 = base64url(enc.encode(JSON.stringify(header)));
-  const payloadB64 = base64url(enc.encode(JSON.stringify(fullPayload)));
-
-  const key = await crypto.subtle.importKey(
-    "raw",
-    enc.encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
-  const signature = await crypto.subtle.sign("HMAC", key, enc.encode(`${headerB64}.${payloadB64}`));
-  const sigB64 = base64url(new Uint8Array(signature));
-
-  return `${headerB64}.${payloadB64}.${sigB64}`;
-}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -74,33 +50,55 @@ Deno.serve(async (req) => {
     }
 
     const DRM_GROUP_ID = Deno.env.get("PANDA_WATERMARK_GROUP_ID");
-    const DRM_SECRET = Deno.env.get("PANDA_WATERMARK_PRIVATE_TOKEN");
+    const PANDA_API_KEY = Deno.env.get("PANDA_API_KEY");
 
-    if (!DRM_GROUP_ID || !DRM_SECRET) {
-      console.error("[PANDA-TOKEN] Missing PANDA_WATERMARK_GROUP_ID or PANDA_WATERMARK_PRIVATE_TOKEN");
+    if (!DRM_GROUP_ID || !PANDA_API_KEY) {
+      console.error("[PANDA-TOKEN] Missing PANDA_WATERMARK_GROUP_ID or PANDA_API_KEY");
       return new Response(JSON.stringify({ token: null }), { status: 200, headers: corsHeaders });
     }
 
-    // Get user profile for watermark strings
-    const { data: profile } = await adminClient
-      .from("profiles")
-      .select("full_name")
-      .eq("user_id", user.id)
-      .single();
+    // Expiration: 1 hour from now (ISO string)
+    const expiredAt = new Date(Date.now() + 3600 * 1000).toISOString();
 
-    const userName = profile?.full_name || user.email || "Membro";
+    // Try official endpoint first
+    let token: string | null = null;
 
-    // Sign JWT locally per Panda docs
-    const jwtPayload = {
-      drm_group_id: DRM_GROUP_ID,
-      string1: "Jovem do Vinho",
-      string2: userName,
-      string3: user.email || "",
-    };
+    const endpoints = [
+      `https://api.pandavideo.com/watermark/groups/${DRM_GROUP_ID}/jwt?expiredAtJwt=${encodeURIComponent(expiredAt)}`,
+      `https://api-v2.pandavideo.com.br/drm/videos/${DRM_GROUP_ID}/jwt?expiredAtJwt=${encodeURIComponent(expiredAt)}`,
+    ];
 
-    const token = await signJwt(jwtPayload, DRM_SECRET, 3600); // 1 hour
+    for (const url of endpoints) {
+      try {
+        // Try Bearer format first
+        let res = await fetch(url, {
+          method: "GET",
+          headers: { "Authorization": `Bearer ${PANDA_API_KEY}` },
+        });
 
-    console.log(`[PANDA-TOKEN] ✅ JWT signed locally for user=${user.id}, video=${video_id}`);
+        // Fallback to raw key if 401
+        if (res.status === 401) {
+          res = await fetch(url, {
+            method: "GET",
+            headers: { "Authorization": PANDA_API_KEY },
+          });
+        }
+
+        if (res.ok) {
+          const data = await res.json();
+          token = data.jwt || data.token || null;
+          if (token) {
+            console.log(`[PANDA-TOKEN] ✅ JWT fetched from ${url} for user=${user.id}, video=${video_id}`);
+            break;
+          }
+        } else {
+          const body = await res.text();
+          console.warn(`[PANDA-TOKEN] ${url} returned ${res.status}: ${body}`);
+        }
+      } catch (err) {
+        console.warn(`[PANDA-TOKEN] Failed to fetch from ${url}:`, (err as Error).message);
+      }
+    }
 
     return new Response(JSON.stringify({ token }), { status: 200, headers: corsHeaders });
   } catch (err) {
