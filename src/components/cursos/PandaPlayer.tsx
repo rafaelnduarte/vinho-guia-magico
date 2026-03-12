@@ -69,7 +69,7 @@ export default function PandaPlayer({
     const validateConfig = async () => {
       // Build config URL
       const configBase = `https://config.tv.pandavideo.com.br/embed/v2/${pandaVideoId}.json`;
-      const configUrl = jwt ? `${configBase}?watermark=${jwt}` : configBase;
+      const configUrl = jwt ? `${configBase}?jwt=${jwt}` : configBase;
 
       try {
         const res = await fetch(configUrl, { method: "GET" });
