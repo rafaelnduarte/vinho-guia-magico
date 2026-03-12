@@ -62,40 +62,50 @@ export default function PandaPlayer({
   }, [pandaVideoId, aulaId, retryCount]);
 
   // Validate config.json before rendering iframe
+  const [useJwt, setUseJwt] = useState(true);
+
   useEffect(() => {
     if (jwtLoading) return;
 
     let cancelled = false;
     const validateConfig = async () => {
-      // Build config URL
       const configBase = `https://config.tv.pandavideo.com.br/embed/v2/${pandaVideoId}.json`;
-      const configUrl = jwt ? `${configBase}?jwt=${jwt}` : configBase;
 
+      // Try with JWT first (if available)
+      if (jwt && useJwt) {
+        const configUrlWithJwt = `${configBase}?jwt=${jwt}`;
+        try {
+          const res = await fetch(configUrlWithJwt, { method: "GET" });
+          if (cancelled) return;
+
+          if (res.ok) {
+            console.log("[PANDA] config.json OK with JWT");
+            setPlayerState("ready");
+            return;
+          }
+          console.warn(`[PANDA] config.json with JWT failed: ${res.status}, trying without JWT...`);
+        } catch (err) {
+          if (cancelled) return;
+          console.warn("[PANDA] config.json with JWT fetch error, trying without JWT...", err);
+        }
+      }
+
+      // Fallback: try WITHOUT JWT
       try {
-        const res = await fetch(configUrl, { method: "GET" });
-
+        const res = await fetch(configBase, { method: "GET" });
         if (cancelled) return;
 
         if (res.ok) {
-          console.log("[PANDA] config.json OK (200)");
+          console.log("[PANDA] config.json OK without JWT — proceeding without DRM");
+          setUseJwt(false);
           setPlayerState("ready");
-        } else if (res.status === 404 || res.status === 401 || res.status === 403) {
-          console.error(`[PANDA] config.json rejected: ${res.status}`);
-          // If first attempt failed and we had a jwt, try re-fetching token once
-          if (retryCount === 0 && jwt) {
-            console.log("[PANDA] Retrying token fetch...");
-            setRetryCount(1);
-          } else {
-            setPlayerState("drm_error");
-          }
-        } else {
-          // Other errors — still try to load player
-          console.warn(`[PANDA] config.json unexpected status: ${res.status}, proceeding anyway`);
-          setPlayerState("ready");
+          return;
         }
+        console.error(`[PANDA] config.json rejected without JWT too: ${res.status}`);
+        setPlayerState("drm_error");
       } catch (err) {
         if (cancelled) return;
-        // CORS or network error — can't validate, proceed with iframe
+        // CORS or network error — proceed with iframe anyway
         console.warn("[PANDA] config.json validation failed (likely CORS), proceeding:", err);
         setPlayerState("ready");
       }
@@ -103,7 +113,7 @@ export default function PandaPlayer({
 
     validateConfig();
     return () => { cancelled = true; };
-  }, [jwtLoading, jwt, pandaVideoId, retryCount]);
+  }, [jwtLoading, jwt, pandaVideoId, useJwt]);
 
   // Listen for postMessage from Panda iframe
   const handleMessage = useCallback(
