@@ -138,9 +138,18 @@ serve(async (req) => {
       );
     }
 
-    // 4. Create or get session
+    // 4. Create or get session (with ownership verification)
     let sessionId = session_id;
-    if (!sessionId) {
+    if (sessionId) {
+      const { data: sessionCheck } = await adminClient
+        .from("chat_sessions")
+        .select("user_id")
+        .eq("id", sessionId)
+        .single();
+      if (!sessionCheck || sessionCheck.user_id !== user.id) {
+        throw new Error("Sessão não encontrada ou não autorizada");
+      }
+    } else {
       const { data: newSession, error: sessErr } = await adminClient
         .from("chat_sessions")
         .insert({ user_id: user.id, title: message.slice(0, 60) })
