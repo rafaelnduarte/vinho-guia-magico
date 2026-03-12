@@ -223,6 +223,163 @@ export default function AdminPandaDiagnostics() {
 
   return (
     <div className="space-y-6">
+      {/* Auditoria Completa Card */}
+      <Card className="border-primary/30">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            📋 Auditoria Completa (Supabase ↔ Panda)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Valida todos os video_ids entre o banco de dados e a API do Panda Video.
+            Identifica inconsistências, órfãos e falhas no config.json.
+          </p>
+          <Button onClick={runAudit} disabled={auditLoading} variant="default">
+            {auditLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Stethoscope className="h-4 w-4 mr-1" />}
+            {auditLoading ? "Auditando... (pode levar 1-2 min)" : "Executar Auditoria Completa"}
+          </Button>
+
+          {auditError && (
+            <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+              ❌ {auditError}
+            </div>
+          )}
+
+          {auditResult && (
+            <div className="space-y-4">
+              {/* Summary */}
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <Card className="border">
+                  <CardContent className="p-3 text-center">
+                    <p className="text-2xl font-bold">{auditResult.summary?.supabase_aulas_with_video ?? 0}</p>
+                    <p className="text-xs text-muted-foreground">Aulas c/ vídeo</p>
+                  </CardContent>
+                </Card>
+                <Card className="border">
+                  <CardContent className="p-3 text-center">
+                    <p className="text-2xl font-bold">{auditResult.summary?.panda_total_videos ?? 0}</p>
+                    <p className="text-xs text-muted-foreground">Vídeos no Panda</p>
+                  </CardContent>
+                </Card>
+                <Card className="border border-yellow-500/50">
+                  <CardContent className="p-3 text-center">
+                    <p className="text-2xl font-bold text-yellow-600">{auditResult.summary?.inconsistent_count ?? 0}</p>
+                    <p className="text-xs text-muted-foreground">Inconsistentes</p>
+                  </CardContent>
+                </Card>
+                <Card className="border border-destructive/50">
+                  <CardContent className="p-3 text-center">
+                    <p className="text-2xl font-bold text-destructive">{auditResult.summary?.config_failed_count ?? 0}</p>
+                    <p className="text-xs text-muted-foreground">config.json 404</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Inconsistent */}
+              {auditResult.inconsistent?.length > 0 && (
+                <Card className="border-yellow-500/30">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">⚠️ Inconsistentes ({auditResult.inconsistent.length})</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Aula</TableHead>
+                          <TableHead>Video ID atual</TableHead>
+                          <TableHead>Sugestão (fuzzy)</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {auditResult.inconsistent.map((item: any, i: number) => (
+                          <TableRow key={i}>
+                            <TableCell className="text-xs">{item.aula_titulo}</TableCell>
+                            <TableCell className="font-mono text-xs">{item.current_video_id?.slice(0, 16)}…</TableCell>
+                            <TableCell className="text-xs">
+                              {item.suggestion ? (
+                                <span className="text-green-600">
+                                  ✅ {item.suggestion.panda_title} ({item.suggestion.panda_id?.slice(0, 12)}…)
+                                </span>
+                              ) : (
+                                <span className="text-destructive">Nenhuma correspondência</span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Config Failed */}
+              {auditResult.config_failed?.length > 0 && (
+                <Card className="border-destructive/30">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">❌ config.json Falhou ({auditResult.config_failed.length})</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Aula</TableHead>
+                          <TableHead>Video ID</TableHead>
+                          <TableHead>Status HTTP</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {auditResult.config_failed.map((item: any, i: number) => (
+                          <TableRow key={i}>
+                            <TableCell className="text-xs">{item.aula_titulo}</TableCell>
+                            <TableCell className="font-mono text-xs">{item.panda_video_id?.slice(0, 16)}…</TableCell>
+                            <TableCell>
+                              <Badge variant="destructive">{item.config_status}</Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Orphans */}
+              {auditResult.orphans?.length > 0 && (
+                <details className="text-xs">
+                  <summary className="cursor-pointer text-muted-foreground hover:text-foreground font-medium">
+                    🔸 Órfãos no Panda ({auditResult.orphans.length} vídeos sem referência no Supabase)
+                  </summary>
+                  <Table className="mt-2">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Título</TableHead>
+                        <TableHead>Panda ID</TableHead>
+                        <TableHead>Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {auditResult.orphans.map((item: any, i: number) => (
+                        <TableRow key={i}>
+                          <TableCell className="text-xs">{item.panda_title}</TableCell>
+                          <TableCell className="font-mono text-xs">{item.panda_id?.slice(0, 16)}…</TableCell>
+                          <TableCell><Badge variant="secondary">{item.panda_status}</Badge></TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </details>
+              )}
+
+              {/* Full JSON */}
+              <details className="text-xs">
+                <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Ver JSON completo</summary>
+                <pre className="mt-2 overflow-auto rounded-md bg-muted p-3 max-h-64">{JSON.stringify(auditResult, null, 2)}</pre>
+              </details>
+            </div>
+          )}
+        </CardContent>
+      </Card>
       {/* Setup Watermark Card */}
       <Card className="border-primary/30">
         <CardHeader>
