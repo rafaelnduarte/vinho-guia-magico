@@ -69,7 +69,7 @@ export default function PandaPlayer({
     const validateConfig = async () => {
       // Build config URL
       const configBase = `https://config.tv.pandavideo.com.br/embed/v2/${pandaVideoId}.json`;
-      const configUrl = jwt ? `${configBase}?watermark=${jwt}` : configBase;
+      const configUrl = jwt ? `${configBase}?jwt=${jwt}` : configBase;
 
       try {
         const res = await fetch(configUrl, { method: "GET" });
@@ -230,7 +230,7 @@ export default function PandaPlayer({
     loop: "false",
     playsinline: "true",
     ...(startAt > 0 ? { start: String(Math.floor(startAt)) } : {}),
-    ...(jwt ? { watermark: jwt } : {}),
+    ...(jwt ? { jwt } : {}),
   });
 
   const src = `https://player-vz-7b95acb0-d42.tv.pandavideo.com.br/embed/?${params.toString()}`;
