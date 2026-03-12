@@ -100,6 +100,22 @@ export default function AdminPandaDiagnostics() {
     }
   };
 
+  const assignAllDrm = async () => {
+    setAssignAllLoading(true);
+    setAssignAllResult(null);
+
+    const { data, error: fnErr } = await supabase.functions.invoke("panda-diagnostics", {
+      body: { action: "assign_drm_all" },
+    });
+
+    setAssignAllLoading(false);
+    if (fnErr) {
+      setAssignAllResult({ success: false, error: fnErr.message });
+    } else {
+      setAssignAllResult(data);
+    }
+  };
+
   const runSetupWatermark = async () => {
     setSetupLoading(true);
     setSetupError(null);
