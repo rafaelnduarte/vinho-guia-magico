@@ -71,10 +71,9 @@ export default function PandaPlayer({
       const configBase = `https://config.tv.pandavideo.com.br/embed/v2/${pandaVideoId}.json`;
 
       // Try with JWT first (if available)
-      if (jwt && useJwt) {
-        const configUrlWithJwt = `${configBase}?jwt=${jwt}`;
+      if (jwt) {
         try {
-          const res = await fetch(configUrlWithJwt, { method: "GET" });
+          const res = await fetch(`${configBase}?jwt=${jwt}`, { method: "GET" });
           if (cancelled) return;
 
           if (res.ok) {
@@ -82,10 +81,18 @@ export default function PandaPlayer({
             setPlayerState("ready");
             return;
           }
-          console.warn(`[PANDA] config.json with JWT failed: ${res.status}, trying without JWT...`);
+
+          if (res.status === 401 || res.status === 403) {
+            console.error(`[PANDA] config.json auth error: ${res.status}`);
+            setPlayerState("drm_error");
+            return;
+          }
+
+          // 404 or other — try without JWT
+          console.warn(`[PANDA] config.json with JWT returned ${res.status}, trying without...`);
         } catch (err) {
           if (cancelled) return;
-          console.warn("[PANDA] config.json with JWT fetch error, trying without JWT...", err);
+          console.warn("[PANDA] config.json with JWT fetch error:", err);
         }
       }
 
@@ -95,16 +102,23 @@ export default function PandaPlayer({
         if (cancelled) return;
 
         if (res.ok) {
-          console.log("[PANDA] config.json OK without JWT — proceeding without DRM");
+          console.log("[PANDA] config.json OK without JWT");
           setUseJwt(false);
           setPlayerState("ready");
           return;
         }
-        console.error(`[PANDA] config.json rejected without JWT too: ${res.status}`);
-        setPlayerState("drm_error");
+
+        if (res.status === 401 || res.status === 403) {
+          console.error(`[PANDA] config.json auth error without JWT: ${res.status}`);
+          setPlayerState("drm_error");
+          return;
+        }
+
+        // 404 or other — proceed anyway, iframe may still work
+        console.warn(`[PANDA] config.json returned ${res.status}, proceeding with iframe anyway`);
+        setPlayerState("ready");
       } catch (err) {
         if (cancelled) return;
-        // CORS or network error — proceed with iframe anyway
         console.warn("[PANDA] config.json validation failed (likely CORS), proceeding:", err);
         setPlayerState("ready");
       }
@@ -112,7 +126,7 @@ export default function PandaPlayer({
 
     validateConfig();
     return () => { cancelled = true; };
-  }, [jwtLoading, jwt, pandaVideoId, useJwt]);
+  }, [jwtLoading, jwt, pandaVideoId]);
 
   // Listen for postMessage from Panda iframe
   const handleMessage = useCallback(
