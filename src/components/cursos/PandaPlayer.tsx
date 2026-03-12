@@ -58,7 +58,7 @@ export default function PandaPlayer({
 
     fetchToken();
     return () => { cancelled = true; };
-  }, [pandaVideoId, aulaId, retryCount]);
+  }, [pandaVideoId, aulaId]);
 
   // Validate config.json before rendering iframe
   const [useJwt, setUseJwt] = useState(true);
