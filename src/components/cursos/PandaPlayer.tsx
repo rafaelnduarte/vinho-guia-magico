@@ -31,7 +31,6 @@ export default function PandaPlayer({
   const [playerState, setPlayerState] = useState<PlayerState>("loading");
   const [jwt, setJwt] = useState<string | null>(null);
   const [jwtLoading, setJwtLoading] = useState(true);
-  const [retryCount, setRetryCount] = useState(0);
 
   // Fetch JWT from panda-token edge function
   useEffect(() => {
