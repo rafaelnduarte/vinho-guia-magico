@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback, lazy, Suspense } from "react";
-import { Loader2, AlertTriangle } from "lucide-react";
+import { Loader2, AlertTriangle, ShieldAlert } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 const HLSPlayer = lazy(() => import("./HLSPlayer"));
@@ -16,6 +16,8 @@ interface PandaPlayerProps {
 
 const FALLBACK_TIMEOUT_MS = 15_000;
 
+type PlayerState = "loading" | "ready" | "drm_error" | "hls_fallback";
+
 export default function PandaPlayer({
   pandaVideoId,
   startAt = 0,
@@ -26,10 +28,10 @@ export default function PandaPlayer({
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const completedRef = useRef(false);
   const receivedMessageRef = useRef(false);
-  const [useHLS, setUseHLS] = useState(false);
-  const [iframeLoading, setIframeLoading] = useState(true);
+  const [playerState, setPlayerState] = useState<PlayerState>("loading");
   const [jwt, setJwt] = useState<string | null>(null);
   const [jwtLoading, setJwtLoading] = useState(true);
+  const [retryCount, setRetryCount] = useState(0);
 
   // Fetch JWT from panda-token edge function
   useEffect(() => {
@@ -46,10 +48,10 @@ export default function PandaPlayer({
           setJwt(data.token);
         }
         if (error) {
-          console.warn("[PANDA] JWT fetch failed, continuing without token:", error);
+          console.warn("[PANDA] JWT fetch failed:", error);
         }
       } catch (err) {
-        console.warn("[PANDA] JWT fetch error, continuing without token:", err);
+        console.warn("[PANDA] JWT fetch error:", err);
       } finally {
         if (!cancelled) setJwtLoading(false);
       }
@@ -57,7 +59,51 @@ export default function PandaPlayer({
 
     fetchToken();
     return () => { cancelled = true; };
-  }, [pandaVideoId, aulaId]);
+  }, [pandaVideoId, aulaId, retryCount]);
+
+  // Validate config.json before rendering iframe
+  useEffect(() => {
+    if (jwtLoading) return;
+
+    let cancelled = false;
+    const validateConfig = async () => {
+      // Build config URL
+      const configBase = `https://config.tv.pandavideo.com.br/embed/v2/${pandaVideoId}.json`;
+      const configUrl = jwt ? `${configBase}?jwt=${jwt}` : configBase;
+
+      try {
+        const res = await fetch(configUrl, { method: "GET" });
+
+        if (cancelled) return;
+
+        if (res.ok) {
+          console.log("[PANDA] config.json OK (200)");
+          setPlayerState("ready");
+        } else if (res.status === 404 || res.status === 401 || res.status === 403) {
+          console.error(`[PANDA] config.json rejected: ${res.status}`);
+          // If first attempt failed and we had a jwt, try re-fetching token once
+          if (retryCount === 0 && jwt) {
+            console.log("[PANDA] Retrying token fetch...");
+            setRetryCount(1);
+          } else {
+            setPlayerState("drm_error");
+          }
+        } else {
+          // Other errors — still try to load player
+          console.warn(`[PANDA] config.json unexpected status: ${res.status}, proceeding anyway`);
+          setPlayerState("ready");
+        }
+      } catch (err) {
+        if (cancelled) return;
+        // CORS or network error — can't validate, proceed with iframe
+        console.warn("[PANDA] config.json validation failed (likely CORS), proceeding:", err);
+        setPlayerState("ready");
+      }
+    };
+
+    validateConfig();
+    return () => { cancelled = true; };
+  }, [jwtLoading, jwt, pandaVideoId, retryCount]);
 
   // Listen for postMessage from Panda iframe
   const handleMessage = useCallback(
@@ -68,7 +114,6 @@ export default function PandaPlayer({
         const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
 
         receivedMessageRef.current = true;
-        setIframeLoading(false);
 
         if (data?.message === "panda_timeupdate" || data?.event === "panda_timeupdate") {
           const currentTime = data.currentTime ?? data.seconds ?? 0;
@@ -88,13 +133,14 @@ export default function PandaPlayer({
           }
         }
 
+        // Only fall back to HLS for actual playback errors, NOT auth/DRM errors
         if (
           data?.message === "panda_error" ||
           data?.event === "panda_error" ||
           data?.message === "panda_playerError"
         ) {
-          console.warn("[PANDA] Player error event received, switching to HLS fallback");
-          setUseHLS(true);
+          console.warn("[PANDA] Player error event, switching to HLS fallback");
+          setPlayerState("hls_fallback");
         }
       } catch {
         // Ignore non-JSON messages
@@ -104,17 +150,18 @@ export default function PandaPlayer({
   );
 
   useEffect(() => {
+    if (playerState !== "ready") return;
+
     completedRef.current = false;
     receivedMessageRef.current = false;
-    setUseHLS(false);
-    setIframeLoading(true);
 
     window.addEventListener("message", handleMessage);
 
+    // Only use timeout fallback when player is in "ready" state
     const timer = setTimeout(() => {
       if (!receivedMessageRef.current) {
-        console.warn("[PANDA] No postMessage received after", FALLBACK_TIMEOUT_MS, "ms — activating HLS fallback");
-        setUseHLS(true);
+        console.warn("[PANDA] No postMessage received after", FALLBACK_TIMEOUT_MS, "ms — HLS fallback");
+        setPlayerState("hls_fallback");
       }
     }, FALLBACK_TIMEOUT_MS);
 
@@ -122,10 +169,10 @@ export default function PandaPlayer({
       window.removeEventListener("message", handleMessage);
       clearTimeout(timer);
     };
-  }, [handleMessage, pandaVideoId]);
+  }, [handleMessage, pandaVideoId, playerState]);
 
-  // Wait for JWT before rendering
-  if (jwtLoading) {
+  // Loading state
+  if (jwtLoading || playerState === "loading") {
     return (
       <div className="relative w-full overflow-hidden rounded-xl bg-secondary flex items-center justify-center" style={{ aspectRatio: "16/9" }}>
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -133,16 +180,29 @@ export default function PandaPlayer({
     );
   }
 
+  // DRM/Auth error — do NOT fall back to HLS
+  if (playerState === "drm_error") {
+    return (
+      <div className="relative w-full overflow-hidden rounded-xl bg-secondary flex items-center justify-center" style={{ aspectRatio: "16/9" }}>
+        <div className="text-center space-y-3 p-6 max-w-md">
+          <ShieldAlert className="h-10 w-10 text-destructive mx-auto" />
+          <p className="text-sm font-medium text-foreground">Erro de acesso DRM</p>
+          <p className="text-xs text-muted-foreground">
+            Este vídeo não está autorizado para reprodução. Verifique se ele está associado ao grupo DRM no painel administrativo.
+          </p>
+          <p className="text-xs text-muted-foreground/60 font-mono">ID: {pandaVideoId}</p>
+        </div>
+      </div>
+    );
+  }
+
   // HLS fallback mode
-  if (useHLS) {
+  if (playerState === "hls_fallback") {
     return (
       <div className="space-y-2">
         <Suspense
           fallback={
-            <div
-              className="relative w-full overflow-hidden rounded-xl bg-secondary flex items-center justify-center"
-              style={{ aspectRatio: "16/9" }}
-            >
+            <div className="relative w-full overflow-hidden rounded-xl bg-secondary flex items-center justify-center" style={{ aspectRatio: "16/9" }}>
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           }
@@ -163,25 +223,20 @@ export default function PandaPlayer({
     );
   }
 
-  // Standard Panda iframe
+  // Standard Panda iframe (playerState === "ready")
   const params = new URLSearchParams({
     v: pandaVideoId,
     autoplay: "false",
     loop: "false",
     playsinline: "true",
     ...(startAt > 0 ? { start: String(Math.floor(startAt)) } : {}),
-    ...(jwt ? { jwt: jwt } : {}),
+    ...(jwt ? { jwt } : {}),
   });
 
   const src = `https://player-vz-7b95acb0-d42.tv.pandavideo.com.br/embed/?${params.toString()}`;
 
   return (
     <div className="relative w-full overflow-hidden rounded-xl bg-secondary" style={{ aspectRatio: "16/9" }}>
-      {iframeLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-secondary z-10">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      )}
       <iframe
         ref={iframeRef}
         src={src}
