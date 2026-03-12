@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
     let token: string | null = null;
 
     const endpoints = [
-      `https://api.pandavideo.com/watermark/groups/${DRM_GROUP_ID}/jwt?expiredAtJwt=${encodeURIComponent(expiredAt)}`,
+      `https://api-v2.pandavideo.com.br/watermark/groups/${DRM_GROUP_ID}/jwt?expiredAtJwt=${encodeURIComponent(expiredAt)}`,
       `https://api-v2.pandavideo.com.br/drm/videos/${DRM_GROUP_ID}/jwt?expiredAtJwt=${encodeURIComponent(expiredAt)}`,
     ];
 
