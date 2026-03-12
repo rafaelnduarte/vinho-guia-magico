@@ -9,6 +9,7 @@ const corsHeaders = {
 };
 
 const PANDA_BASE = "https://api-v2.pandavideo.com.br";
+const PANDA_V1 = "https://api.pandavideo.com";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -60,24 +61,33 @@ Deno.serve(async (req) => {
     const PANDA_API_KEY = Deno.env.get("PANDA_API_KEY")!;
 
     // Helper: assign a single video to DRM group
-    // Helper: assign video(s) to DRM group via PUT /drm/videos/{groupId}
+    // Helper: assign video(s) to watermark group
+    // Try v1 watermark endpoint first, then v2 /drm/videos/ fallback
     const assignVideosToGroup = async (videoIds: string[], groupId: string, apiKey: string): Promise<{ success: boolean; error?: string }> => {
-      for (const auth of [apiKey, `Bearer ${apiKey}`]) {
-        const res = await fetch(`${PANDA_BASE}/drm/videos/${groupId}`, {
-          method: "PUT",
-          headers: { "Authorization": auth, "Content-Type": "application/json" },
-          body: JSON.stringify({ video_ids: videoIds }),
-        });
-        if (res.ok) {
-          return { success: true };
-        }
-        const errText = await res.text();
-        console.warn(`[PANDA-DIAG] assign PUT failed (${auth.startsWith("Bearer") ? "Bearer" : "no-prefix"}): ${res.status} ${errText.substring(0, 300)}`);
-        if (res.status !== 401 && res.status !== 403) {
-          return { success: false, error: `${res.status}: ${errText.substring(0, 300)}` };
+      const urls = [
+        `${PANDA_V1}/watermark/groups/${groupId}`,
+        `${PANDA_BASE}/drm/videos/${groupId}`,
+      ];
+      for (const url of urls) {
+        for (const auth of [`Bearer ${apiKey}`, apiKey]) {
+          const res = await fetch(url, {
+            method: "PUT",
+            headers: { "Authorization": auth, "Content-Type": "application/json" },
+            body: JSON.stringify({ video_ids: videoIds }),
+          });
+          if (res.ok) {
+            console.log(`[PANDA-DIAG] assign PUT success via ${url}`);
+            return { success: true };
+          }
+          const errText = await res.text();
+          console.warn(`[PANDA-DIAG] assign PUT failed (${url}, ${auth.startsWith("Bearer") ? "Bearer" : "raw"}): ${res.status} ${errText.substring(0, 300)}`);
+          if (res.status !== 401 && res.status !== 403) {
+            // Non-auth error, try next URL
+            break;
+          }
         }
       }
-      return { success: false, error: "Auth failed (401/403)" };
+      return { success: false, error: "All endpoints failed" };
     };
 
     // Handle assign_drm action — associate single video with DRM group
@@ -131,31 +141,46 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: "PANDA_WATERMARK_GROUP_ID not configured" }), { status: 200, headers: corsHeaders });
       }
 
-      const res = await fetch(`${PANDA_BASE}/drm/videos/${groupId}`, {
-        method: "GET",
-        headers: { "Authorization": PANDA_API_KEY, "Content-Type": "application/json" },
-      });
+      // Try v1 watermark endpoint first, then v2
+      const urls = [
+        `${PANDA_V1}/watermark/groups/${groupId}`,
+        `${PANDA_BASE}/drm/videos/${groupId}`,
+      ];
 
-      const resText = await res.text();
-      if (!res.ok) {
-        return new Response(JSON.stringify({ error: `Panda API error ${res.status}`, detail: resText, group_id: groupId }), { status: 200, headers: corsHeaders });
+      for (const url of urls) {
+        for (const auth of [`Bearer ${PANDA_API_KEY}`, PANDA_API_KEY]) {
+          try {
+            const res = await fetch(url, {
+              method: "GET",
+              headers: { "Authorization": auth, "Content-Type": "application/json" },
+            });
+
+            if (!res.ok) continue;
+
+            const resText = await res.text();
+            try {
+              const groupData = JSON.parse(resText);
+              return new Response(JSON.stringify({
+                group_id: groupId,
+                endpoint_used: url,
+                name: groupData.name,
+                active: groupData.active,
+                has_secret: !!groupData.secret,
+                secret_preview: groupData.secret ? groupData.secret.substring(0, 8) + "..." : null,
+                video_count: groupData.videos?.length || groupData.video_ids?.length || 0,
+                videos: (groupData.videos || groupData.video_ids || []).slice(0, 10).map((v: any) => typeof v === 'string' ? { id: v } : { id: v.id || v, title: v.title }),
+                raw_keys: Object.keys(groupData),
+              }), { status: 200, headers: corsHeaders });
+            } catch {
+              return new Response(JSON.stringify({ error: "Failed to parse response", raw: resText.substring(0, 500) }), { status: 200, headers: corsHeaders });
+            }
+          } catch (e) {
+            console.warn(`[PANDA-DIAG] group_info fetch failed (${url}):`, (e as Error).message);
+          }
+        }
       }
 
-      try {
-        const groupData = JSON.parse(resText);
-        return new Response(JSON.stringify({
-          group_id: groupId,
-          name: groupData.name,
-          active: groupData.active,
-          has_secret: !!groupData.secret,
-          secret_preview: groupData.secret ? groupData.secret.substring(0, 8) + "..." : null,
-          video_count: groupData.videos?.length || 0,
-          videos: (groupData.videos || []).slice(0, 10).map((v: any) => ({ id: v.id || v, title: v.title })),
-          raw_keys: Object.keys(groupData),
-        }), { status: 200, headers: corsHeaders });
-      } catch {
-        return new Response(JSON.stringify({ error: "Failed to parse group response", raw: resText.substring(0, 500) }), { status: 200, headers: corsHeaders });
-      }
+      return new Response(JSON.stringify({ error: "All endpoints failed for group_info", group_id: groupId }), { status: 200, headers: corsHeaders });
     }
 
     if (!video_id) {
