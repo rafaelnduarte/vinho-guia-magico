@@ -60,26 +60,27 @@ Deno.serve(async (req) => {
     const PANDA_API_KEY = Deno.env.get("PANDA_API_KEY")!;
 
     // Helper: assign a single video to DRM group
-    const assignSingleVideo = async (vid: string, groupId: string, apiKey: string): Promise<{ success: boolean; video_id: string; error?: string }> => {
-      // Try Bearer first, then no-prefix
-      for (const auth of [`Bearer ${apiKey}`, apiKey]) {
-        const res = await fetch(`${PANDA_BASE}/videos/${vid}`, {
+    // Helper: assign video(s) to DRM group via PUT /drm/videos/{groupId}
+    const assignVideosToGroup = async (videoIds: string[], groupId: string, apiKey: string): Promise<{ success: boolean; error?: string }> => {
+      for (const auth of [apiKey, `Bearer ${apiKey}`]) {
+        const res = await fetch(`${PANDA_BASE}/drm/videos/${groupId}`, {
           method: "PUT",
           headers: { "Authorization": auth, "Content-Type": "application/json" },
-          body: JSON.stringify({ drm_group_id: groupId }),
+          body: JSON.stringify({ video_ids: videoIds }),
         });
         if (res.ok) {
-          return { success: true, video_id: vid };
+          return { success: true };
         }
         const errText = await res.text();
+        console.warn(`[PANDA-DIAG] assign PUT failed (${auth.startsWith("Bearer") ? "Bearer" : "no-prefix"}): ${res.status} ${errText.substring(0, 300)}`);
         if (res.status !== 401 && res.status !== 403) {
-          return { success: false, video_id: vid, error: `${res.status}: ${errText.substring(0, 200)}` };
+          return { success: false, error: `${res.status}: ${errText.substring(0, 300)}` };
         }
       }
-      return { success: false, video_id: vid, error: "Auth failed (401/403)" };
+      return { success: false, error: "Auth failed (401/403)" };
     };
 
-    // Handle assign_drm action — associate video with DRM group
+    // Handle assign_drm action — associate single video with DRM group
     if (action === "assign_drm") {
       const vid = body.video_id;
       const groupId = Deno.env.get("PANDA_WATERMARK_GROUP_ID");
@@ -88,8 +89,8 @@ Deno.serve(async (req) => {
       }
 
       console.log(`[PANDA-DIAG] Assigning video ${vid} to DRM group ${groupId}`);
-      const result = await assignSingleVideo(vid, groupId, PANDA_API_KEY);
-      return new Response(JSON.stringify(result), { status: 200, headers: corsHeaders });
+      const result = await assignVideosToGroup([vid], groupId, PANDA_API_KEY);
+      return new Response(JSON.stringify({ ...result, video_id: vid, group_id: groupId }), { status: 200, headers: corsHeaders });
     }
 
     // Handle assign_drm_all — bulk associate ALL aulas videos to DRM group
@@ -109,23 +110,18 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ success: false, error: aulasErr?.message || "No aulas with panda_video_id found", total: 0 }), { status: 200, headers: corsHeaders });
       }
 
-      const uniqueIds = [...new Set(aulas.map((a: any) => a.panda_video_id).filter(Boolean))];
-      console.log(`[PANDA-DIAG] assign_drm_all: ${uniqueIds.length} unique videos`);
+      const uniqueIds = [...new Set(aulas.map((a: any) => a.panda_video_id).filter(Boolean))] as string[];
+      console.log(`[PANDA-DIAG] assign_drm_all: ${uniqueIds.length} unique videos to group ${groupId}`);
 
-      const results = { total: uniqueIds.length, success: 0, failed: 0, errors: [] as any[] };
+      // Send all video_ids in a single PUT request
+      const result = await assignVideosToGroup(uniqueIds, groupId, PANDA_API_KEY);
 
-      for (const vid of uniqueIds) {
-        const r = await assignSingleVideo(vid, groupId, PANDA_API_KEY);
-        if (r.success) {
-          results.success++;
-        } else {
-          results.failed++;
-          results.errors.push({ video_id: vid, error: r.error });
-        }
-      }
-
-      console.log(`[PANDA-DIAG] assign_drm_all done: ${results.success}/${results.total} success`);
-      return new Response(JSON.stringify({ success: results.failed === 0, ...results }), { status: 200, headers: corsHeaders });
+      console.log(`[PANDA-DIAG] assign_drm_all result: ${result.success ? "SUCCESS" : "FAILED"}`);
+      return new Response(JSON.stringify({
+        success: result.success,
+        total: uniqueIds.length,
+        error: result.error || undefined,
+      }), { status: 200, headers: corsHeaders });
     }
 
     // Handle group_info action
