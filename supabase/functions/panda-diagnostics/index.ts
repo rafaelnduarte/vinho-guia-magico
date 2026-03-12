@@ -61,24 +61,33 @@ Deno.serve(async (req) => {
     const PANDA_API_KEY = Deno.env.get("PANDA_API_KEY")!;
 
     // Helper: assign a single video to DRM group
-    // Helper: assign video(s) to DRM group via PUT /drm/videos/{groupId}
+    // Helper: assign video(s) to watermark group
+    // Try v1 watermark endpoint first, then v2 /drm/videos/ fallback
     const assignVideosToGroup = async (videoIds: string[], groupId: string, apiKey: string): Promise<{ success: boolean; error?: string }> => {
-      for (const auth of [apiKey, `Bearer ${apiKey}`]) {
-        const res = await fetch(`${PANDA_BASE}/drm/videos/${groupId}`, {
-          method: "PUT",
-          headers: { "Authorization": auth, "Content-Type": "application/json" },
-          body: JSON.stringify({ video_ids: videoIds }),
-        });
-        if (res.ok) {
-          return { success: true };
-        }
-        const errText = await res.text();
-        console.warn(`[PANDA-DIAG] assign PUT failed (${auth.startsWith("Bearer") ? "Bearer" : "no-prefix"}): ${res.status} ${errText.substring(0, 300)}`);
-        if (res.status !== 401 && res.status !== 403) {
-          return { success: false, error: `${res.status}: ${errText.substring(0, 300)}` };
+      const urls = [
+        `${PANDA_V1}/watermark/groups/${groupId}`,
+        `${PANDA_BASE}/drm/videos/${groupId}`,
+      ];
+      for (const url of urls) {
+        for (const auth of [`Bearer ${apiKey}`, apiKey]) {
+          const res = await fetch(url, {
+            method: "PUT",
+            headers: { "Authorization": auth, "Content-Type": "application/json" },
+            body: JSON.stringify({ video_ids: videoIds }),
+          });
+          if (res.ok) {
+            console.log(`[PANDA-DIAG] assign PUT success via ${url}`);
+            return { success: true };
+          }
+          const errText = await res.text();
+          console.warn(`[PANDA-DIAG] assign PUT failed (${url}, ${auth.startsWith("Bearer") ? "Bearer" : "raw"}): ${res.status} ${errText.substring(0, 300)}`);
+          if (res.status !== 401 && res.status !== 403) {
+            // Non-auth error, try next URL
+            break;
+          }
         }
       }
-      return { success: false, error: "Auth failed (401/403)" };
+      return { success: false, error: "All endpoints failed" };
     };
 
     // Handle assign_drm action — associate single video with DRM group
