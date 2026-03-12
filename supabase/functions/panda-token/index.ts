@@ -93,6 +93,19 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
     }
 
+    // Verify active membership using service role client
+    const adminClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+    const { data: hasAccess } = await adminClient.rpc("has_active_access", { _user_id: user.id });
+    if (!hasAccess) {
+      return new Response(
+        JSON.stringify({ error: "Forbidden", message: "Active membership required" }),
+        { status: 403, headers: corsHeaders }
+      );
+    }
+
     const { video_id } = await req.json();
     if (!video_id) {
       return new Response(JSON.stringify({ error: "video_id is required" }), { status: 400, headers: corsHeaders });
