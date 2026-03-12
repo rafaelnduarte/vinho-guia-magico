@@ -10,6 +10,24 @@ const corsHeaders = {
 
 const PANDA_BASE = "https://api-v2.pandavideo.com";
 
+function normalizeScrappy(str: string): string {
+  return (str || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\.(mp4|mov|mkv|avi)$/g, "")
+    .replace(/modulo\s*\d+/g, "")
+    .replace(/\bpp\b/g, "")
+    .replace(/\bparte\s*\d+/g, "")
+    .replace(/\b\d+\s*-\s*/g, "")
+    .replace(/\b\d+\.\s*/g, "")
+    .replace(/-/g, " ")
+    .replace(/_/g, " ")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function mapPandaStatus(pandaStatus: string): string {
   if (pandaStatus === "CONVERTED") return "completed";
   if (pandaStatus === "FAILED" || pandaStatus === "ERROR") return "failed";
@@ -86,15 +104,17 @@ Deno.serve(async (req) => {
     const results = {
       folders_synced: 0,
       videos_synced: 0,
+      normalized_count: 0,
       errors: [] as string[],
     };
+
+    // Track all synced panda_video_ids for orphan cleanup
+    const allSyncedVideoIds: string[] = [];
 
     // Determine which folders to sync
     let foldersToSync: Array<{ id: string; name: string }> = [];
 
     if (targetFolderId) {
-      // Per-course sync: just use that folder
-      // Fetch folder info from Panda to get name
       const folderRes = await fetch(`${PANDA_BASE}/folders/${targetFolderId}`, {
         headers: { Authorization: apiKey, Accept: "application/json" },
       });
@@ -102,11 +122,9 @@ Deno.serve(async (req) => {
         const folderData = await folderRes.json();
         foldersToSync = [{ id: targetFolderId, name: folderData.name || targetFolderId }];
       } else {
-        // Fallback: just use the ID
         foldersToSync = [{ id: targetFolderId, name: targetFolderId }];
       }
     } else {
-      // Full sync: fetch all folders from Panda
       const foldersRes = await fetch(`${PANDA_BASE}/folders`, {
         headers: { Authorization: apiKey, Accept: "application/json" },
       });
@@ -115,13 +133,14 @@ Deno.serve(async (req) => {
     }
 
     for (const folder of foldersToSync) {
-      // PASSO 1 — Upsert curso + fetch id
+      // PASSO 1 — Upsert curso with titulo_normalizado
       const { error: cursoUpsertErr } = await supabase
         .from("cursos")
         .upsert(
           {
             panda_folder_id: folder.id,
             titulo: folder.name,
+            titulo_normalizado: normalizeScrappy(folder.name),
             is_published: false,
           },
           { onConflict: "panda_folder_id" }
@@ -158,15 +177,25 @@ Deno.serve(async (req) => {
       console.log(`videos a sincronizar: ${videos.length}`);
 
       const syncedVideoIds: string[] = [];
+      const indexRows: Array<{
+        panda_video_id: string;
+        titulo_original: string;
+        titulo_normalizado: string;
+        curso_id: string;
+        last_synced_at: string;
+      }> = [];
 
       for (const [index, video] of videos.entries()) {
         console.log(`Syncing video [${index + 1}/${videos.length}]: "${video.title}" (id=${video.id})`);
+
+        const tituloNormalizado = normalizeScrappy(video.title || "");
 
         const { error: aulaError } = await supabase.from("aulas").upsert(
           {
             panda_video_id: video.id,
             curso_id: cursoId,
             titulo: video.title || "Sem título",
+            titulo_normalizado: tituloNormalizado,
             descricao: "",
             duracao_segundos: Math.floor(video.length || 0),
             sort_order: index + 1,
@@ -182,9 +211,35 @@ Deno.serve(async (req) => {
           results.errors.push(`${video.title}: ${aulaError.message}`);
           continue;
         }
-        console.log(`Video "${video.title}" synced OK`);
+
+        console.log(`Video "${video.title}" synced OK → normalized: "${tituloNormalizado}"`);
         syncedVideoIds.push(video.id);
+        allSyncedVideoIds.push(video.id);
         results.videos_synced++;
+        results.normalized_count++;
+
+        // Prepare index row
+        indexRows.push({
+          panda_video_id: video.id,
+          titulo_original: video.title || "Sem título",
+          titulo_normalizado: tituloNormalizado,
+          curso_id: cursoId,
+          last_synced_at: new Date().toISOString(),
+        });
+      }
+
+      // PASSO 3 — Upsert panda_title_index for this folder
+      if (indexRows.length > 0) {
+        const { error: indexError } = await supabase
+          .from("panda_title_index")
+          .upsert(indexRows, { onConflict: "panda_video_id" });
+
+        if (indexError) {
+          console.error(`Index upsert error for folder "${folder.name}": ${indexError.message}`);
+          results.errors.push(`Index ${folder.name}: ${indexError.message}`);
+        } else {
+          console.log(`Index updated: ${indexRows.length} entries for folder "${folder.name}"`);
+        }
       }
 
       // Assign profile to all synced videos
@@ -210,10 +265,25 @@ Deno.serve(async (req) => {
           console.log(`Profile assignment for folder "${folder.name}": status=${profileRes.status} body=${profileBody}`);
         } catch (profileErr) {
           console.error(`Profile assignment error for folder "${folder.name}":`, profileErr);
-          results.errors.push(`Profile assignment ${folder.name}: ${profileErr.message}`);
+          results.errors.push(`Profile assignment ${folder.name}: ${(profileErr as Error).message}`);
         }
       } else if (!profileId) {
         console.log("PANDA_PROFILE_ID not set, skipping profile assignment");
+      }
+    }
+
+    // PASSO 4 — Full sync: clean orphan entries from panda_title_index
+    if (!targetFolderId && allSyncedVideoIds.length > 0) {
+      const { error: cleanupError, count } = await supabase
+        .from("panda_title_index")
+        .delete()
+        .not("panda_video_id", "in", `(${allSyncedVideoIds.join(",")})`);
+
+      if (cleanupError) {
+        console.error(`Orphan cleanup error: ${cleanupError.message}`);
+        results.errors.push(`Orphan cleanup: ${cleanupError.message}`);
+      } else {
+        console.log(`Orphan cleanup: removed ${count ?? 0} stale index entries`);
       }
     }
 
@@ -226,7 +296,7 @@ Deno.serve(async (req) => {
       { status: 200, headers: corsHeaders }
     );
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
+    return new Response(JSON.stringify({ error: (err as Error).message }), {
       status: 500,
       headers: corsHeaders,
     });
