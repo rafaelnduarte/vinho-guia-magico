@@ -66,6 +66,24 @@ export default function AdminPandaDiagnostics() {
   const [assignDrmResult, setAssignDrmResult] = useState<any>(null);
   const [assignAllLoading, setAssignAllLoading] = useState(false);
   const [assignAllResult, setAssignAllResult] = useState<any>(null);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditResult, setAuditResult] = useState<any>(null);
+  const [auditError, setAuditError] = useState<string | null>(null);
+
+  const runAudit = async () => {
+    setAuditLoading(true);
+    setAuditError(null);
+    setAuditResult(null);
+
+    const { data, error: fnErr } = await supabase.functions.invoke("panda-audit");
+
+    setAuditLoading(false);
+    if (fnErr) {
+      setAuditError(fnErr.message);
+    } else {
+      setAuditResult(data);
+    }
+  };
 
   const fetchGroupInfo = async () => {
     setGroupInfoLoading(true);
