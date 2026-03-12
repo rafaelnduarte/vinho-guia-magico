@@ -136,6 +136,7 @@ export type Database = {
           status: string
           thumbnail_url: string | null
           titulo: string
+          titulo_normalizado: string | null
           updated_at: string
         }
         Insert: {
@@ -151,6 +152,7 @@ export type Database = {
           status?: string
           thumbnail_url?: string | null
           titulo: string
+          titulo_normalizado?: string | null
           updated_at?: string
         }
         Update: {
@@ -166,6 +168,7 @@ export type Database = {
           status?: string
           thumbnail_url?: string | null
           titulo?: string
+          titulo_normalizado?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -305,6 +308,7 @@ export type Database = {
           sort_order: number
           tipo: string
           titulo: string
+          titulo_normalizado: string | null
           updated_at: string
         }
         Insert: {
@@ -317,6 +321,7 @@ export type Database = {
           sort_order?: number
           tipo?: string
           titulo: string
+          titulo_normalizado?: string | null
           updated_at?: string
         }
         Update: {
@@ -329,6 +334,7 @@ export type Database = {
           sort_order?: number
           tipo?: string
           titulo?: string
+          titulo_normalizado?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -491,6 +497,30 @@ export type Database = {
           status?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      panda_title_index: {
+        Row: {
+          curso_id: string | null
+          last_synced_at: string
+          panda_video_id: string
+          titulo_normalizado: string
+          titulo_original: string
+        }
+        Insert: {
+          curso_id?: string | null
+          last_synced_at?: string
+          panda_video_id: string
+          titulo_normalizado: string
+          titulo_original: string
+        }
+        Update: {
+          curso_id?: string | null
+          last_synced_at?: string
+          panda_video_id?: string
+          titulo_normalizado?: string
+          titulo_original?: string
         }
         Relationships: []
       }
