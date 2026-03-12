@@ -31,6 +31,7 @@ export default function PandaPlayer({
   const [playerState, setPlayerState] = useState<PlayerState>("loading");
   const [jwt, setJwt] = useState<string | null>(null);
   const [jwtLoading, setJwtLoading] = useState(true);
+  const [retryCount, setRetryCount] = useState(0);
 
   // Fetch JWT from panda-token edge function
   useEffect(() => {
@@ -58,67 +59,43 @@ export default function PandaPlayer({
 
     fetchToken();
     return () => { cancelled = true; };
-  }, [pandaVideoId, aulaId]);
+  }, [pandaVideoId, aulaId, retryCount]);
 
   // Validate config.json before rendering iframe
-  const [useJwt, setUseJwt] = useState(true);
-
   useEffect(() => {
     if (jwtLoading) return;
 
     let cancelled = false;
     const validateConfig = async () => {
+      // Build config URL
       const configBase = `https://config.tv.pandavideo.com.br/embed/v2/${pandaVideoId}.json`;
+      const configUrl = jwt ? `${configBase}?jwt=${jwt}` : configBase;
 
-      // Try with JWT first (if available)
-      if (jwt) {
-        try {
-          const res = await fetch(`${configBase}?jwt=${jwt}`, { method: "GET" });
-          if (cancelled) return;
-
-          if (res.ok) {
-            console.log("[PANDA] config.json OK with JWT");
-            setPlayerState("ready");
-            return;
-          }
-
-          if (res.status === 401 || res.status === 403) {
-            console.error(`[PANDA] config.json auth error: ${res.status}`);
-            setPlayerState("drm_error");
-            return;
-          }
-
-          // 404 or other — try without JWT
-          console.warn(`[PANDA] config.json with JWT returned ${res.status}, trying without...`);
-        } catch (err) {
-          if (cancelled) return;
-          console.warn("[PANDA] config.json with JWT fetch error:", err);
-        }
-      }
-
-      // Fallback: try WITHOUT JWT
       try {
-        const res = await fetch(configBase, { method: "GET" });
+        const res = await fetch(configUrl, { method: "GET" });
+
         if (cancelled) return;
 
         if (res.ok) {
-          console.log("[PANDA] config.json OK without JWT");
-          setUseJwt(false);
+          console.log("[PANDA] config.json OK (200)");
           setPlayerState("ready");
-          return;
+        } else if (res.status === 404 || res.status === 401 || res.status === 403) {
+          console.error(`[PANDA] config.json rejected: ${res.status}`);
+          // If first attempt failed and we had a jwt, try re-fetching token once
+          if (retryCount === 0 && jwt) {
+            console.log("[PANDA] Retrying token fetch...");
+            setRetryCount(1);
+          } else {
+            setPlayerState("drm_error");
+          }
+        } else {
+          // Other errors — still try to load player
+          console.warn(`[PANDA] config.json unexpected status: ${res.status}, proceeding anyway`);
+          setPlayerState("ready");
         }
-
-        if (res.status === 401 || res.status === 403) {
-          console.error(`[PANDA] config.json auth error without JWT: ${res.status}`);
-          setPlayerState("drm_error");
-          return;
-        }
-
-        // 404 or other — proceed anyway, iframe may still work
-        console.warn(`[PANDA] config.json returned ${res.status}, proceeding with iframe anyway`);
-        setPlayerState("ready");
       } catch (err) {
         if (cancelled) return;
+        // CORS or network error — can't validate, proceed with iframe
         console.warn("[PANDA] config.json validation failed (likely CORS), proceeding:", err);
         setPlayerState("ready");
       }
@@ -126,7 +103,7 @@ export default function PandaPlayer({
 
     validateConfig();
     return () => { cancelled = true; };
-  }, [jwtLoading, jwt, pandaVideoId]);
+  }, [jwtLoading, jwt, pandaVideoId, retryCount]);
 
   // Listen for postMessage from Panda iframe
   const handleMessage = useCallback(
@@ -253,7 +230,7 @@ export default function PandaPlayer({
     loop: "false",
     playsinline: "true",
     ...(startAt > 0 ? { start: String(Math.floor(startAt)) } : {}),
-    ...(jwt && useJwt ? { jwt } : {}),
+    ...(jwt ? { jwt } : {}),
   });
 
   const src = `https://player-vz-7b95acb0-d42.tv.pandavideo.com.br/embed/?${params.toString()}`;
