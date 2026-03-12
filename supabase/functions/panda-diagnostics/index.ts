@@ -141,31 +141,46 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: "PANDA_WATERMARK_GROUP_ID not configured" }), { status: 200, headers: corsHeaders });
       }
 
-      const res = await fetch(`${PANDA_BASE}/drm/videos/${groupId}`, {
-        method: "GET",
-        headers: { "Authorization": PANDA_API_KEY, "Content-Type": "application/json" },
-      });
+      // Try v1 watermark endpoint first, then v2
+      const urls = [
+        `${PANDA_V1}/watermark/groups/${groupId}`,
+        `${PANDA_BASE}/drm/videos/${groupId}`,
+      ];
 
-      const resText = await res.text();
-      if (!res.ok) {
-        return new Response(JSON.stringify({ error: `Panda API error ${res.status}`, detail: resText, group_id: groupId }), { status: 200, headers: corsHeaders });
+      for (const url of urls) {
+        for (const auth of [`Bearer ${PANDA_API_KEY}`, PANDA_API_KEY]) {
+          try {
+            const res = await fetch(url, {
+              method: "GET",
+              headers: { "Authorization": auth, "Content-Type": "application/json" },
+            });
+
+            if (!res.ok) continue;
+
+            const resText = await res.text();
+            try {
+              const groupData = JSON.parse(resText);
+              return new Response(JSON.stringify({
+                group_id: groupId,
+                endpoint_used: url,
+                name: groupData.name,
+                active: groupData.active,
+                has_secret: !!groupData.secret,
+                secret_preview: groupData.secret ? groupData.secret.substring(0, 8) + "..." : null,
+                video_count: groupData.videos?.length || groupData.video_ids?.length || 0,
+                videos: (groupData.videos || groupData.video_ids || []).slice(0, 10).map((v: any) => typeof v === 'string' ? { id: v } : { id: v.id || v, title: v.title }),
+                raw_keys: Object.keys(groupData),
+              }), { status: 200, headers: corsHeaders });
+            } catch {
+              return new Response(JSON.stringify({ error: "Failed to parse response", raw: resText.substring(0, 500) }), { status: 200, headers: corsHeaders });
+            }
+          } catch (e) {
+            console.warn(`[PANDA-DIAG] group_info fetch failed (${url}):`, (e as Error).message);
+          }
+        }
       }
 
-      try {
-        const groupData = JSON.parse(resText);
-        return new Response(JSON.stringify({
-          group_id: groupId,
-          name: groupData.name,
-          active: groupData.active,
-          has_secret: !!groupData.secret,
-          secret_preview: groupData.secret ? groupData.secret.substring(0, 8) + "..." : null,
-          video_count: groupData.videos?.length || 0,
-          videos: (groupData.videos || []).slice(0, 10).map((v: any) => ({ id: v.id || v, title: v.title })),
-          raw_keys: Object.keys(groupData),
-        }), { status: 200, headers: corsHeaders });
-      } catch {
-        return new Response(JSON.stringify({ error: "Failed to parse group response", raw: resText.substring(0, 500) }), { status: 200, headers: corsHeaders });
-      }
+      return new Response(JSON.stringify({ error: "All endpoints failed for group_info", group_id: groupId }), { status: 200, headers: corsHeaders });
     }
 
     if (!video_id) {
