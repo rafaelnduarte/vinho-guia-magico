@@ -239,7 +239,7 @@ export default function PandaPlayer({
     loop: "false",
     playsinline: "true",
     ...(startAt > 0 ? { start: String(Math.floor(startAt)) } : {}),
-    ...(jwt ? { jwt } : {}),
+    ...(jwt && useJwt ? { jwt } : {}),
   });
 
   const src = `https://player-vz-7b95acb0-d42.tv.pandavideo.com.br/embed/?${params.toString()}`;
