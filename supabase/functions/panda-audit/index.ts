@@ -365,6 +365,8 @@ Deno.serve(async (req) => {
         inconsistent_count: inconsistent.length,
         orphan_count: orphans.length,
         config_ok_count: configOkCount,
+        config_drm_jwt_ok_count: configDrmJwtOkCount,
+        config_api_exists_count: configApiExistsCount,
         config_failed_count: configFailed.length,
         used_local_index: !!(indexVideos && indexVideos.length > 0),
       },
