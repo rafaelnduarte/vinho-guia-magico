@@ -325,9 +325,15 @@ Deno.serve(async (req) => {
     // Step 4: Validate config.json for all Supabase videos
     const configFailed: any[] = [];
     let configOkCount = 0;
+    let configDrmJwtOkCount = 0;
+    let configApiExistsCount = 0;
 
     for (const aula of aulasWithVideo) {
-      const result = await validateConfig(aula.panda_video_id);
+      const result = await validateConfig(aula.panda_video_id, {
+        jwt: drmJwt,
+        pandaApiKey: PANDA_API_KEY,
+      });
+
       if (!result.ok) {
         configFailed.push({
           aula_id: aula.id,
@@ -335,14 +341,19 @@ Deno.serve(async (req) => {
           panda_video_id: aula.panda_video_id,
           config_status: result.status,
           config_ok: result.ok,
+          config_mode: result.mode,
         });
       } else {
         configOkCount++;
+        if (result.mode === "drm_jwt") configDrmJwtOkCount++;
+        if (result.mode === "api_exists") configApiExistsCount++;
       }
       await new Promise((r) => setTimeout(r, 100));
     }
 
     console.log(`✅ config.json OK: ${configOkCount}`);
+    console.log(`🔐 config.json OK via JWT: ${configDrmJwtOkCount}`);
+    console.log(`📦 config validado por existência API: ${configApiExistsCount}`);
     console.log(`❌ config.json FAILED: ${configFailed.length}`);
 
     const report = {
