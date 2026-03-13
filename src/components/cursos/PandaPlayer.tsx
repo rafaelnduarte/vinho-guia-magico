@@ -16,7 +16,7 @@ interface PandaPlayerProps {
 
 const FALLBACK_TIMEOUT_MS = 15_000;
 
-type PlayerState = "loading" | "ready" | "drm_error" | "hls_fallback";
+type PlayerState = "loading" | "ready" | "drm_error" | "not_found" | "hls_fallback";
 
 export default function PandaPlayer({
   pandaVideoId,
