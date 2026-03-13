@@ -234,10 +234,16 @@ export default function AdminCursos() {
         <h2 className="text-xl font-bold text-foreground">
           CURSOS {cursoList.length > 0 && `(${cursoList.length})`}
         </h2>
-        <Button variant="outline" size="sm" onClick={handleSync} disabled={syncing}>
-          <Download className="h-4 w-4 mr-1" />
-          {syncing ? "Sincronizando..." : "Sincronizar com Panda"}
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={handleIncrementalSync} disabled={syncing}>
+            <RefreshCw className={`h-4 w-4 mr-1 ${syncing ? "animate-spin" : ""}`} />
+            {syncing ? "Sincronizando..." : "Sync Rápido"}
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleSync} disabled={syncing}>
+            <Download className="h-4 w-4 mr-1" />
+            {syncing ? "Sincronizando..." : "Sync Completo"}
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
