@@ -55,108 +55,7 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { video_id, action } = body;
-
-    const PANDA_API_KEY = Deno.env.get("PANDA_API_KEY")!;
-
-    // Helper: assign a single video to DRM group
-    // Helper: assign video(s) to DRM group via PUT /drm/videos/{groupId}
-    const assignVideosToGroup = async (videoIds: string[], groupId: string, apiKey: string): Promise<{ success: boolean; error?: string }> => {
-      for (const auth of [apiKey, `Bearer ${apiKey}`]) {
-        const res = await fetch(`${PANDA_BASE}/drm/videos/${groupId}`, {
-          method: "PUT",
-          headers: { "Authorization": auth, "Content-Type": "application/json" },
-          body: JSON.stringify({ video_ids: videoIds }),
-        });
-        if (res.ok) {
-          return { success: true };
-        }
-        const errText = await res.text();
-        console.warn(`[PANDA-DIAG] assign PUT failed (${auth.startsWith("Bearer") ? "Bearer" : "no-prefix"}): ${res.status} ${errText.substring(0, 300)}`);
-        if (res.status !== 401 && res.status !== 403) {
-          return { success: false, error: `${res.status}: ${errText.substring(0, 300)}` };
-        }
-      }
-      return { success: false, error: "Auth failed (401/403)" };
-    };
-
-    // Handle assign_drm action — associate single video with DRM group
-    if (action === "assign_drm") {
-      const vid = body.video_id;
-      const groupId = Deno.env.get("PANDA_WATERMARK_GROUP_ID");
-      if (!vid || !groupId) {
-        return new Response(JSON.stringify({ success: false, error: "video_id and PANDA_WATERMARK_GROUP_ID required" }), { status: 200, headers: corsHeaders });
-      }
-
-      console.log(`[PANDA-DIAG] Assigning video ${vid} to DRM group ${groupId}`);
-      const result = await assignVideosToGroup([vid], groupId, PANDA_API_KEY);
-      return new Response(JSON.stringify({ ...result, video_id: vid, group_id: groupId }), { status: 200, headers: corsHeaders });
-    }
-
-    // Handle assign_drm_all — bulk associate ALL aulas videos to DRM group
-    if (action === "assign_drm_all") {
-      const groupId = Deno.env.get("PANDA_WATERMARK_GROUP_ID");
-      if (!groupId) {
-        return new Response(JSON.stringify({ success: false, error: "PANDA_WATERMARK_GROUP_ID not configured" }), { status: 200, headers: corsHeaders });
-      }
-
-      const adminSupa = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-      const { data: aulas, error: aulasErr } = await adminSupa
-        .from("aulas")
-        .select("panda_video_id, titulo")
-        .not("panda_video_id", "is", null);
-
-      if (aulasErr || !aulas?.length) {
-        return new Response(JSON.stringify({ success: false, error: aulasErr?.message || "No aulas with panda_video_id found", total: 0 }), { status: 200, headers: corsHeaders });
-      }
-
-      const uniqueIds = [...new Set(aulas.map((a: any) => a.panda_video_id).filter(Boolean))] as string[];
-      console.log(`[PANDA-DIAG] assign_drm_all: ${uniqueIds.length} unique videos to group ${groupId}`);
-
-      // Send all video_ids in a single PUT request
-      const result = await assignVideosToGroup(uniqueIds, groupId, PANDA_API_KEY);
-
-      console.log(`[PANDA-DIAG] assign_drm_all result: ${result.success ? "SUCCESS" : "FAILED"}`);
-      return new Response(JSON.stringify({
-        success: result.success,
-        total: uniqueIds.length,
-        error: result.error || undefined,
-      }), { status: 200, headers: corsHeaders });
-    }
-
-    // Handle group_info action
-    if (action === "group_info") {
-      const groupId = Deno.env.get("PANDA_WATERMARK_GROUP_ID");
-      if (!groupId) {
-        return new Response(JSON.stringify({ error: "PANDA_WATERMARK_GROUP_ID not configured" }), { status: 200, headers: corsHeaders });
-      }
-
-      const res = await fetch(`${PANDA_BASE}/drm/videos/${groupId}`, {
-        method: "GET",
-        headers: { "Authorization": PANDA_API_KEY, "Content-Type": "application/json" },
-      });
-
-      const resText = await res.text();
-      if (!res.ok) {
-        return new Response(JSON.stringify({ error: `Panda API error ${res.status}`, detail: resText, group_id: groupId }), { status: 200, headers: corsHeaders });
-      }
-
-      try {
-        const groupData = JSON.parse(resText);
-        return new Response(JSON.stringify({
-          group_id: groupId,
-          name: groupData.name,
-          active: groupData.active,
-          has_secret: !!groupData.secret,
-          secret_preview: groupData.secret ? groupData.secret.substring(0, 8) + "..." : null,
-          video_count: groupData.videos?.length || 0,
-          videos: (groupData.videos || []).slice(0, 10).map((v: any) => ({ id: v.id || v, title: v.title })),
-          raw_keys: Object.keys(groupData),
-        }), { status: 200, headers: corsHeaders });
-      } catch {
-        return new Response(JSON.stringify({ error: "Failed to parse group response", raw: resText.substring(0, 500) }), { status: 200, headers: corsHeaders });
-      }
-    }
+    const { video_id } = body;
 
     if (!video_id) {
       return new Response(
@@ -178,9 +77,14 @@ Deno.serve(async (req) => {
     // CHECK 1: Video status on Panda
     let videoData: any = null;
     try {
-      const res = await fetch(`${PANDA_BASE}/videos/${video_id}`, {
-        headers: { Authorization: pandaApiKey, Accept: "application/json" },
+      let res = await fetch(`${PANDA_BASE}/videos/${video_id}`, {
+        headers: { Authorization: `Bearer ${pandaApiKey}`, Accept: "application/json" },
       });
+      if (res.status === 401) {
+        res = await fetch(`${PANDA_BASE}/videos/${video_id}`, {
+          headers: { Authorization: pandaApiKey, Accept: "application/json" },
+        });
+      }
       if (!res.ok) {
         checks.video_status = {
           status: "ERROR",
@@ -196,7 +100,6 @@ Deno.serve(async (req) => {
           duration: videoData.duration ?? 0,
           title: videoData.title ?? "",
           folder_id: videoData.folder_id ?? null,
-          profile_id: videoData.profile_id ?? null,
         };
       }
     } catch (e) {
@@ -221,7 +124,7 @@ Deno.serve(async (req) => {
 
     const { data: aula, error: aulaErr } = await adminSupa
       .from("aulas")
-      .select("id, titulo, is_published, status, curso_id")
+      .select("id, titulo, is_published, status, curso_id, embed_url")
       .eq("panda_video_id", video_id)
       .maybeSingle();
 
@@ -240,6 +143,22 @@ Deno.serve(async (req) => {
         is_published: aula.is_published,
         aula_status: aula.status,
         curso_id: aula.curso_id,
+        embed_url: aula.embed_url ? "✅ presente" : "❌ ausente",
+      };
+    }
+
+    // CHECK 4: Embed URL
+    checks.embed = {
+      status: aula?.embed_url ? "OK" : "WARNING",
+      embed_url: aula?.embed_url || "Não configurado — execute Sync Panda",
+    };
+
+    // CHECK 5: Thumbnail
+    if (videoData) {
+      const thumb = videoData.thumbnail || videoData.thumbnail_url;
+      checks.thumbnail = {
+        status: thumb ? "OK" : "WARNING",
+        url: thumb || "Sem thumbnail",
       };
     }
 
@@ -257,7 +176,7 @@ Deno.serve(async (req) => {
         issues,
         recommendation:
           issues.length === 0
-            ? "Tudo OK — problema pode ser no Download Server do Panda Dashboard."
+            ? "Tudo OK — vídeo pronto para reprodução via embed."
             : issues.join("; "),
       }),
       { status: 200, headers: corsHeaders }

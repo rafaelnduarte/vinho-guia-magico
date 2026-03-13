@@ -34,7 +34,6 @@ function computeConfidence(a: string, b: string): number {
     const ratio = Math.min(na.length, nb.length) / Math.max(na.length, nb.length);
     return Math.round(70 + ratio * 30);
   }
-  // Word overlap
   const wordsA = new Set(na.split(" ").filter(Boolean));
   const wordsB = new Set(nb.split(" ").filter(Boolean));
   const intersection = [...wordsA].filter((w) => wordsB.has(w)).length;
@@ -43,111 +42,23 @@ function computeConfidence(a: string, b: string): number {
   return Math.round((intersection / union) * 100);
 }
 
-type ConfigValidationResult = {
-  status: number;
-  ok: boolean;
-  mode: "public" | "drm_jwt" | "api_exists" | "failed";
-};
-
-async function fetchWithPandaAuth(
-  url: string,
-  apiKey: string,
-  init: RequestInit = {}
-): Promise<Response> {
-  const method = init.method ?? "GET";
-  const headers = new Headers(init.headers ?? {});
-  if (!headers.has("Accept")) headers.set("Accept", "application/json");
-
-  let res = await fetch(url, {
-    ...init,
-    method,
-    headers: { ...Object.fromEntries(headers.entries()), Authorization: `Bearer ${apiKey}` },
-  });
-
-  if (res.status === 401) {
-    res = await fetch(url, {
-      ...init,
-      method,
-      headers: { ...Object.fromEntries(headers.entries()), Authorization: apiKey },
+async function validateVideoExists(videoId: string, pandaApiKey: string): Promise<{ exists: boolean; status?: string }> {
+  try {
+    let res = await fetch(`https://api-v2.pandavideo.com.br/videos/${videoId}`, {
+      headers: { Authorization: `Bearer ${pandaApiKey}` },
     });
-  }
-
-  return res;
-}
-
-async function fetchDrmJwt(apiKey?: string | null, groupId?: string | null): Promise<string | null> {
-  if (!apiKey || !groupId) return null;
-
-  const expiredAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
-  const endpoints = [
-    `https://api.pandavideo.com/watermark/groups/${groupId}/jwt?expiredAtJwt=${encodeURIComponent(expiredAt)}`,
-    `https://api-v2.pandavideo.com.br/drm/videos/${groupId}/jwt?expiredAtJwt=${encodeURIComponent(expiredAt)}`,
-  ];
-
-  for (const url of endpoints) {
-    try {
-      const res = await fetchWithPandaAuth(url, apiKey, { method: "GET" });
-      if (!res.ok) continue;
-      const data = await res.json();
-      const token = data?.jwt || data?.token || null;
-      if (token) return token;
-    } catch {
-      // Try next endpoint
-    }
-  }
-
-  return null;
-}
-
-async function validateVideoExists(videoId: string, pandaApiKey?: string | null): Promise<boolean> {
-  if (!pandaApiKey) return false;
-  try {
-    const res = await fetchWithPandaAuth(
-      `https://api-v2.pandavideo.com.br/videos/${videoId}`,
-      pandaApiKey,
-      { method: "GET" }
-    );
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
-async function validateConfig(
-  videoId: string,
-  options: { jwt?: string | null; pandaApiKey?: string | null }
-): Promise<ConfigValidationResult> {
-  const configBase = `https://config.tv.pandavideo.com.br/embed/v2/${videoId}.json`;
-
-  try {
-    const publicRes = await fetch(configBase, { method: "GET" });
-    if (publicRes.ok) {
-      return { status: publicRes.status, ok: true, mode: "public" };
-    }
-
-    if ([401, 403, 404].includes(publicRes.status) && options.jwt) {
-      const jwtRes = await fetch(`${configBase}?jwt=${encodeURIComponent(options.jwt)}`, {
-        method: "GET",
+    if (res.status === 401) {
+      res = await fetch(`https://api-v2.pandavideo.com.br/videos/${videoId}`, {
+        headers: { Authorization: pandaApiKey },
       });
-      if (jwtRes.ok) {
-        return { status: jwtRes.status, ok: true, mode: "drm_jwt" };
-      }
     }
-
-    if ([401, 403, 404].includes(publicRes.status)) {
-      const exists = await validateVideoExists(videoId, options.pandaApiKey);
-      if (exists) {
-        return { status: publicRes.status, ok: true, mode: "api_exists" };
-      }
+    if (res.ok) {
+      const data = await res.json();
+      return { exists: true, status: data.status };
     }
-
-    return { status: publicRes.status, ok: false, mode: "failed" };
+    return { exists: false };
   } catch {
-    const exists = await validateVideoExists(videoId, options.pandaApiKey);
-    if (exists) {
-      return { status: 0, ok: true, mode: "api_exists" };
-    }
-    return { status: 0, ok: false, mode: "failed" };
+    return { exists: false };
   }
 }
 
@@ -198,16 +109,13 @@ Deno.serve(async (req) => {
     }
 
     const PANDA_API_KEY = Deno.env.get("PANDA_API_KEY");
-    const PANDA_WATERMARK_GROUP_ID = Deno.env.get("PANDA_WATERMARK_GROUP_ID");
-    const drmJwt = await fetchDrmJwt(PANDA_API_KEY, PANDA_WATERMARK_GROUP_ID);
 
     console.log("📋 Starting Panda Video Audit...");
-    console.log(`🔐 DRM JWT disponível: ${drmJwt ? "sim" : "não"}`);
 
     // Step 1: Read all aulas with panda_video_id
     const { data: aulas, error: aulasErr } = await adminClient
       .from("aulas")
-      .select("id, titulo, panda_video_id, curso_id, is_published, status");
+      .select("id, titulo, panda_video_id, embed_url, curso_id, is_published, status");
 
     if (aulasErr) throw new Error(`Failed to read aulas: ${aulasErr.message}`);
 
@@ -232,11 +140,9 @@ Deno.serve(async (req) => {
         status: v.status,
         folder_id: v.folder_id,
       }));
-    } else {
+    } else if (PANDA_API_KEY) {
       // Fallback: fetch from Panda API
       console.log("📊 panda_videos_index empty, fetching from Panda API...");
-      if (!PANDA_API_KEY) throw new Error("PANDA_API_KEY not configured");
-
       let page = 1;
       const limit = 50;
       while (true) {
@@ -277,10 +183,21 @@ Deno.serve(async (req) => {
     // Step 3: Compare — find inconsistent and orphans
     const inconsistent: any[] = [];
     const orphans: any[] = [];
+    const missingEmbed: any[] = [];
+    const failedVideos: any[] = [];
 
     for (const aula of aulasWithVideo) {
+      // Check embed_url
+      if (!aula.embed_url) {
+        missingEmbed.push({
+          aula_id: aula.id,
+          aula_titulo: aula.titulo,
+          panda_video_id: aula.panda_video_id,
+        });
+      }
+
       if (!pandaVideoMap.has(aula.panda_video_id)) {
-        // Try fuzzy match with confidence
+        // Try fuzzy match
         let bestMatch: any = null;
         let bestConfidence = 0;
 
@@ -305,6 +222,16 @@ Deno.serve(async (req) => {
             confidence: bestConfidence,
           } : null,
         });
+      } else {
+        const pandaVideo = pandaVideoMap.get(aula.panda_video_id);
+        if (pandaVideo?.status === "FAILED" || pandaVideo?.status === "ERROR") {
+          failedVideos.push({
+            aula_id: aula.id,
+            aula_titulo: aula.titulo,
+            panda_video_id: aula.panda_video_id,
+            panda_status: pandaVideo.status,
+          });
+        }
       }
     }
 
@@ -321,40 +248,8 @@ Deno.serve(async (req) => {
 
     console.log(`⚠️ Inconsistent: ${inconsistent.length}`);
     console.log(`🔸 Orphans: ${orphans.length}`);
-
-    // Step 4: Validate config.json for all Supabase videos
-    const configFailed: any[] = [];
-    let configOkCount = 0;
-    let configDrmJwtOkCount = 0;
-    let configApiExistsCount = 0;
-
-    for (const aula of aulasWithVideo) {
-      const result = await validateConfig(aula.panda_video_id, {
-        jwt: drmJwt,
-        pandaApiKey: PANDA_API_KEY,
-      });
-
-      if (!result.ok) {
-        configFailed.push({
-          aula_id: aula.id,
-          aula_titulo: aula.titulo,
-          panda_video_id: aula.panda_video_id,
-          config_status: result.status,
-          config_ok: result.ok,
-          config_mode: result.mode,
-        });
-      } else {
-        configOkCount++;
-        if (result.mode === "drm_jwt") configDrmJwtOkCount++;
-        if (result.mode === "api_exists") configApiExistsCount++;
-      }
-      await new Promise((r) => setTimeout(r, 100));
-    }
-
-    console.log(`✅ config.json OK: ${configOkCount}`);
-    console.log(`🔐 config.json OK via JWT: ${configDrmJwtOkCount}`);
-    console.log(`📦 config validado por existência API: ${configApiExistsCount}`);
-    console.log(`❌ config.json FAILED: ${configFailed.length}`);
+    console.log(`📭 Missing embed: ${missingEmbed.length}`);
+    console.log(`❌ Failed videos: ${failedVideos.length}`);
 
     const report = {
       timestamp: new Date().toISOString(),
@@ -364,15 +259,14 @@ Deno.serve(async (req) => {
         panda_total_videos: pandaVideos.length,
         inconsistent_count: inconsistent.length,
         orphan_count: orphans.length,
-        config_ok_count: configOkCount,
-        config_drm_jwt_ok_count: configDrmJwtOkCount,
-        config_api_exists_count: configApiExistsCount,
-        config_failed_count: configFailed.length,
+        missing_embed_count: missingEmbed.length,
+        failed_videos_count: failedVideos.length,
         used_local_index: !!(indexVideos && indexVideos.length > 0),
       },
       inconsistent,
       orphans,
-      config_failed: configFailed,
+      missing_embed: missingEmbed,
+      failed_videos: failedVideos,
     };
 
     console.log("📋 Audit complete:", JSON.stringify(report.summary));
