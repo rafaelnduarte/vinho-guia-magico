@@ -22,6 +22,7 @@ import {
   RotateCcw,
   RefreshCw,
   Upload,
+  Wrench,
 } from "lucide-react";
 
 interface DiagResult {
@@ -69,11 +70,15 @@ export default function AdminPandaDiagnostics() {
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditResult, setAuditResult] = useState<any>(null);
   const [auditError, setAuditError] = useState<string | null>(null);
+  const [fixingId, setFixingId] = useState<string | null>(null);
+  const [fixAllLoading, setFixAllLoading] = useState(false);
+  const [fixResult, setFixResult] = useState<any>(null);
 
   const runAudit = async () => {
     setAuditLoading(true);
     setAuditError(null);
     setAuditResult(null);
+    setFixResult(null);
 
     const { data, error: fnErr } = await supabase.functions.invoke("panda-audit");
 
@@ -84,6 +89,87 @@ export default function AdminPandaDiagnostics() {
       setAuditResult(data);
     }
   };
+
+  const applySingleFix = async (aulaId: string, newVideoId: string) => {
+    setFixingId(aulaId);
+    const { data, error: fnErr } = await supabase.functions.invoke("panda-fix", {
+      body: { fixes: [{ aula_id: aulaId, new_video_id: newVideoId }] },
+    });
+    setFixingId(null);
+
+    if (fnErr) {
+      setFixResult({ error: fnErr.message });
+    } else {
+      setFixResult(data);
+      // Remove fixed item from audit result
+      if (auditResult?.inconsistent) {
+        setAuditResult({
+          ...auditResult,
+          inconsistent: auditResult.inconsistent.filter((i: any) => i.aula_id !== aulaId),
+          summary: {
+            ...auditResult.summary,
+            inconsistent_count: (auditResult.summary?.inconsistent_count || 1) - 1,
+          },
+        });
+      }
+      refetchAuditLogs();
+    }
+  };
+
+  const applyAllFixes = async () => {
+    if (!auditResult?.inconsistent) return;
+
+    const highConfidence = auditResult.inconsistent.filter(
+      (i: any) => i.suggestion && (i.suggestion.confidence ?? 0) >= 80
+    );
+
+    if (highConfidence.length === 0) {
+      setFixResult({ error: "Nenhuma sugestão com confiança ≥ 80%" });
+      return;
+    }
+
+    setFixAllLoading(true);
+    const fixes = highConfidence.map((i: any) => ({
+      aula_id: i.aula_id,
+      new_video_id: i.suggestion.panda_id,
+    }));
+
+    const { data, error: fnErr } = await supabase.functions.invoke("panda-fix", {
+      body: { fixes },
+    });
+
+    setFixAllLoading(false);
+    if (fnErr) {
+      setFixResult({ error: fnErr.message });
+    } else {
+      setFixResult(data);
+      // Remove fixed items
+      const fixedIds = new Set(fixes.map((f: any) => f.aula_id));
+      setAuditResult({
+        ...auditResult,
+        inconsistent: auditResult.inconsistent.filter((i: any) => !fixedIds.has(i.aula_id)),
+        summary: {
+          ...auditResult.summary,
+          inconsistent_count: (auditResult.summary?.inconsistent_count || 0) - (data?.success_count || 0),
+        },
+      });
+      refetchAuditLogs();
+    }
+  };
+
+  // Fetch audit logs
+  const { data: auditLogs, refetch: refetchAuditLogs } = useQuery({
+    queryKey: ["panda-audit-logs"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("panda_audit_log" as any)
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(30);
+      if (error) throw error;
+      return data as any[];
+    },
+  });
 
   const fetchGroupInfo = async () => {
     setGroupInfoLoading(true);
@@ -200,7 +286,6 @@ export default function AdminPandaDiagnostics() {
     const body: any = { video_id: id, strategy };
     if (strategy === "REUPLOAD") {
       body.file_url = reuploadUrl.trim();
-      // Get folder_id and title from diagnostics if available
       const videoCheck = result?.checks?.video_status;
       if (videoCheck) {
         body.folder_id = videoCheck.folder_id;
@@ -221,6 +306,10 @@ export default function AdminPandaDiagnostics() {
     }
   };
 
+  const highConfidenceCount = auditResult?.inconsistent?.filter(
+    (i: any) => i.suggestion && (i.suggestion.confidence ?? 0) >= 80
+  ).length ?? 0;
+
   return (
     <div className="space-y-6">
       {/* Auditoria Completa Card */}
@@ -235,10 +324,15 @@ export default function AdminPandaDiagnostics() {
             Valida todos os video_ids entre o banco de dados e a API do Panda Video.
             Identifica inconsistências, órfãos e falhas no config.json.
           </p>
-          <Button onClick={runAudit} disabled={auditLoading} variant="default">
-            {auditLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Stethoscope className="h-4 w-4 mr-1" />}
-            {auditLoading ? "Auditando... (pode levar 1-2 min)" : "Executar Auditoria Completa"}
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button onClick={runAudit} disabled={auditLoading} variant="default">
+              {auditLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Stethoscope className="h-4 w-4 mr-1" />}
+              {auditLoading ? "Auditando... (pode levar 1-2 min)" : "Executar Auditoria Completa"}
+            </Button>
+            {auditResult?.summary?.used_local_index && (
+              <Badge variant="secondary">Usando índice local</Badge>
+            )}
+          </div>
 
           {auditError && (
             <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
@@ -276,11 +370,35 @@ export default function AdminPandaDiagnostics() {
                 </Card>
               </div>
 
+              {/* Fix Result */}
+              {fixResult && (
+                <div className={`rounded-md p-3 text-sm ${fixResult.error ? "bg-destructive/10 text-destructive" : "bg-green-500/10 text-green-700 dark:text-green-400"}`}>
+                  {fixResult.error ? (
+                    <p>❌ {fixResult.error}</p>
+                  ) : (
+                    <p>✅ {fixResult.success_count} correção(ões) aplicada(s) com sucesso. {fixResult.error_count > 0 ? `${fixResult.error_count} falha(s).` : ""}</p>
+                  )}
+                </div>
+              )}
+
               {/* Inconsistent */}
               {auditResult.inconsistent?.length > 0 && (
                 <Card className="border-yellow-500/30">
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-base">⚠️ Inconsistentes ({auditResult.inconsistent.length})</CardTitle>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base">⚠️ Inconsistentes ({auditResult.inconsistent.length})</CardTitle>
+                      {highConfidenceCount > 0 && (
+                        <Button
+                          size="sm"
+                          variant="default"
+                          onClick={applyAllFixes}
+                          disabled={fixAllLoading}
+                        >
+                          {fixAllLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Wrench className="h-4 w-4 mr-1" />}
+                          Corrigir Todos ({highConfidenceCount} c/ confiança ≥80%)
+                        </Button>
+                      )}
+                    </div>
                   </CardHeader>
                   <CardContent>
                     <Table>
@@ -289,21 +407,48 @@ export default function AdminPandaDiagnostics() {
                           <TableHead>Aula</TableHead>
                           <TableHead>Video ID atual</TableHead>
                           <TableHead>Sugestão (fuzzy)</TableHead>
+                          <TableHead>Confiança</TableHead>
+                          <TableHead>Ação</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {auditResult.inconsistent.map((item: any, i: number) => (
                           <TableRow key={i}>
-                            <TableCell className="text-xs">{item.aula_titulo}</TableCell>
+                            <TableCell className="text-xs max-w-[200px] truncate">{item.aula_titulo}</TableCell>
                             <TableCell className="font-mono text-xs">{item.current_video_id?.slice(0, 16)}…</TableCell>
                             <TableCell className="text-xs">
                               {item.suggestion ? (
                                 <span className="text-green-600">
-                                  ✅ {item.suggestion.panda_title} ({item.suggestion.panda_id?.slice(0, 12)}…)
+                                  {item.suggestion.panda_title} ({item.suggestion.panda_id?.slice(0, 12)}…)
                                 </span>
                               ) : (
                                 <span className="text-destructive">Nenhuma correspondência</span>
                               )}
+                            </TableCell>
+                            <TableCell>
+                              {item.suggestion ? (
+                                <Badge variant={item.suggestion.confidence >= 80 ? "default" : item.suggestion.confidence >= 50 ? "secondary" : "destructive"}>
+                                  {item.suggestion.confidence}%
+                                </Badge>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {item.suggestion ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={fixingId === item.aula_id}
+                                  onClick={() => applySingleFix(item.aula_id, item.suggestion.panda_id)}
+                                >
+                                  {fixingId === item.aula_id ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    "Aplicar"
+                                  )}
+                                </Button>
+                              ) : null}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -380,6 +525,53 @@ export default function AdminPandaDiagnostics() {
           )}
         </CardContent>
       </Card>
+
+      {/* Audit Log */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between text-lg">
+            <span>🔧 Histórico de Correções</span>
+            <Button size="sm" variant="ghost" onClick={() => refetchAuditLogs()}>
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!auditLogs?.length ? (
+            <p className="text-sm text-muted-foreground">Nenhuma correção aplicada ainda.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Aula ID</TableHead>
+                  <TableHead>Ação</TableHead>
+                  <TableHead>Resultado</TableHead>
+                  <TableHead>Video Antigo</TableHead>
+                  <TableHead>Video Novo</TableHead>
+                  <TableHead>Data</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {auditLogs.map((log: any) => (
+                  <TableRow key={log.id}>
+                    <TableCell className="font-mono text-xs">{log.aula_id?.slice(0, 12)}…</TableCell>
+                    <TableCell><Badge variant="secondary">{log.action}</Badge></TableCell>
+                    <TableCell>
+                      <Badge variant={log.result === "success" ? "default" : "destructive"}>{log.result}</Badge>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">{log.old_video_id?.slice(0, 12)}…</TableCell>
+                    <TableCell className="font-mono text-xs">{log.new_video_id?.slice(0, 12)}…</TableCell>
+                    <TableCell className="text-xs">
+                      {new Date(log.created_at).toLocaleString("pt-BR")}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Setup Watermark Card */}
       <Card className="border-primary/30">
         <CardHeader>
