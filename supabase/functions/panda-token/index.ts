@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { video_id } = await req.json();
+    const { video_id, aula_id: _aula_id } = await req.json();
     if (!video_id) {
       return new Response(JSON.stringify({ error: "video_id is required" }), { status: 400, headers: corsHeaders });
     }
