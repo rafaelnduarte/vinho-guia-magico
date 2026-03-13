@@ -128,6 +128,7 @@ export type Database = {
           curso_id: string
           descricao: string | null
           duracao_segundos: number
+          embed_html: string | null
           embed_url: string | null
           id: string
           is_published: boolean
@@ -145,6 +146,7 @@ export type Database = {
           curso_id: string
           descricao?: string | null
           duracao_segundos?: number
+          embed_html?: string | null
           embed_url?: string | null
           id?: string
           is_published?: boolean
@@ -162,6 +164,7 @@ export type Database = {
           curso_id?: string
           descricao?: string | null
           duracao_segundos?: number
+          embed_html?: string | null
           embed_url?: string | null
           id?: string
           is_published?: boolean
