@@ -184,7 +184,7 @@ serve(async (req) => {
         .eq("id", sessionId)
         .single();
       if (!sessionCheck || sessionCheck.user_id !== user.id) {
-        throw new Error("Sessão não encontrada ou não autorizada");
+        throw new HttpError(403, "forbidden", "Sessão não encontrada ou não autorizada");
       }
     } else {
       const { data: newSession, error: sessErr } = await adminClient
