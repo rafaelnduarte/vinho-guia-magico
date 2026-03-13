@@ -219,6 +219,34 @@ export default function SommelierPage() {
       refetchUsage();
     } catch (e: any) {
       console.error(e);
+
+      let backendMessage: string | null = null;
+
+      if (e instanceof FunctionsHttpError) {
+        const errorPayload = await e.context.json().catch(() => null) as { error?: string; message?: string } | null;
+
+        if (errorPayload?.error === "payment_required") {
+          setMessages(prev => [
+            ...prev,
+            {
+              role: "assistant",
+              content: `⚠️ ${errorPayload.message || "A IA está temporariamente indisponível por limite de crédito do provedor."}`,
+            },
+          ]);
+          return;
+        }
+
+        if (errorPayload?.error === "rate_limited") {
+          setMessages(prev => [
+            ...prev,
+            { role: "assistant", content: `⏳ ${errorPayload.message || "Muitas mensagens no momento."}` },
+          ]);
+          return;
+        }
+
+        backendMessage = errorPayload?.message ?? null;
+      }
+
       // On error, check if the server already saved the response (user may have navigated away and come back)
       if (sessionId) {
         const { data: latestMessages } = await supabase
@@ -240,7 +268,7 @@ export default function SommelierPage() {
           }
         }
       }
-      toast({ title: "Erro", description: e.message || "Falha ao enviar mensagem", variant: "destructive" });
+      toast({ title: "Erro", description: backendMessage || e.message || "Falha ao enviar mensagem", variant: "destructive" });
       setMessages(prev => prev.slice(0, -1)); // remove optimistic user msg
     } finally {
       setIsLoading(false);
