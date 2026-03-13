@@ -43,16 +43,111 @@ function computeConfidence(a: string, b: string): number {
   return Math.round((intersection / union) * 100);
 }
 
-async function validateConfig(videoId: string): Promise<{ status: number; ok: boolean }> {
+type ConfigValidationResult = {
+  status: number;
+  ok: boolean;
+  mode: "public" | "drm_jwt" | "api_exists" | "failed";
+};
+
+async function fetchWithPandaAuth(
+  url: string,
+  apiKey: string,
+  init: RequestInit = {}
+): Promise<Response> {
+  const method = init.method ?? "GET";
+  const headers = new Headers(init.headers ?? {});
+  if (!headers.has("Accept")) headers.set("Accept", "application/json");
+
+  let res = await fetch(url, {
+    ...init,
+    method,
+    headers: { ...Object.fromEntries(headers.entries()), Authorization: `Bearer ${apiKey}` },
+  });
+
+  if (res.status === 401) {
+    res = await fetch(url, {
+      ...init,
+      method,
+      headers: { ...Object.fromEntries(headers.entries()), Authorization: apiKey },
+    });
+  }
+
+  return res;
+}
+
+async function fetchDrmJwt(apiKey?: string | null, groupId?: string | null): Promise<string | null> {
+  if (!apiKey || !groupId) return null;
+
+  const expiredAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+  const endpoints = [
+    `https://api.pandavideo.com/watermark/groups/${groupId}/jwt?expiredAtJwt=${encodeURIComponent(expiredAt)}`,
+    `https://api-v2.pandavideo.com.br/drm/videos/${groupId}/jwt?expiredAtJwt=${encodeURIComponent(expiredAt)}`,
+  ];
+
+  for (const url of endpoints) {
+    try {
+      const res = await fetchWithPandaAuth(url, apiKey, { method: "GET" });
+      if (!res.ok) continue;
+      const data = await res.json();
+      const token = data?.jwt || data?.token || null;
+      if (token) return token;
+    } catch {
+      // Try next endpoint
+    }
+  }
+
+  return null;
+}
+
+async function validateVideoExists(videoId: string, pandaApiKey?: string | null): Promise<boolean> {
+  if (!pandaApiKey) return false;
   try {
-    const res = await fetch(
-      `https://config.tv.pandavideo.com.br/embed/v2/${videoId}.json`,
+    const res = await fetchWithPandaAuth(
+      `https://api-v2.pandavideo.com.br/videos/${videoId}`,
+      pandaApiKey,
       { method: "GET" }
     );
-    await res.text();
-    return { status: res.status, ok: res.ok };
+    return res.ok;
   } catch {
-    return { status: 0, ok: false };
+    return false;
+  }
+}
+
+async function validateConfig(
+  videoId: string,
+  options: { jwt?: string | null; pandaApiKey?: string | null }
+): Promise<ConfigValidationResult> {
+  const configBase = `https://config.tv.pandavideo.com.br/embed/v2/${videoId}.json`;
+
+  try {
+    const publicRes = await fetch(configBase, { method: "GET" });
+    if (publicRes.ok) {
+      return { status: publicRes.status, ok: true, mode: "public" };
+    }
+
+    if ([401, 403, 404].includes(publicRes.status) && options.jwt) {
+      const jwtRes = await fetch(`${configBase}?jwt=${encodeURIComponent(options.jwt)}`, {
+        method: "GET",
+      });
+      if (jwtRes.ok) {
+        return { status: jwtRes.status, ok: true, mode: "drm_jwt" };
+      }
+    }
+
+    if ([401, 403, 404].includes(publicRes.status)) {
+      const exists = await validateVideoExists(videoId, options.pandaApiKey);
+      if (exists) {
+        return { status: publicRes.status, ok: true, mode: "api_exists" };
+      }
+    }
+
+    return { status: publicRes.status, ok: false, mode: "failed" };
+  } catch {
+    const exists = await validateVideoExists(videoId, options.pandaApiKey);
+    if (exists) {
+      return { status: 0, ok: true, mode: "api_exists" };
+    }
+    return { status: 0, ok: false, mode: "failed" };
   }
 }
 
@@ -102,7 +197,12 @@ Deno.serve(async (req) => {
       });
     }
 
+    const PANDA_API_KEY = Deno.env.get("PANDA_API_KEY");
+    const PANDA_WATERMARK_GROUP_ID = Deno.env.get("PANDA_WATERMARK_GROUP_ID");
+    const drmJwt = await fetchDrmJwt(PANDA_API_KEY, PANDA_WATERMARK_GROUP_ID);
+
     console.log("📋 Starting Panda Video Audit...");
+    console.log(`🔐 DRM JWT disponível: ${drmJwt ? "sim" : "não"}`);
 
     // Step 1: Read all aulas with panda_video_id
     const { data: aulas, error: aulasErr } = await adminClient
@@ -135,7 +235,6 @@ Deno.serve(async (req) => {
     } else {
       // Fallback: fetch from Panda API
       console.log("📊 panda_videos_index empty, fetching from Panda API...");
-      const PANDA_API_KEY = Deno.env.get("PANDA_API_KEY");
       if (!PANDA_API_KEY) throw new Error("PANDA_API_KEY not configured");
 
       let page = 1;
@@ -226,9 +325,15 @@ Deno.serve(async (req) => {
     // Step 4: Validate config.json for all Supabase videos
     const configFailed: any[] = [];
     let configOkCount = 0;
+    let configDrmJwtOkCount = 0;
+    let configApiExistsCount = 0;
 
     for (const aula of aulasWithVideo) {
-      const result = await validateConfig(aula.panda_video_id);
+      const result = await validateConfig(aula.panda_video_id, {
+        jwt: drmJwt,
+        pandaApiKey: PANDA_API_KEY,
+      });
+
       if (!result.ok) {
         configFailed.push({
           aula_id: aula.id,
@@ -236,14 +341,19 @@ Deno.serve(async (req) => {
           panda_video_id: aula.panda_video_id,
           config_status: result.status,
           config_ok: result.ok,
+          config_mode: result.mode,
         });
       } else {
         configOkCount++;
+        if (result.mode === "drm_jwt") configDrmJwtOkCount++;
+        if (result.mode === "api_exists") configApiExistsCount++;
       }
       await new Promise((r) => setTimeout(r, 100));
     }
 
     console.log(`✅ config.json OK: ${configOkCount}`);
+    console.log(`🔐 config.json OK via JWT: ${configDrmJwtOkCount}`);
+    console.log(`📦 config validado por existência API: ${configApiExistsCount}`);
     console.log(`❌ config.json FAILED: ${configFailed.length}`);
 
     const report = {
@@ -255,6 +365,8 @@ Deno.serve(async (req) => {
         inconsistent_count: inconsistent.length,
         orphan_count: orphans.length,
         config_ok_count: configOkCount,
+        config_drm_jwt_ok_count: configDrmJwtOkCount,
+        config_api_exists_count: configApiExistsCount,
         config_failed_count: configFailed.length,
         used_local_index: !!(indexVideos && indexVideos.length > 0),
       },
