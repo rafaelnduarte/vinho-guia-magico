@@ -368,28 +368,28 @@ serve(async (req) => {
       }),
     });
 
+    let assistantContent = "Desculpe, não consegui gerar uma resposta.";
+    let tokensIn = 0;
+    let tokensOut = 0;
+
     if (!aiResponse.ok) {
       if (aiResponse.status === 429) {
         throw new HttpError(429, "rate_limited", "Serviço sobrecarregado. Tente novamente em instantes.");
       }
 
       if (aiResponse.status === 402) {
-        throw new HttpError(
-          402,
-          "payment_required",
-          "Limite do provedor de IA atingido. Reduzi o contexto para economizar tokens, tente novamente em alguns segundos."
-        );
+        assistantContent = buildProviderFallbackReply(contextPack);
+      } else {
+        const errText = await aiResponse.text();
+        console.error("AI gateway error:", aiResponse.status, errText);
+        throw new HttpError(502, "ai_gateway_error", "Erro ao consultar IA");
       }
-
-      const errText = await aiResponse.text();
-      console.error("AI gateway error:", aiResponse.status, errText);
-      throw new HttpError(502, "ai_gateway_error", "Erro ao consultar IA");
+    } else {
+      const aiData = await aiResponse.json();
+      assistantContent = aiData.choices?.[0]?.message?.content ?? assistantContent;
+      tokensIn = aiData.usage?.prompt_tokens ?? 0;
+      tokensOut = aiData.usage?.completion_tokens ?? 0;
     }
-
-    const aiData = await aiResponse.json();
-    const assistantContent = aiData.choices?.[0]?.message?.content ?? "Desculpe, não consegui gerar uma resposta.";
-    const tokensIn = aiData.usage?.prompt_tokens ?? 0;
-    const tokensOut = aiData.usage?.completion_tokens ?? 0;
 
     // 9. Calculate cost
     const costUsd = (tokensIn / 1000) * Number(pricing.price_in_per_1k) +
