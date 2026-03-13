@@ -68,25 +68,19 @@ export default function PandaPlayer({
     return () => { cancelled = true; };
   }, [pandaVideoId, aulaId, retryCount]);
 
-  // Validate config.json before rendering iframe (only for public/non-DRM videos)
+  // Validate config.json before rendering iframe
   useEffect(() => {
     if (jwtLoading) return;
-    if (playerState === "not_found") return;
 
-    // DRM videos: JWT was validated server-side by panda-token, trust it
-    if (jwt) {
-      console.log("[PANDA] JWT present, skipping config.json validation (DRM-protected)");
-      setPlayerState("ready");
-      return;
-    }
-
-    // Public videos (no JWT): validate config.json directly
     let cancelled = false;
     const validateConfig = async () => {
+      // Build config URL
       const configBase = `https://config.tv.pandavideo.com.br/embed/v2/${pandaVideoId}.json`;
+      const configUrl = jwt ? `${configBase}?jwt=${jwt}` : configBase;
 
       try {
-        const res = await fetch(configBase, { method: "GET" });
+        const res = await fetch(configUrl, { method: "GET" });
+
         if (cancelled) return;
 
         if (res.ok) {
@@ -94,13 +88,21 @@ export default function PandaPlayer({
           setPlayerState("ready");
         } else if (res.status === 404 || res.status === 401 || res.status === 403) {
           console.error(`[PANDA] config.json rejected: ${res.status}`);
-          setPlayerState("drm_error");
+          // If first attempt failed and we had a jwt, try re-fetching token once
+          if (retryCount === 0 && jwt) {
+            console.log("[PANDA] Retrying token fetch...");
+            setRetryCount(1);
+          } else {
+            setPlayerState("drm_error");
+          }
         } else {
+          // Other errors — still try to load player
           console.warn(`[PANDA] config.json unexpected status: ${res.status}, proceeding anyway`);
           setPlayerState("ready");
         }
       } catch (err) {
         if (cancelled) return;
+        // CORS or network error — can't validate, proceed with iframe
         console.warn("[PANDA] config.json validation failed (likely CORS), proceeding:", err);
         setPlayerState("ready");
       }
@@ -108,7 +110,7 @@ export default function PandaPlayer({
 
     validateConfig();
     return () => { cancelled = true; };
-  }, [jwtLoading, jwt, pandaVideoId, playerState]);
+  }, [jwtLoading, jwt, pandaVideoId, retryCount]);
 
   // Listen for postMessage from Panda iframe
   const handleMessage = useCallback(
