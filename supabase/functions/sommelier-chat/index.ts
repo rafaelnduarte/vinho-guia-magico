@@ -506,6 +506,14 @@ serve(async (req) => {
     );
   } catch (e) {
     console.error("sommelier-chat error:", e);
+
+    if (e instanceof HttpError) {
+      return new Response(
+        JSON.stringify({ error: e.code, message: e.message }),
+        { status: e.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     return new Response(
       JSON.stringify({ error: "server_error", message: (e as Error).message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
