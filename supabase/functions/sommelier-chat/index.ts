@@ -88,7 +88,7 @@ serve(async (req) => {
     const systemPrompt = pricing.system_prompt || FALLBACK_SYSTEM_PROMPT;
     const maxTokens = pricing.max_tokens_detalhado;
 
-    // 1b. Get active knowledge base entries
+    // 1b. Get active knowledge base entries (capped to avoid oversized prompts)
     const { data: knowledgeEntries } = await adminClient
       .from("ai_knowledge_base")
       .select("title, content, category")
@@ -97,10 +97,24 @@ serve(async (req) => {
 
     let knowledgeContext = "";
     if (knowledgeEntries && knowledgeEntries.length > 0) {
-      const knowledgeText = knowledgeEntries
-        .map(e => `### ${e.title} [${e.category}]\n${e.content}`)
-        .join("\n\n");
-      knowledgeContext = `\n\nBASE DE CONHECIMENTO (use como referência):\n${knowledgeText}`;
+      let remainingChars = MAX_KNOWLEDGE_CHARS;
+      const compactKnowledge: string[] = [];
+
+      for (const entry of knowledgeEntries) {
+        if (remainingChars <= 0) break;
+
+        const rawChunk = `### ${entry.title} [${entry.category}]\n${entry.content.slice(0, 2500)}`;
+        const chunk = rawChunk.slice(0, remainingChars);
+
+        if (chunk.trim().length > 0) {
+          compactKnowledge.push(chunk);
+          remainingChars -= chunk.length;
+        }
+      }
+
+      if (compactKnowledge.length > 0) {
+        knowledgeContext = `\n\nBASE DE CONHECIMENTO (resumo):\n${compactKnowledge.join("\n\n")}`;
+      }
     }
 
     // 2. Check monthly budget
