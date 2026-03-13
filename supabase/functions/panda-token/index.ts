@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { video_id } = await req.json();
+    const { video_id, aula_id: _aula_id } = await req.json();
     if (!video_id) {
       return new Response(JSON.stringify({ error: "video_id is required" }), { status: 400, headers: corsHeaders });
     }
@@ -108,8 +108,32 @@ Deno.serve(async (req) => {
       }
     }
 
-    const DRM_GROUP_ID = Deno.env.get("PANDA_WATERMARK_GROUP_ID");
+    // Validate the resolved video exists in Panda
     const PANDA_API_KEY = Deno.env.get("PANDA_API_KEY");
+    if (PANDA_API_KEY) {
+      try {
+        let checkRes = await fetch(`https://api-v2.pandavideo.com.br/videos/${resolvedVideoId}`, {
+          headers: { Authorization: `Bearer ${PANDA_API_KEY}` },
+        });
+        if (checkRes.status === 401) {
+          checkRes = await fetch(`https://api-v2.pandavideo.com.br/videos/${resolvedVideoId}`, {
+            headers: { Authorization: PANDA_API_KEY },
+          });
+        }
+        if (checkRes.status === 404) {
+          console.warn(`[PANDA-TOKEN] ❌ Video ${resolvedVideoId} not found in Panda (404)`);
+          return new Response(
+            JSON.stringify({ token: null, error: "VIDEO_NOT_FOUND", video_id: resolvedVideoId }),
+            { status: 200, headers: corsHeaders }
+          );
+        }
+      } catch (err) {
+        console.warn(`[PANDA-TOKEN] Video validation failed:`, (err as Error).message);
+        // Proceed anyway — might be network issue
+      }
+    }
+
+    const DRM_GROUP_ID = Deno.env.get("PANDA_WATERMARK_GROUP_ID");
 
     if (!DRM_GROUP_ID || !PANDA_API_KEY) {
       console.error("[PANDA-TOKEN] Missing PANDA_WATERMARK_GROUP_ID or PANDA_API_KEY");

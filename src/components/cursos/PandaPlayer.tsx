@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback, lazy, Suspense } from "react";
-import { Loader2, AlertTriangle, ShieldAlert } from "lucide-react";
+import { Loader2, AlertTriangle, ShieldAlert, VideoOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 const HLSPlayer = lazy(() => import("./HLSPlayer"));
@@ -16,7 +16,7 @@ interface PandaPlayerProps {
 
 const FALLBACK_TIMEOUT_MS = 15_000;
 
-type PlayerState = "loading" | "ready" | "drm_error" | "hls_fallback";
+type PlayerState = "loading" | "ready" | "drm_error" | "not_found" | "hls_fallback";
 
 export default function PandaPlayer({
   pandaVideoId,
@@ -44,7 +44,14 @@ export default function PandaPlayer({
         const { data, error } = await supabase.functions.invoke("panda-token", {
           body: { video_id: pandaVideoId, aula_id: aulaId || null },
         });
-        if (!cancelled && data?.token) {
+        if (cancelled) return;
+        if (data?.error === "VIDEO_NOT_FOUND") {
+          console.warn("[PANDA] Video not found in Panda:", pandaVideoId);
+          setPlayerState("not_found");
+          setJwtLoading(false);
+          return;
+        }
+        if (data?.token) {
           setJwt(data.token);
         }
         if (error) {
@@ -180,7 +187,22 @@ export default function PandaPlayer({
     );
   }
 
-  // DRM/Auth error — do NOT fall back to HLS
+  // Video not found in Panda — distinct from DRM error
+  if (playerState === "not_found") {
+    return (
+      <div className="relative w-full overflow-hidden rounded-xl bg-secondary flex items-center justify-center" style={{ aspectRatio: "16/9" }}>
+        <div className="text-center space-y-3 p-6 max-w-md">
+          <VideoOff className="h-10 w-10 text-muted-foreground mx-auto" />
+          <p className="text-sm font-medium text-foreground">Vídeo temporariamente indisponível</p>
+          <p className="text-xs text-muted-foreground">
+            Este vídeo não foi encontrado na plataforma de streaming. Pode estar em processamento ou requer sincronização pelo administrador.
+          </p>
+          <p className="text-xs text-muted-foreground/60 font-mono">ID: {pandaVideoId}</p>
+        </div>
+      </div>
+    );
+  }
+
   if (playerState === "drm_error") {
     return (
       <div className="relative w-full overflow-hidden rounded-xl bg-secondary flex items-center justify-center" style={{ aspectRatio: "16/9" }}>

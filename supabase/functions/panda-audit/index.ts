@@ -9,61 +9,38 @@ const corsHeaders = {
 };
 
 function normalize(title: string): string {
-  return title
+  return (title || "")
     .toLowerCase()
-    .replace(/\.mp4$/i, "")
-    .replace(/[-_]+/g, " ")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\.(mp4|mov|mkv|avi)$/g, "")
+    .replace(/modulo\s*\d+/g, "")
+    .replace(/\bpp\b/g, "")
+    .replace(/\bparte\s*\d+/g, "")
+    .replace(/\b\d+\s*-\s*/g, "")
+    .replace(/\b\d+\.\s*/g, "")
+    .replace(/-/g, " ")
+    .replace(/_/g, " ")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
 
-function fuzzyMatch(a: string, b: string): boolean {
+function computeConfidence(a: string, b: string): number {
   const na = normalize(a);
   const nb = normalize(b);
-  if (na === nb) return true;
-  if (na.includes(nb) || nb.includes(na)) return true;
-  // Check if first 10 chars match (for partial titles)
-  if (na.length > 10 && nb.length > 10 && na.slice(0, 10) === nb.slice(0, 10)) return true;
-  return false;
-}
-
-async function fetchAllPandaVideos(apiKey: string): Promise<any[]> {
-  const allVideos: any[] = [];
-  let page = 1;
-  const limit = 50;
-
-  while (true) {
-    const url = `https://api-v2.pandavideo.com.br/videos?page=${page}&limit=${limit}`;
-    let res = await fetch(url, {
-      headers: { Authorization: `Bearer ${apiKey}` },
-    });
-
-    // Fallback without Bearer prefix
-    if (res.status === 401) {
-      res = await fetch(url, {
-        headers: { Authorization: apiKey },
-      });
-    }
-
-    if (!res.ok) {
-      const txt = await res.text();
-      throw new Error(`Panda API error page=${page}: ${res.status} ${txt}`);
-    }
-
-    const data = await res.json();
-    const videos = data.videos || data;
-
-    if (!Array.isArray(videos) || videos.length === 0) break;
-
-    allVideos.push(...videos);
-    if (videos.length < limit) break;
-    page++;
-
-    // Small delay to avoid rate limiting
-    await new Promise((r) => setTimeout(r, 200));
+  if (na === nb) return 100;
+  if (na.includes(nb) || nb.includes(na)) {
+    const ratio = Math.min(na.length, nb.length) / Math.max(na.length, nb.length);
+    return Math.round(70 + ratio * 30);
   }
-
-  return allVideos;
+  // Word overlap
+  const wordsA = new Set(na.split(" ").filter(Boolean));
+  const wordsB = new Set(nb.split(" ").filter(Boolean));
+  const intersection = [...wordsA].filter((w) => wordsB.has(w)).length;
+  const union = new Set([...wordsA, ...wordsB]).size;
+  if (union === 0) return 0;
+  return Math.round((intersection / union) * 100);
 }
 
 async function validateConfig(videoId: string): Promise<{ status: number; ok: boolean }> {
@@ -72,9 +49,9 @@ async function validateConfig(videoId: string): Promise<{ status: number; ok: bo
       `https://config.tv.pandavideo.com.br/embed/v2/${videoId}.json`,
       { method: "GET" }
     );
-    await res.text(); // consume body
+    await res.text();
     return { status: res.status, ok: res.ok };
-  } catch (e) {
+  } catch {
     return { status: 0, ok: false };
   }
 }
@@ -85,12 +62,10 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Auth check — admin only
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: corsHeaders,
+        status: 401, headers: corsHeaders,
       });
     }
 
@@ -104,14 +79,11 @@ Deno.serve(async (req) => {
     const { data: claimsData, error: claimsErr } = await supabase.auth.getClaims(token);
     if (claimsErr || !claimsData?.claims) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: corsHeaders,
+        status: 401, headers: corsHeaders,
       });
     }
 
     const userId = claimsData.claims.sub as string;
-
-    // Admin check
     const adminClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -126,8 +98,7 @@ Deno.serve(async (req) => {
 
     if (!roleData) {
       return new Response(JSON.stringify({ error: "Admin access required" }), {
-        status: 403,
-        headers: corsHeaders,
+        status: 403, headers: corsHeaders,
       });
     }
 
@@ -145,34 +116,80 @@ Deno.serve(async (req) => {
 
     console.log(`📊 Supabase: ${aulasWithVideo.length} aulas with video IDs (${supaVideoIds.size} unique)`);
 
-    // Step 2: Fetch all Panda videos
-    const PANDA_API_KEY = Deno.env.get("PANDA_API_KEY");
-    if (!PANDA_API_KEY) throw new Error("PANDA_API_KEY not configured");
+    // Step 2: Try to use panda_videos_index first (faster, offline)
+    const { data: indexVideos } = await adminClient
+      .from("panda_videos_index")
+      .select("id, title, title_normalized, status, folder_id");
 
-    const pandaVideos = await fetchAllPandaVideos(PANDA_API_KEY);
+    let pandaVideos: any[] = [];
+
+    if (indexVideos && indexVideos.length > 0) {
+      console.log(`📊 Using panda_videos_index: ${indexVideos.length} entries`);
+      pandaVideos = indexVideos.map((v: any) => ({
+        id: v.id,
+        title: v.title,
+        title_normalized: v.title_normalized,
+        status: v.status,
+        folder_id: v.folder_id,
+      }));
+    } else {
+      // Fallback: fetch from Panda API
+      console.log("📊 panda_videos_index empty, fetching from Panda API...");
+      const PANDA_API_KEY = Deno.env.get("PANDA_API_KEY");
+      if (!PANDA_API_KEY) throw new Error("PANDA_API_KEY not configured");
+
+      let page = 1;
+      const limit = 50;
+      while (true) {
+        const url = `https://api-v2.pandavideo.com.br/videos?page=${page}&limit=${limit}`;
+        let res = await fetch(url, {
+          headers: { Authorization: `Bearer ${PANDA_API_KEY}` },
+        });
+        if (res.status === 401) {
+          res = await fetch(url, { headers: { Authorization: PANDA_API_KEY } });
+        }
+        if (!res.ok) break;
+
+        const data = await res.json();
+        const videos = data.videos || data;
+        if (!Array.isArray(videos) || videos.length === 0) break;
+
+        pandaVideos.push(...videos.map((v: any) => ({
+          id: v.id,
+          title: v.title || "Sem título",
+          title_normalized: normalize(v.title || ""),
+          status: v.status,
+          folder_id: v.folder_id || null,
+        })));
+
+        if (videos.length < limit) break;
+        page++;
+        await new Promise((r) => setTimeout(r, 200));
+      }
+    }
+
     const pandaVideoMap = new Map<string, any>();
     for (const v of pandaVideos) {
       pandaVideoMap.set(v.id, v);
     }
 
-    console.log(`📊 Panda: ${pandaVideos.length} videos found`);
+    console.log(`📊 Panda catalog: ${pandaVideos.length} videos`);
 
-    // Step 3: Compare
-    const inconsistent: any[] = []; // In Supabase but NOT in Panda
-    const orphans: any[] = []; // In Panda but NOT in Supabase
+    // Step 3: Compare — find inconsistent and orphans
+    const inconsistent: any[] = [];
+    const orphans: any[] = [];
 
     for (const aula of aulasWithVideo) {
       if (!pandaVideoMap.has(aula.panda_video_id)) {
-        // Try fuzzy match
-        let suggestion = null;
+        // Try fuzzy match with confidence
+        let bestMatch: any = null;
+        let bestConfidence = 0;
+
         for (const pv of pandaVideos) {
-          if (fuzzyMatch(aula.titulo, pv.title || "")) {
-            suggestion = {
-              panda_id: pv.id,
-              panda_title: pv.title,
-              panda_status: pv.status,
-            };
-            break;
+          const confidence = computeConfidence(aula.titulo, pv.title);
+          if (confidence > bestConfidence && confidence >= 40) {
+            bestConfidence = confidence;
+            bestMatch = pv;
           }
         }
 
@@ -182,7 +199,12 @@ Deno.serve(async (req) => {
           current_video_id: aula.panda_video_id,
           curso_id: aula.curso_id,
           is_published: aula.is_published,
-          suggestion,
+          suggestion: bestMatch ? {
+            panda_id: bestMatch.id,
+            panda_title: bestMatch.title,
+            panda_status: bestMatch.status,
+            confidence: bestConfidence,
+          } : null,
         });
       }
     }
@@ -194,37 +216,34 @@ Deno.serve(async (req) => {
           panda_title: pv.title || "Sem título",
           panda_status: pv.status,
           panda_folder_id: pv.folder_id || null,
-          created_at: pv.created_at,
         });
       }
     }
 
-    console.log(`⚠️ Inconsistent (Supabase→Panda missing): ${inconsistent.length}`);
-    console.log(`🔸 Orphans (Panda only): ${orphans.length}`);
+    console.log(`⚠️ Inconsistent: ${inconsistent.length}`);
+    console.log(`🔸 Orphans: ${orphans.length}`);
 
     // Step 4: Validate config.json for all Supabase videos
-    const configResults: any[] = [];
     const configFailed: any[] = [];
+    let configOkCount = 0;
 
     for (const aula of aulasWithVideo) {
       const result = await validateConfig(aula.panda_video_id);
-      const entry = {
-        aula_id: aula.id,
-        aula_titulo: aula.titulo,
-        panda_video_id: aula.panda_video_id,
-        config_status: result.status,
-        config_ok: result.ok,
-      };
-      configResults.push(entry);
       if (!result.ok) {
-        configFailed.push(entry);
+        configFailed.push({
+          aula_id: aula.id,
+          aula_titulo: aula.titulo,
+          panda_video_id: aula.panda_video_id,
+          config_status: result.status,
+          config_ok: result.ok,
+        });
+      } else {
+        configOkCount++;
       }
-
-      // Small delay between config checks
       await new Promise((r) => setTimeout(r, 100));
     }
 
-    console.log(`✅ config.json OK: ${configResults.length - configFailed.length}`);
+    console.log(`✅ config.json OK: ${configOkCount}`);
     console.log(`❌ config.json FAILED: ${configFailed.length}`);
 
     const report = {
@@ -235,13 +254,13 @@ Deno.serve(async (req) => {
         panda_total_videos: pandaVideos.length,
         inconsistent_count: inconsistent.length,
         orphan_count: orphans.length,
-        config_ok_count: configResults.length - configFailed.length,
+        config_ok_count: configOkCount,
         config_failed_count: configFailed.length,
+        used_local_index: !!(indexVideos && indexVideos.length > 0),
       },
       inconsistent,
       orphans,
       config_failed: configFailed,
-      config_all: configResults,
     };
 
     console.log("📋 Audit complete:", JSON.stringify(report.summary));
@@ -250,7 +269,7 @@ Deno.serve(async (req) => {
   } catch (err) {
     console.error("Audit error:", err);
     return new Response(
-      JSON.stringify({ error: err.message || "Audit failed" }),
+      JSON.stringify({ error: (err as Error).message || "Audit failed" }),
       { status: 500, headers: corsHeaders }
     );
   }

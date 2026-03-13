@@ -105,6 +105,7 @@ Deno.serve(async (req) => {
       folders_synced: 0,
       videos_synced: 0,
       normalized_count: 0,
+      videos_indexed: 0,
       errors: [] as string[],
     };
 
@@ -285,6 +286,64 @@ Deno.serve(async (req) => {
       } else {
         console.log(`Orphan cleanup: removed ${count ?? 0} stale index entries`);
       }
+    }
+
+    // PASSO 5 — Populate panda_videos_index with ALL Panda videos (full catalog)
+    try {
+      console.log("📦 Fetching all Panda videos for full catalog index...");
+      const allPandaVideos: any[] = [];
+      let page = 1;
+      const limit = 50;
+
+      while (true) {
+        const url = `https://api-v2.pandavideo.com.br/videos?page=${page}&limit=${limit}`;
+        let res = await fetch(url, {
+          headers: { Authorization: apiKey, Accept: "application/json" },
+        });
+
+        if (!res.ok) break;
+
+        const data = await res.json();
+        const videos = data.videos || data;
+        if (!Array.isArray(videos) || videos.length === 0) break;
+
+        allPandaVideos.push(...videos);
+        if (videos.length < limit) break;
+        page++;
+        await new Promise((r) => setTimeout(r, 200));
+      }
+
+      console.log(`📦 Total Panda videos fetched: ${allPandaVideos.length}`);
+
+      // Upsert into panda_videos_index in batches of 50
+      for (let i = 0; i < allPandaVideos.length; i += 50) {
+        const batch = allPandaVideos.slice(i, i + 50).map((v: any) => ({
+          id: v.id,
+          title: v.title || "Sem título",
+          title_normalized: normalizeScrappy(v.title || ""),
+          status: v.status || null,
+          folder_id: v.folder_id || null,
+          created_at: v.created_at || null,
+          updated_at: v.updated_at || null,
+          synced_at: new Date().toISOString(),
+        }));
+
+        const { error: indexErr } = await supabase
+          .from("panda_videos_index")
+          .upsert(batch, { onConflict: "id" });
+
+        if (indexErr) {
+          console.error(`panda_videos_index upsert error batch ${i}: ${indexErr.message}`);
+          results.errors.push(`Videos index batch ${i}: ${indexErr.message}`);
+        } else {
+          results.videos_indexed += batch.length;
+        }
+      }
+
+      console.log(`📦 panda_videos_index populated: ${results.videos_indexed} entries`);
+    } catch (indexErr) {
+      console.error("panda_videos_index population error:", indexErr);
+      results.errors.push(`Videos index: ${(indexErr as Error).message}`);
     }
 
     return new Response(

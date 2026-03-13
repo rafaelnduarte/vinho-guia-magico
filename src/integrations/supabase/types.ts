@@ -500,6 +500,39 @@ export type Database = {
         }
         Relationships: []
       }
+      panda_audit_log: {
+        Row: {
+          action: string
+          aula_id: string | null
+          created_at: string | null
+          details: Json | null
+          id: string
+          new_video_id: string | null
+          old_video_id: string | null
+          result: string
+        }
+        Insert: {
+          action: string
+          aula_id?: string | null
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          new_video_id?: string | null
+          old_video_id?: string | null
+          result: string
+        }
+        Update: {
+          action?: string
+          aula_id?: string | null
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          new_video_id?: string | null
+          old_video_id?: string | null
+          result?: string
+        }
+        Relationships: []
+      }
       panda_title_index: {
         Row: {
           curso_id: string | null
@@ -521,6 +554,39 @@ export type Database = {
           panda_video_id?: string
           titulo_normalizado?: string
           titulo_original?: string
+        }
+        Relationships: []
+      }
+      panda_videos_index: {
+        Row: {
+          created_at: string | null
+          folder_id: string | null
+          id: string
+          status: string | null
+          synced_at: string | null
+          title: string
+          title_normalized: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          folder_id?: string | null
+          id: string
+          status?: string | null
+          synced_at?: string | null
+          title: string
+          title_normalized: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          folder_id?: string | null
+          id?: string
+          status?: string | null
+          synced_at?: string | null
+          title?: string
+          title_normalized?: string
+          updated_at?: string | null
         }
         Relationships: []
       }
