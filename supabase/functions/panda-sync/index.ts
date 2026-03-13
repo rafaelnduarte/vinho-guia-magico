@@ -145,12 +145,38 @@ Deno.serve(async (req) => {
       const videosData = await videosRes.json();
       const videos = videosData.videos ?? [];
 
+      // Try assigning profile (non-blocking, with diagnostic logging)
+      const profileId = Deno.env.get("PANDA_PROFILE_ID");
+      if (profileId) {
+        for (const video of videos) {
+          try {
+            console.log(`[panda-sync] Attempting profile assignment for video ${video.id} with PANDA_PROFILE_ID=${profileId}`);
+            const profileRes = await fetch(`${PANDA_BASE}/videos/${video.id}`, {
+              method: "PATCH",
+              headers: { ...pandaHeaders, "Content-Type": "application/json" },
+              body: JSON.stringify({ player_id: profileId }),
+            });
+            if (!profileRes.ok) {
+              const errText = await profileRes.text();
+              console.warn(`[panda-sync] Profile assignment failed for ${video.id} (${profileRes.status}): ${errText}`);
+            } else {
+              console.log(`[panda-sync] Profile assigned successfully for ${video.id}`);
+            }
+          } catch (profileErr) {
+            console.warn(`[panda-sync] Profile assignment exception for ${video.id}: ${(profileErr as Error).message}`);
+          }
+        }
+      } else {
+        console.log("[panda-sync] PANDA_PROFILE_ID not set, skipping profile assignment");
+      }
+
       for (const [index, video] of videos.entries()) {
         // Fetch individual video details to get embed_url and embed_html
         let embedUrl: string | null = null;
         let embedHtml: string | null = null;
 
         try {
+          console.log(`[panda-sync] Fetching details for video ${video.id}`);
           const detailRes = await fetch(`${PANDA_BASE}/videos/${video.id}`, {
             headers: pandaHeaders,
           });
@@ -158,14 +184,18 @@ Deno.serve(async (req) => {
             const detail = await detailRes.json();
             embedUrl = detail.embed_url || detail.player_url || null;
             embedHtml = detail.embed_html || detail.embed_code || detail.embed || null;
+            console.log(`[panda-sync] Video ${video.id}: embed_url=${embedUrl ? "YES" : "NO"}, embed_html=${embedHtml ? "YES" : "NO"}`);
+          } else {
+            console.warn(`[panda-sync] Detail fetch failed for ${video.id}: ${detailRes.status}`);
           }
-        } catch {
-          // If detail fetch fails, skip embed fields
+        } catch (detailErr) {
+          console.warn(`[panda-sync] Detail fetch exception for ${video.id}: ${(detailErr as Error).message}`);
         }
 
         // Fallback: build embed_url if API didn't provide one
         if (!embedUrl && video.id) {
           embedUrl = `https://player-vz-7b95acb0-d42.tv.pandavideo.com.br/embed/?v=${video.id}`;
+          console.log(`[panda-sync] Using fallback embed_url for ${video.id}`);
         }
 
         const { error: aulaError } = await supabase.from("aulas").upsert(
