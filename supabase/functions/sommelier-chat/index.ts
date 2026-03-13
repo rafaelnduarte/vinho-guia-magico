@@ -358,20 +358,20 @@ serve(async (req) => {
 
     if (!aiResponse.ok) {
       if (aiResponse.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "rate_limited", message: "Serviço sobrecarregado. Tente novamente em instantes." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        throw new HttpError(429, "rate_limited", "Serviço sobrecarregado. Tente novamente em instantes.");
       }
+
       if (aiResponse.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "payment_required", message: "Créditos de IA esgotados no servidor." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        throw new HttpError(
+          402,
+          "payment_required",
+          "Limite do provedor de IA atingido. Reduzi o contexto para economizar tokens, tente novamente em alguns segundos."
         );
       }
+
       const errText = await aiResponse.text();
       console.error("AI gateway error:", aiResponse.status, errText);
-      throw new Error("Erro ao consultar IA");
+      throw new HttpError(502, "ai_gateway_error", "Erro ao consultar IA");
     }
 
     const aiData = await aiResponse.json();
