@@ -23,13 +23,46 @@ REGRAS:
 11. Seja sucinto e objetivo. Vá direto ao ponto. Evite introduções longas ou repetições desnecessárias.
 12. NUNCA entregue uma resposta incompleta. Se precisar ser breve, priorize completude sobre detalhe.`;
 
+const MAX_KNOWLEDGE_CHARS = 12_000;
+const MAX_WINES_IN_CONTEXT = 60;
+
+class HttpError extends Error {
+  status: number;
+  code: string;
+
+  constructor(status: number, code: string, message: string) {
+    super(message);
+    this.status = status;
+    this.code = code;
+  }
+}
+
+const normalizeText = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+const buildProviderFallbackReply = (contextPack: Array<{ nome: string; pais: string | null; safra: number | null; tipo: string | null }>) => {
+  if (!contextPack.length) {
+    return "⚠️ O provedor de IA está instável agora. Tente novamente em instantes.";
+  }
+
+  const quickSuggestions = contextPack.slice(0, 3)
+    .map((wine) => `- **${wine.nome}** (${wine.pais ?? "Origem não informada"}, ${wine.safra ?? "s/ safra"})${wine.tipo ? ` — ${wine.tipo}` : ""}`)
+    .join("\n");
+
+  return `⚠️ O provedor de IA está temporariamente indisponível, mas já te deixo sugestões rápidas do portal:\n\n${quickSuggestions}\n\nSe quiser, me mande novamente sua pergunta em alguns segundos que tento uma resposta completa.`;
+};
+
 serve(async (req) => {
-  if (req.method === "OPTIONS")
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
 
   try {
     const authHeader = req.headers.get("authorization");
-    if (!authHeader) throw new Error("Não autorizado");
+    if (!authHeader) throw new HttpError(401, "unauthorized", "Não autorizado");
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -41,7 +74,7 @@ serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
     const { data: { user }, error: authErr } = await userClient.auth.getUser();
-    if (authErr || !user) throw new Error("Não autorizado");
+    if (authErr || !user) throw new HttpError(401, "unauthorized", "Não autorizado");
 
     // Service client for writes
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
@@ -50,9 +83,11 @@ serve(async (req) => {
     const { message, session_id } = body;
 
     if (!message || typeof message !== "string" || message.trim().length === 0) {
-      throw new Error("Mensagem vazia");
+      throw new HttpError(400, "validation_error", "Mensagem vazia");
     }
-    if (message.length > 2000) throw new Error("Mensagem muito longa (max 2000 chars)");
+    if (message.length > 2000) {
+      throw new HttpError(400, "validation_error", "Mensagem muito longa (max 2000 chars)");
+    }
 
     // 1. Get pricing config (includes system_prompt)
     const { data: pricingArr } = await adminClient
@@ -60,12 +95,12 @@ serve(async (req) => {
       .select("*")
       .limit(1);
     const pricing = pricingArr?.[0];
-    if (!pricing) throw new Error("Configuração de preços não encontrada");
+    if (!pricing) throw new HttpError(500, "server_config", "Configuração de preços não encontrada");
 
     const systemPrompt = pricing.system_prompt || FALLBACK_SYSTEM_PROMPT;
     const maxTokens = pricing.max_tokens_detalhado;
 
-    // 1b. Get active knowledge base entries
+    // 1b. Get active knowledge base entries (capped to avoid oversized prompts)
     const { data: knowledgeEntries } = await adminClient
       .from("ai_knowledge_base")
       .select("title, content, category")
@@ -74,10 +109,24 @@ serve(async (req) => {
 
     let knowledgeContext = "";
     if (knowledgeEntries && knowledgeEntries.length > 0) {
-      const knowledgeText = knowledgeEntries
-        .map(e => `### ${e.title} [${e.category}]\n${e.content}`)
-        .join("\n\n");
-      knowledgeContext = `\n\nBASE DE CONHECIMENTO (use como referência):\n${knowledgeText}`;
+      let remainingChars = MAX_KNOWLEDGE_CHARS;
+      const compactKnowledge: string[] = [];
+
+      for (const entry of knowledgeEntries) {
+        if (remainingChars <= 0) break;
+
+        const rawChunk = `### ${entry.title} [${entry.category}]\n${entry.content.slice(0, 2500)}`;
+        const chunk = rawChunk.slice(0, remainingChars);
+
+        if (chunk.trim().length > 0) {
+          compactKnowledge.push(chunk);
+          remainingChars -= chunk.length;
+        }
+      }
+
+      if (compactKnowledge.length > 0) {
+        knowledgeContext = `\n\nBASE DE CONHECIMENTO (resumo):\n${compactKnowledge.join("\n\n")}`;
+      }
     }
 
     // 2. Check monthly budget
@@ -147,7 +196,7 @@ serve(async (req) => {
         .eq("id", sessionId)
         .single();
       if (!sessionCheck || sessionCheck.user_id !== user.id) {
-        throw new Error("Sessão não encontrada ou não autorizada");
+        throw new HttpError(403, "forbidden", "Sessão não encontrada ou não autorizada");
       }
     } else {
       const { data: newSession, error: sessErr } = await adminClient
@@ -186,26 +235,60 @@ serve(async (req) => {
       conversationMessages = allHistory;
     }
 
-    // 6. RAG: ALWAYS fetch ALL wines first, then add keyword-matched ones with priority
-    // Fetch ALL wines from curadoria and acervo (complete catalog)
+    // 6. RAG enxuto: busca direcionada para evitar payload gigante e erro 402
     const { data: allWines } = await adminClient
       .from("wines")
-      .select("id, name, producer, country, region, vintage, type, grape, importer, price_range, description, tasting_notes, image_url, rating, status")
+      .select("id, name, producer, country, region, vintage, type, grape, importer, price_range, description, tasting_notes, rating, status")
       .in("status", ["curadoria", "acervo"])
       .order("created_at", { ascending: false });
 
     const allWinesList = allWines ?? [];
 
-    // Build context: include ALL wines (compact format for large catalogs)
-    const wineContext = allWinesList;
+    const querySource = normalizeText(
+      `${message} ${conversationMessages.slice(-4).map((m) => m.content).join(" ")}`
+    );
 
-    // Get seals for all wines
-    const wineIds = wineContext.map(w => w.id);
-    let sealMap: Record<string, string[]> = {};
-    let notesMap: Record<string, string[]> = {};
+    const queryTokens = Array.from(
+      new Set(querySource.split(/[^a-z0-9]+/g).filter((token) => token.length >= 3))
+    ).slice(0, 25);
+
+    const scoredWines = allWinesList
+      .map((wine) => {
+        const searchable = normalizeText(
+          [wine.name, wine.producer, wine.country, wine.region, wine.type, wine.grape, wine.importer]
+            .filter(Boolean)
+            .join(" ")
+        );
+
+        let score = 0;
+        for (const token of queryTokens) {
+          if (!searchable.includes(token)) continue;
+          if (normalizeText(wine.name ?? "").includes(token)) score += 5;
+          else if (normalizeText(wine.grape ?? "").includes(token) || normalizeText(wine.type ?? "").includes(token)) score += 3;
+          else score += 1;
+        }
+
+        return { wine, score };
+      })
+      .sort((a, b) => b.score - a.score);
+
+    const matchedWines = scoredWines
+      .filter((item) => item.score > 0)
+      .slice(0, MAX_WINES_IN_CONTEXT)
+      .map((item) => item.wine);
+
+    const fallbackWines = scoredWines
+      .filter((item) => item.score === 0)
+      .slice(0, Math.max(0, MAX_WINES_IN_CONTEXT - matchedWines.length))
+      .map((item) => item.wine);
+
+    const wineContext = [...matchedWines, ...fallbackWines];
+
+    const wineIds = wineContext.map((wine) => wine.id);
+    const sealMap: Record<string, string[]> = {};
+    const notesMap: Record<string, string[]> = {};
 
     if (wineIds.length > 0) {
-      // Batch fetch seals and notes in parallel
       const [{ data: wineSeals }, { data: thomasNotes }] = await Promise.all([
         adminClient
           .from("wine_seals")
@@ -220,36 +303,38 @@ serve(async (req) => {
 
       wineSeals?.forEach((ws: any) => {
         if (!sealMap[ws.wine_id]) sealMap[ws.wine_id] = [];
-        sealMap[ws.wine_id].push(ws.seals?.name ?? "");
+        if (ws.seals?.name) sealMap[ws.wine_id].push(ws.seals.name);
       });
 
-      thomasNotes?.forEach((n: any) => {
-        if (!notesMap[n.wine_id]) notesMap[n.wine_id] = [];
-        notesMap[n.wine_id].push(`[${n.note_type}] ${n.note_text}`);
+      thomasNotes?.forEach((note: any) => {
+        if (!notesMap[note.wine_id]) notesMap[note.wine_id] = [];
+        notesMap[note.wine_id].push(`[${note.note_type}] ${note.note_text}`);
       });
     }
 
-    const contextPack = wineContext.map(w => ({
-      id: w.id,
-      nome: w.name,
-      produtor: w.producer,
-      pais: w.country,
-      regiao: w.region,
-      safra: w.vintage,
-      tipo: w.type,
-      uva: w.grape,
-      importadora: w.importer,
-      preco: w.price_range,
-      descricao: w.description?.slice(0, 200),
-      notas_degustacao: w.tasting_notes?.slice(0, 150),
-      nota: w.rating,
-      status: (w as any).status,
-      selos: sealMap[w.id] ?? [],
-      notas_thomas: notesMap[w.id] ?? [],
+    const contextPack = wineContext.map((wine) => ({
+      id: wine.id,
+      nome: wine.name,
+      produtor: wine.producer,
+      pais: wine.country,
+      regiao: wine.region,
+      safra: wine.vintage,
+      tipo: wine.type,
+      uva: wine.grape,
+      importadora: wine.importer,
+      preco: wine.price_range,
+      descricao: wine.description?.slice(0, 140),
+      notas_degustacao: wine.tasting_notes?.slice(0, 120),
+      nota: wine.rating,
+      status: wine.status,
+      selos: sealMap[wine.id] ?? [],
+      notas_thomas: notesMap[wine.id] ?? [],
     }));
 
+    const allWineNames = allWinesList.map((wine) => wine.name).join(" | ").slice(0, 6000);
+
     const contextMessage = contextPack.length > 0
-      ? `\n\nCATÁLOGO COMPLETO DO PORTAL (${contextPack.length} vinhos — use APENAS estes para recomendações do portal). Vinhos com status "acervo" são históricos e podem não estar disponíveis para compra:\n${JSON.stringify(contextPack, null, 0)}`
+      ? `\n\nCATÁLOGO DO PORTAL: ${allWinesList.length} vinhos cadastrados.\nVinhos em foco para esta pergunta (${contextPack.length}):\n${JSON.stringify(contextPack)}\n\nNomes do catálogo (referência rápida): ${allWineNames}`
       : "\n\nNenhum vinho cadastrado no portal no momento.";
 
     // 7. Save user message
@@ -283,28 +368,28 @@ serve(async (req) => {
       }),
     });
 
+    let assistantContent = "Desculpe, não consegui gerar uma resposta.";
+    let tokensIn = 0;
+    let tokensOut = 0;
+
     if (!aiResponse.ok) {
       if (aiResponse.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "rate_limited", message: "Serviço sobrecarregado. Tente novamente em instantes." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        throw new HttpError(429, "rate_limited", "Serviço sobrecarregado. Tente novamente em instantes.");
       }
-      if (aiResponse.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "payment_required", message: "Créditos de IA esgotados no servidor." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      const errText = await aiResponse.text();
-      console.error("AI gateway error:", aiResponse.status, errText);
-      throw new Error("Erro ao consultar IA");
-    }
 
-    const aiData = await aiResponse.json();
-    const assistantContent = aiData.choices?.[0]?.message?.content ?? "Desculpe, não consegui gerar uma resposta.";
-    const tokensIn = aiData.usage?.prompt_tokens ?? 0;
-    const tokensOut = aiData.usage?.completion_tokens ?? 0;
+      if (aiResponse.status === 402) {
+        assistantContent = buildProviderFallbackReply(contextPack);
+      } else {
+        const errText = await aiResponse.text();
+        console.error("AI gateway error:", aiResponse.status, errText);
+        throw new HttpError(502, "ai_gateway_error", "Erro ao consultar IA");
+      }
+    } else {
+      const aiData = await aiResponse.json();
+      assistantContent = aiData.choices?.[0]?.message?.content ?? assistantContent;
+      tokensIn = aiData.usage?.prompt_tokens ?? 0;
+      tokensOut = aiData.usage?.completion_tokens ?? 0;
+    }
 
     // 9. Calculate cost
     const costUsd = (tokensIn / 1000) * Number(pricing.price_in_per_1k) +
@@ -433,6 +518,14 @@ serve(async (req) => {
     );
   } catch (e) {
     console.error("sommelier-chat error:", e);
+
+    if (e instanceof HttpError) {
+      return new Response(
+        JSON.stringify({ error: e.code, message: e.message }),
+        { status: e.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     return new Response(
       JSON.stringify({ error: "server_error", message: (e as Error).message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
