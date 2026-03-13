@@ -43,6 +43,18 @@ const normalizeText = (value: string) =>
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
 
+const buildProviderFallbackReply = (contextPack: Array<{ nome: string; pais: string | null; safra: number | null; tipo: string | null }>) => {
+  if (!contextPack.length) {
+    return "⚠️ O provedor de IA está instável agora. Tente novamente em instantes.";
+  }
+
+  const quickSuggestions = contextPack.slice(0, 3)
+    .map((wine) => `- **${wine.nome}** (${wine.pais ?? "Origem não informada"}, ${wine.safra ?? "s/ safra"})${wine.tipo ? ` — ${wine.tipo}` : ""}`)
+    .join("\n");
+
+  return `⚠️ O provedor de IA está temporariamente indisponível, mas já te deixo sugestões rápidas do portal:\n\n${quickSuggestions}\n\nSe quiser, me mande novamente sua pergunta em alguns segundos que tento uma resposta completa.`;
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
