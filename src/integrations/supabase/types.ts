@@ -128,6 +128,7 @@ export type Database = {
           curso_id: string
           descricao: string | null
           duracao_segundos: number
+          embed_url: string | null
           id: string
           is_published: boolean
           panda_quiz_id: string | null
@@ -144,6 +145,7 @@ export type Database = {
           curso_id: string
           descricao?: string | null
           duracao_segundos?: number
+          embed_url?: string | null
           id?: string
           is_published?: boolean
           panda_quiz_id?: string | null
@@ -160,6 +162,7 @@ export type Database = {
           curso_id?: string
           descricao?: string | null
           duracao_segundos?: number
+          embed_url?: string | null
           id?: string
           is_published?: boolean
           panda_quiz_id?: string | null

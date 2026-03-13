@@ -8,7 +8,7 @@ const corsHeaders = {
   "Content-Type": "application/json",
 };
 
-const PANDA_BASE = "https://api-v2.pandavideo.com";
+const PANDA_BASE = "https://api-v2.pandavideo.com.br";
 
 function normalizeScrappy(str: string): string {
   return (str || "")
@@ -32,6 +32,10 @@ function mapPandaStatus(pandaStatus: string): string {
   if (pandaStatus === "CONVERTED") return "completed";
   if (pandaStatus === "FAILED" || pandaStatus === "ERROR") return "failed";
   return "processing";
+}
+
+function buildEmbedUrl(videoId: string): string {
+  return `https://player-vz-7b95acb0-d42.tv.pandavideo.com.br/embed/?v=${videoId}`;
 }
 
 Deno.serve(async (req) => {
@@ -190,7 +194,7 @@ Deno.serve(async (req) => {
       results.folders_synced++;
       console.log(`cursoId: ${cursoId} (folder: "${folder.name}")`);
 
-      // PASSO 2 — Fetch videos and upsert aulas
+      // PASSO 2 — Fetch videos and upsert aulas with embed_url
       const videosRes = await fetch(
         `${PANDA_BASE}/videos?folder_id=${folder.id}`,
         { headers: { Authorization: apiKey, Accept: "application/json" } }
@@ -223,6 +227,7 @@ Deno.serve(async (req) => {
         console.log(`Syncing video [${index + 1}/${videos.length}]: "${video.title}" (id=${video.id})`);
 
         const tituloNormalizado = normalizeScrappy(video.title || "");
+        const embedUrl = buildEmbedUrl(video.id);
 
         const { error: aulaError } = await supabase.from("aulas").upsert(
           {
@@ -236,6 +241,7 @@ Deno.serve(async (req) => {
             is_published: video.status === "CONVERTED",
             thumbnail_url: video.thumbnail || video.thumbnail_url || null,
             status: mapPandaStatus(video.status || ""),
+            embed_url: embedUrl,
           },
           { onConflict: "panda_video_id" }
         );
@@ -246,7 +252,7 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        console.log(`Video "${video.title}" synced OK → normalized: "${tituloNormalizado}"`);
+        console.log(`Video "${video.title}" synced OK → embed: "${embedUrl}"`);
         syncedVideoIds.push(video.id);
         allSyncedVideoIds.push(video.id);
         results.videos_synced++;
@@ -281,7 +287,7 @@ Deno.serve(async (req) => {
       if (profileId && syncedVideoIds.length > 0) {
         try {
           const profileRes = await fetch(
-            `https://api-v2.pandavideo.com.br/profile/?type=set-videos`,
+            `${PANDA_BASE}/profile/?type=set-videos`,
             {
               method: "POST",
               headers: {
@@ -329,8 +335,8 @@ Deno.serve(async (req) => {
       const limit = 50;
 
       while (true) {
-        const url = `https://api-v2.pandavideo.com.br/videos?page=${page}&limit=${limit}`;
-        let res = await fetch(url, {
+        const url = `${PANDA_BASE}/videos?page=${page}&limit=${limit}`;
+        const res = await fetch(url, {
           headers: { Authorization: apiKey, Accept: "application/json" },
         });
 

@@ -14,6 +14,7 @@ interface AulaData {
   descricao: string | null;
   duracao_segundos: number;
   panda_video_id: string | null;
+  embed_url: string | null;
   sort_order: number;
 }
 
@@ -61,7 +62,7 @@ export default function AulaPage() {
       const [aulaRes, siblingsRes, progressoRes] = await Promise.all([
         supabase
           .from("aulas")
-          .select("id, titulo, descricao, duracao_segundos, panda_video_id, sort_order")
+          .select("id, titulo, descricao, duracao_segundos, panda_video_id, embed_url, sort_order")
           .eq("id", aulaId)
           .maybeSingle(),
         supabase
@@ -85,10 +86,6 @@ export default function AulaPage() {
         const siblings = (siblingsRes.data as { id: string; titulo: string }[])
           .sort((a, b) => a.titulo.localeCompare(b.titulo, 'pt-BR', { numeric: true }));
         const idx = siblings.findIndex((s) => s.id === aulaId);
-        console.log('[NAV] Siblings ordenados:', siblings.map(s => s.titulo));
-        console.log('[NAV] Aula atual:', aulaId, 'Index:', idx);
-        if (idx > 0) console.log('[NAV] Anterior:', siblings[idx - 1].titulo);
-        if (idx < siblings.length - 1) console.log('[NAV] Próxima:', siblings[idx + 1].titulo);
         setPrevAulaId(idx > 0 ? siblings[idx - 1].id : null);
         setNextAulaId(idx < siblings.length - 1 ? siblings[idx + 1].id : null);
       }
@@ -165,6 +162,8 @@ export default function AulaPage() {
     return <p className="text-center py-12 text-muted-foreground">Aula não encontrada.</p>;
   }
 
+  const hasVideo = aula.embed_url || aula.panda_video_id;
+
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6">
       {/* Breadcrumb */}
@@ -173,9 +172,10 @@ export default function AulaPage() {
       </Button>
 
       {/* Player */}
-      {aula.panda_video_id ? (
+      {hasVideo ? (
         <PandaPlayer
-          pandaVideoId={aula.panda_video_id}
+          embedUrl={aula.embed_url}
+          pandaVideoId={aula.panda_video_id || undefined}
           startAt={startAt}
           userId={user?.id}
           aulaId={aulaId}

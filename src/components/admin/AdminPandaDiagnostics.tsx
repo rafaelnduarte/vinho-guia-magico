@@ -57,16 +57,6 @@ export default function AdminPandaDiagnostics() {
   const [recoveryLoading, setRecoveryLoading] = useState<string | null>(null);
   const [recoveryResult, setRecoveryResult] = useState<any>(null);
   const [reuploadUrl, setReuploadUrl] = useState("");
-  const [setupLoading, setSetupLoading] = useState(false);
-  const [setupResult, setSetupResult] = useState<any>(null);
-  const [setupError, setSetupError] = useState<string | null>(null);
-  const [groupInfoLoading, setGroupInfoLoading] = useState(false);
-  const [groupInfo, setGroupInfo] = useState<any>(null);
-  const [groupInfoError, setGroupInfoError] = useState<string | null>(null);
-  const [assignDrmLoading, setAssignDrmLoading] = useState(false);
-  const [assignDrmResult, setAssignDrmResult] = useState<any>(null);
-  const [assignAllLoading, setAssignAllLoading] = useState(false);
-  const [assignAllResult, setAssignAllResult] = useState<any>(null);
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditResult, setAuditResult] = useState<any>(null);
   const [auditError, setAuditError] = useState<string | null>(null);
@@ -101,7 +91,6 @@ export default function AdminPandaDiagnostics() {
       setFixResult({ error: fnErr.message });
     } else {
       setFixResult(data);
-      // Remove fixed item from audit result
       if (auditResult?.inconsistent) {
         setAuditResult({
           ...auditResult,
@@ -143,7 +132,6 @@ export default function AdminPandaDiagnostics() {
       setFixResult({ error: fnErr.message });
     } else {
       setFixResult(data);
-      // Remove fixed items
       const fixedIds = new Set(fixes.map((f: any) => f.aula_id));
       setAuditResult({
         ...auditResult,
@@ -170,72 +158,6 @@ export default function AdminPandaDiagnostics() {
       return data as any[];
     },
   });
-
-  const fetchGroupInfo = async () => {
-    setGroupInfoLoading(true);
-    setGroupInfoError(null);
-    setGroupInfo(null);
-
-    const { data, error: fnErr } = await supabase.functions.invoke("panda-diagnostics", {
-      body: { action: "group_info" },
-    });
-
-    setGroupInfoLoading(false);
-    if (fnErr) {
-      setGroupInfoError(fnErr.message);
-    } else {
-      setGroupInfo(data);
-    }
-  };
-
-  const assignDrm = async (vid: string) => {
-    setAssignDrmLoading(true);
-    setAssignDrmResult(null);
-
-    const { data, error: fnErr } = await supabase.functions.invoke("panda-diagnostics", {
-      body: { action: "assign_drm", video_id: vid },
-    });
-
-    setAssignDrmLoading(false);
-    if (fnErr) {
-      setAssignDrmResult({ success: false, error: fnErr.message });
-    } else {
-      setAssignDrmResult(data);
-    }
-  };
-
-  const assignAllDrm = async () => {
-    setAssignAllLoading(true);
-    setAssignAllResult(null);
-
-    const { data, error: fnErr } = await supabase.functions.invoke("panda-diagnostics", {
-      body: { action: "assign_drm_all" },
-    });
-
-    setAssignAllLoading(false);
-    if (fnErr) {
-      setAssignAllResult({ success: false, error: fnErr.message });
-    } else {
-      setAssignAllResult(data);
-    }
-  };
-
-  const runSetupWatermark = async () => {
-    setSetupLoading(true);
-    setSetupError(null);
-    setSetupResult(null);
-
-    const { data, error: fnErr } = await supabase.functions.invoke("setup-watermark", {
-      method: "POST",
-    });
-
-    setSetupLoading(false);
-    if (fnErr) {
-      setSetupError(fnErr.message);
-    } else {
-      setSetupResult(data);
-    }
-  };
 
   // Fetch recovery logs
   const { data: recoveryLogs, refetch: refetchLogs } = useQuery({
@@ -322,7 +244,7 @@ export default function AdminPandaDiagnostics() {
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
             Valida todos os video_ids entre o banco de dados e a API do Panda Video.
-            Identifica inconsistências, órfãos e falhas no config.json.
+            Identifica inconsistências, vídeos sem embed, e vídeos com falha.
           </p>
           <div className="flex items-center gap-3">
             <Button onClick={runAudit} disabled={auditLoading} variant="default">
@@ -362,13 +284,19 @@ export default function AdminPandaDiagnostics() {
                     <p className="text-xs text-muted-foreground">Inconsistentes</p>
                   </CardContent>
                 </Card>
-                <Card className="border border-destructive/50">
+                <Card className="border border-yellow-500/50">
                   <CardContent className="p-3 text-center">
-                    <p className="text-2xl font-bold text-destructive">{auditResult.summary?.config_failed_count ?? 0}</p>
-                    <p className="text-xs text-muted-foreground">config.json 404</p>
+                    <p className="text-2xl font-bold text-yellow-600">{auditResult.summary?.missing_embed_count ?? 0}</p>
+                    <p className="text-xs text-muted-foreground">Sem embed_url</p>
                   </CardContent>
                 </Card>
               </div>
+
+              {auditResult.summary?.failed_videos_count > 0 && (
+                <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+                  ❌ {auditResult.summary.failed_videos_count} vídeo(s) com status FAILED no Panda
+                </div>
+              )}
 
               {/* Fix Result */}
               {fixResult && (
@@ -458,11 +386,46 @@ export default function AdminPandaDiagnostics() {
                 </Card>
               )}
 
-              {/* Config Failed */}
-              {auditResult.config_failed?.length > 0 && (
+              {/* Missing Embed */}
+              {auditResult.missing_embed?.length > 0 && (
+                <Card className="border-yellow-500/30">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">📭 Sem embed_url ({auditResult.missing_embed.length})</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Essas aulas não possuem embed_url. Execute "Sync Panda" para preencher automaticamente.
+                    </p>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Aula</TableHead>
+                          <TableHead>Video ID</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {auditResult.missing_embed.slice(0, 20).map((item: any, i: number) => (
+                          <TableRow key={i}>
+                            <TableCell className="text-xs">{item.aula_titulo}</TableCell>
+                            <TableCell className="font-mono text-xs">{item.panda_video_id?.slice(0, 16)}…</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                    {auditResult.missing_embed.length > 20 && (
+                      <p className="text-xs text-muted-foreground mt-2">
+                        ...e mais {auditResult.missing_embed.length - 20} aulas
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Failed Videos */}
+              {auditResult.failed_videos?.length > 0 && (
                 <Card className="border-destructive/30">
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-base">❌ config.json Falhou ({auditResult.config_failed.length})</CardTitle>
+                    <CardTitle className="text-base">❌ Vídeos com Falha ({auditResult.failed_videos.length})</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <Table>
@@ -470,17 +433,15 @@ export default function AdminPandaDiagnostics() {
                         <TableRow>
                           <TableHead>Aula</TableHead>
                           <TableHead>Video ID</TableHead>
-                          <TableHead>Status HTTP</TableHead>
+                          <TableHead>Status Panda</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {auditResult.config_failed.map((item: any, i: number) => (
+                        {auditResult.failed_videos.map((item: any, i: number) => (
                           <TableRow key={i}>
                             <TableCell className="text-xs">{item.aula_titulo}</TableCell>
                             <TableCell className="font-mono text-xs">{item.panda_video_id?.slice(0, 16)}…</TableCell>
-                            <TableCell>
-                              <Badge variant="destructive">{item.config_status}</Badge>
-                            </TableCell>
+                            <TableCell><Badge variant="destructive">{item.panda_status}</Badge></TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -493,7 +454,7 @@ export default function AdminPandaDiagnostics() {
               {auditResult.orphans?.length > 0 && (
                 <details className="text-xs">
                   <summary className="cursor-pointer text-muted-foreground hover:text-foreground font-medium">
-                    🔸 Órfãos no Panda ({auditResult.orphans.length} vídeos sem referência no Supabase)
+                    🔸 Órfãos no Panda ({auditResult.orphans.length} vídeos sem referência no banco)
                   </summary>
                   <Table className="mt-2">
                     <TableHeader>
@@ -572,140 +533,12 @@ export default function AdminPandaDiagnostics() {
         </CardContent>
       </Card>
 
-      {/* Setup Watermark Card */}
-      <Card className="border-primary/30">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            🔐 Setup Watermark Group (DRM)
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Executa uma única vez para criar o Watermark Group no Panda, habilitar DRM e gerar o Private Token.
-            Os valores retornados devem ser salvos como secrets.
-          </p>
-          <Button onClick={runSetupWatermark} disabled={setupLoading} variant="default">
-            {setupLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Stethoscope className="h-4 w-4 mr-1" />}
-            Executar Setup Watermark
-          </Button>
-
-          {setupError && (
-            <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-              ❌ {setupError}
-            </div>
-          )}
-
-          {setupResult && (
-            <div className="space-y-3">
-              <div className={`rounded-md p-4 text-sm ${setupResult.success ? "bg-green-500/10 text-green-700 dark:text-green-400" : "bg-destructive/10 text-destructive"}`}>
-                <p className="font-medium">{setupResult.success ? "✅ Setup completo!" : "❌ Setup falhou"}</p>
-              </div>
-              {setupResult.group_id && (
-                <div className="rounded-md bg-muted p-3 space-y-2">
-                  <p className="text-xs font-medium">Copie estes valores para adicionar como secrets:</p>
-                  <div className="text-xs font-mono">
-                    <p><span className="font-bold">PANDA_WATERMARK_GROUP_ID:</span> {setupResult.group_id}</p>
-                    <p><span className="font-bold">PANDA_WATERMARK_PRIVATE_TOKEN:</span> {setupResult.key || setupResult.private_token || "N/A"}</p>
-                  </div>
-                  {setupResult.next_steps && (
-                    <ul className="text-xs text-muted-foreground list-disc pl-4 mt-2">
-                      {setupResult.next_steps.map((s: string, i: number) => <li key={i}>{s}</li>)}
-                    </ul>
-                  )}
-                </div>
-              )}
-              <details className="text-xs">
-                <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Ver JSON completo</summary>
-                <pre className="mt-2 overflow-auto rounded-md bg-muted p-3 max-h-40">{JSON.stringify(setupResult, null, 2)}</pre>
-              </details>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Bulk Assign ALL to DRM Group */}
-      <Card className="border-primary/30">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            🔗 Associar TODOS ao DRM Group
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Associa TODOS os vídeos cadastrados nas aulas ao DRM/Watermark Group. 
-            Sem esta associação, o Panda limita a reprodução a 6 segundos.
-          </p>
-          <Button onClick={assignAllDrm} disabled={assignAllLoading} variant="default">
-            {assignAllLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-            Associar TODOS os vídeos ao DRM Group
-          </Button>
-
-          {assignAllResult && (
-            <div className="space-y-2">
-              <div className={`rounded-md p-4 text-sm ${assignAllResult.success ? "bg-green-500/10 text-green-700 dark:text-green-400" : "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400"}`}>
-                <p className="font-medium">
-                  {assignAllResult.success ? "✅ Todos associados com sucesso!" : `⚠️ Concluído com ${assignAllResult.failed} falha(s)`}
-                </p>
-                <p className="mt-1 text-xs">
-                  Total: {assignAllResult.total} | Sucesso: {assignAllResult.success_count ?? assignAllResult.success} | Falhas: {assignAllResult.failed}
-                </p>
-              </div>
-              {assignAllResult.errors?.length > 0 && (
-                <details className="text-xs">
-                  <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
-                    Ver falhas ({assignAllResult.errors.length})
-                  </summary>
-                  <pre className="mt-2 overflow-auto rounded-md bg-muted p-3 max-h-40">
-                    {JSON.stringify(assignAllResult.errors, null, 2)}
-                  </pre>
-                </details>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* DRM Group Info Card */}
-      <Card className="border-primary/30">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            🔍 DRM Group Info
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Consulta o DRM Group no Panda para verificar se o grupo existe, tem secret válido e quais vídeos estão associados.
-          </p>
-          <Button onClick={fetchGroupInfo} disabled={groupInfoLoading} variant="outline">
-            {groupInfoLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Stethoscope className="h-4 w-4 mr-1" />}
-            Consultar DRM Group
-          </Button>
-
-          {groupInfoError && (
-            <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-              ❌ {groupInfoError}
-            </div>
-          )}
-
-          {groupInfo && (
-            <div className="space-y-3">
-              <div className={`rounded-md p-4 text-sm ${groupInfo.error ? "bg-destructive/10 text-destructive" : "bg-green-500/10 text-green-700 dark:text-green-400"}`}>
-                <p className="font-medium">{groupInfo.error ? `❌ ${groupInfo.error}` : "✅ DRM Group encontrado"}</p>
-              </div>
-              <details className="text-xs">
-                <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Ver JSON completo</summary>
-                <pre className="mt-2 overflow-auto rounded-md bg-muted p-3 max-h-40">{JSON.stringify(groupInfo, null, 2)}</pre>
-              </details>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
+      {/* Individual Video Diagnostic */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
             <Stethoscope className="h-5 w-5" />
-            Diagnóstico Panda Video
+            Diagnóstico Individual
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -768,38 +601,6 @@ export default function AdminPandaDiagnostics() {
                   </Card>
                 ))}
               </div>
-
-              {/* Assign to DRM Group */}
-              <Card className="border-primary/30">
-                <CardContent className="p-4 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm">🔗 Associar vídeo ao DRM Group</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Sem associação ao grupo DRM, o Panda limita a reprodução a 6 segundos.
-                  </p>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => assignDrm(videoId.trim())}
-                    disabled={assignDrmLoading || !videoId.trim()}
-                  >
-                    {assignDrmLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-                    Assign to DRM Group
-                  </Button>
-                  {assignDrmResult && (
-                    <div className={`rounded-md p-3 text-sm ${assignDrmResult.success ? "bg-green-500/10 text-green-700 dark:text-green-400" : "bg-destructive/10 text-destructive"}`}>
-                      <p className="font-medium">{assignDrmResult.success ? "✅ Vídeo associado ao grupo DRM" : `❌ ${assignDrmResult.error}`}</p>
-                      {assignDrmResult.response && (
-                        <details className="text-xs mt-1">
-                          <summary className="cursor-pointer">Detalhes</summary>
-                          <pre className="mt-1 overflow-auto">{assignDrmResult.response}</pre>
-                        </details>
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
 
               {/* Recovery Actions */}
               {result.issues_count > 0 && (
