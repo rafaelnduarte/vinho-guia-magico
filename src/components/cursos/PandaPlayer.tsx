@@ -3,6 +3,7 @@ import { Loader2, VideoOff } from "lucide-react";
 
 interface PandaPlayerProps {
   embedUrl?: string | null;
+  embedHtml?: string | null;
   pandaVideoId?: string;
   startAt?: number;
   userId?: string;
@@ -14,6 +15,7 @@ interface PandaPlayerProps {
 
 export default function PandaPlayer({
   embedUrl,
+  embedHtml,
   pandaVideoId,
   startAt = 0,
   onProgress,
@@ -23,8 +25,12 @@ export default function PandaPlayer({
   const completedRef = useRef(false);
   const [ready, setReady] = useState(false);
 
-  // Build the iframe src
+  // If embedHtml is provided, render it directly
+  const useHtml = !!embedHtml;
+
+  // Build the iframe src (only used when embedHtml is NOT available)
   const src = (() => {
+    if (useHtml) return null;
     if (embedUrl) return embedUrl;
     if (pandaVideoId) {
       const params = new URLSearchParams({
@@ -72,22 +78,22 @@ export default function PandaPlayer({
   );
 
   useEffect(() => {
-    if (!src) return;
+    if (!src && !useHtml) return;
     completedRef.current = false;
     setReady(false);
 
     window.addEventListener("message", handleMessage);
 
-    // Mark ready after short delay to allow iframe to start loading
     const timer = setTimeout(() => setReady(true), 500);
 
     return () => {
       window.removeEventListener("message", handleMessage);
       clearTimeout(timer);
     };
-  }, [handleMessage, src]);
+  }, [handleMessage, src, useHtml]);
 
-  if (!src) {
+  // No video available at all
+  if (!src && !useHtml) {
     return (
       <div className="relative w-full overflow-hidden rounded-xl bg-secondary flex items-center justify-center" style={{ aspectRatio: "16/9" }}>
         <div className="text-center space-y-3 p-6 max-w-md">
@@ -101,6 +107,25 @@ export default function PandaPlayer({
     );
   }
 
+  // Render embed_html via dangerouslySetInnerHTML
+  if (useHtml) {
+    return (
+      <div className="relative w-full overflow-hidden rounded-xl bg-secondary" style={{ aspectRatio: "16/9" }}>
+        {!ready && (
+          <div className="absolute inset-0 flex items-center justify-center bg-secondary z-10">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        )}
+        <div
+          className="absolute inset-0 w-full h-full [&>iframe]:w-full [&>iframe]:h-full [&>iframe]:border-0"
+          dangerouslySetInnerHTML={{ __html: embedHtml! }}
+          onLoad={() => setReady(true)}
+        />
+      </div>
+    );
+  }
+
+  // Render via iframe src
   return (
     <div className="relative w-full overflow-hidden rounded-xl bg-secondary" style={{ aspectRatio: "16/9" }}>
       {!ready && (
@@ -110,7 +135,7 @@ export default function PandaPlayer({
       )}
       <iframe
         ref={iframeRef}
-        src={src}
+        src={src!}
         className="absolute inset-0 w-full h-full border-0"
         allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture"
         allowFullScreen

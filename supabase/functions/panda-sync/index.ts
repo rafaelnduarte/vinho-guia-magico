@@ -16,10 +16,6 @@ function mapPandaStatus(pandaStatus: string): string {
   return "processing";
 }
 
-function buildEmbedUrl(videoId: string): string {
-  return `https://player-vz-7b95acb0-d42.tv.pandavideo.com.br/embed/?v=${videoId}`;
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -33,21 +29,21 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Validate user via getUser
     const anonClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
+    const { data: userData, error: userError } = await anonClient.auth.getUser();
+    if (userError || !userData?.user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401, headers: corsHeaders,
       });
     }
 
-    const userId = claimsData.claims.sub;
+    const userId = userData.user.id;
     const { data: roleCheck } = await anonClient.rpc("has_role", {
       _user_id: userId,
       _role: "admin",
@@ -86,12 +82,14 @@ Deno.serve(async (req) => {
       errors: [] as string[],
     };
 
+    const pandaHeaders = { Authorization: apiKey, Accept: "application/json" };
+
     // Determine which folders to sync
     let foldersToSync: Array<{ id: string; name: string }> = [];
 
     if (targetFolderId) {
       const folderRes = await fetch(`${PANDA_BASE}/folders/${targetFolderId}`, {
-        headers: { Authorization: apiKey, Accept: "application/json" },
+        headers: pandaHeaders,
       });
       if (folderRes.ok) {
         const folderData = await folderRes.json();
@@ -101,7 +99,7 @@ Deno.serve(async (req) => {
       }
     } else {
       const foldersRes = await fetch(`${PANDA_BASE}/folders`, {
-        headers: { Authorization: apiKey, Accept: "application/json" },
+        headers: pandaHeaders,
       });
       const foldersData = await foldersRes.json();
       foldersToSync = foldersData.folders ?? [];
@@ -139,18 +137,36 @@ Deno.serve(async (req) => {
       const cursoId = cursoData.id;
       results.folders_synced++;
 
-      // Fetch videos and upsert aulas
+      // Fetch videos list for this folder
       const videosRes = await fetch(
         `${PANDA_BASE}/videos?folder_id=${folder.id}`,
-        { headers: { Authorization: apiKey, Accept: "application/json" } }
+        { headers: pandaHeaders }
       );
       const videosData = await videosRes.json();
       const videos = videosData.videos ?? [];
 
-      const syncedVideoIds: string[] = [];
-
       for (const [index, video] of videos.entries()) {
-        const embedUrl = buildEmbedUrl(video.id);
+        // Fetch individual video details to get embed_url and embed_html
+        let embedUrl: string | null = null;
+        let embedHtml: string | null = null;
+
+        try {
+          const detailRes = await fetch(`${PANDA_BASE}/videos/${video.id}`, {
+            headers: pandaHeaders,
+          });
+          if (detailRes.ok) {
+            const detail = await detailRes.json();
+            embedUrl = detail.embed_url || detail.player_url || null;
+            embedHtml = detail.embed_html || detail.embed_code || detail.embed || null;
+          }
+        } catch {
+          // If detail fetch fails, skip embed fields
+        }
+
+        // Fallback: build embed_url if API didn't provide one
+        if (!embedUrl && video.id) {
+          embedUrl = `https://player-vz-7b95acb0-d42.tv.pandavideo.com.br/embed/?v=${video.id}`;
+        }
 
         const { error: aulaError } = await supabase.from("aulas").upsert(
           {
@@ -164,6 +180,7 @@ Deno.serve(async (req) => {
             thumbnail_url: video.thumbnail || video.thumbnail_url || null,
             status: mapPandaStatus(video.status || ""),
             embed_url: embedUrl,
+            embed_html: embedHtml,
           },
           { onConflict: "panda_video_id" }
         );
@@ -173,29 +190,7 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        syncedVideoIds.push(video.id);
         results.videos_synced++;
-      }
-
-      // Assign profile to synced videos
-      const profileId = Deno.env.get("PANDA_PROFILE_ID");
-      if (profileId && syncedVideoIds.length > 0) {
-        try {
-          await fetch(`${PANDA_BASE}/profile/?type=set-videos`, {
-            method: "POST",
-            headers: {
-              Authorization: apiKey,
-              Accept: "application/json",
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              profile: profileId,
-              videos: syncedVideoIds,
-            }),
-          });
-        } catch (profileErr) {
-          results.errors.push(`Profile assignment ${folder.name}: ${(profileErr as Error).message}`);
-        }
       }
     }
 

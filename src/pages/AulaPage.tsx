@@ -15,6 +15,7 @@ interface AulaData {
   duracao_segundos: number;
   panda_video_id: string | null;
   embed_url: string | null;
+  embed_html: string | null;
   sort_order: number;
 }
 
@@ -62,7 +63,7 @@ export default function AulaPage() {
       const [aulaRes, siblingsRes, progressoRes] = await Promise.all([
         supabase
           .from("aulas")
-          .select("id, titulo, descricao, duracao_segundos, panda_video_id, embed_url, sort_order")
+          .select("id, titulo, descricao, duracao_segundos, panda_video_id, embed_url, embed_html, sort_order")
           .eq("id", aulaId)
           .maybeSingle(),
         supabase
@@ -162,7 +163,7 @@ export default function AulaPage() {
     return <p className="text-center py-12 text-muted-foreground">Aula não encontrada.</p>;
   }
 
-  const hasVideo = aula.embed_url || aula.panda_video_id;
+  const hasVideo = aula.embed_html || aula.embed_url || aula.panda_video_id;
 
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6">
@@ -175,6 +176,7 @@ export default function AulaPage() {
       {hasVideo ? (
         <PandaPlayer
           embedUrl={aula.embed_url}
+          embedHtml={aula.embed_html}
           pandaVideoId={aula.panda_video_id || undefined}
           startAt={startAt}
           userId={user?.id}
