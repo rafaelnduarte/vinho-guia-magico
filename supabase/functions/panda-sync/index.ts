@@ -92,13 +92,34 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check for optional folder_id in body (per-course sync)
+    // Parse request body
     let targetFolderId: string | null = null;
+    let incremental = false;
     try {
       const body = await req.json();
       targetFolderId = body?.folder_id || null;
+      incremental = body?.incremental === true;
     } catch {
-      // No body or invalid JSON — sync all folders
+      // No body or invalid JSON — full sync, non-incremental
+    }
+
+    const syncMode = incremental ? "incremental" : "full";
+    console.log(`🔄 Sync mode: ${syncMode}`);
+
+    // For incremental sync, get last sync timestamp
+    let lastSyncAt: string | null = null;
+    if (incremental) {
+      const { data: lastSyncRow } = await supabase
+        .from("panda_videos_index")
+        .select("synced_at")
+        .order("synced_at", { ascending: false })
+        .limit(1)
+        .single();
+      lastSyncAt = lastSyncRow?.synced_at || null;
+      console.log(`📅 Last sync at: ${lastSyncAt || "never (falling back to full)"}`);
+      if (!lastSyncAt) {
+        console.log("⚠️ No previous sync found, running full sync instead");
+      }
     }
 
     const results = {
@@ -106,6 +127,8 @@ Deno.serve(async (req) => {
       videos_synced: 0,
       normalized_count: 0,
       videos_indexed: 0,
+      skipped_unchanged: 0,
+      sync_mode: syncMode,
       errors: [] as string[],
     };
 
@@ -187,6 +210,16 @@ Deno.serve(async (req) => {
       }> = [];
 
       for (const [index, video] of videos.entries()) {
+        // Incremental: skip videos not updated since last sync
+        if (incremental && lastSyncAt && video.updated_at) {
+          if (new Date(video.updated_at) <= new Date(lastSyncAt)) {
+            results.skipped_unchanged++;
+            allSyncedVideoIds.push(video.id);
+            syncedVideoIds.push(video.id);
+            continue;
+          }
+        }
+
         console.log(`Syncing video [${index + 1}/${videos.length}]: "${video.title}" (id=${video.id})`);
 
         const tituloNormalizado = normalizeScrappy(video.title || "");
@@ -273,8 +306,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    // PASSO 4 — Full sync: clean orphan entries from panda_title_index
-    if (!targetFolderId && allSyncedVideoIds.length > 0) {
+    // PASSO 4 — Full sync only: clean orphan entries from panda_title_index
+    if (!incremental && !targetFolderId && allSyncedVideoIds.length > 0) {
       const { error: cleanupError, count } = await supabase
         .from("panda_title_index")
         .delete()
@@ -315,9 +348,18 @@ Deno.serve(async (req) => {
 
       console.log(`📦 Total Panda videos fetched: ${allPandaVideos.length}`);
 
+      // For incremental, filter to only videos updated since lastSyncAt
+      const videosToIndex = (incremental && lastSyncAt)
+        ? allPandaVideos.filter((v: any) => !v.updated_at || new Date(v.updated_at) > new Date(lastSyncAt!))
+        : allPandaVideos;
+
+      if (incremental && lastSyncAt) {
+        console.log(`📦 Incremental: indexing ${videosToIndex.length} of ${allPandaVideos.length} (changed since ${lastSyncAt})`);
+      }
+
       // Upsert into panda_videos_index in batches of 50
-      for (let i = 0; i < allPandaVideos.length; i += 50) {
-        const batch = allPandaVideos.slice(i, i + 50).map((v: any) => ({
+      for (let i = 0; i < videosToIndex.length; i += 50) {
+        const batch = videosToIndex.slice(i, i + 50).map((v: any) => ({
           id: v.id,
           title: v.title || "Sem título",
           title_normalized: normalizeScrappy(v.title || ""),
@@ -349,7 +391,9 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        message: "Sincronização concluída",
+        message: incremental
+          ? `Sync incremental concluído — ${results.videos_synced} atualizados, ${results.skipped_unchanged} ignorados`
+          : "Sincronização concluída",
         ...results,
       }),
       { status: 200, headers: corsHeaders }

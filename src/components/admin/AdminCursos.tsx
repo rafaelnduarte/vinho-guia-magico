@@ -94,26 +94,65 @@ export default function AdminCursos() {
     },
   });
 
-  async function handleSync() {
-    setSyncing(true);
-    toast({ title: "Sincronizando dados do Panda..." });
+  async function handlePandaSync(options?: { incremental?: boolean; folder_id?: string }) {
+    const isIncremental = options?.incremental === true;
+    const isCourseSync = !!options?.folder_id;
+
+    if (isCourseSync) {
+      setSyncingCurso(true);
+    } else {
+      setSyncing(true);
+    }
+
+    toast({ title: isIncremental ? "Sync incremental..." : "Sincronizando dados do Panda..." });
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData?.session?.access_token;
       const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+
+      const body: Record<string, any> = {};
+      if (options?.folder_id) body.folder_id = options.folder_id;
+      if (isIncremental) body.incremental = true;
+
       const res = await fetch(
         `https://${projectId}.supabase.co/functions/v1/panda-sync`,
-        { method: "POST", headers: { Authorization: `Bearer ${token}` } }
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+        }
       );
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || "Erro na sincronização");
-      toast({ title: `${result.folders_synced} cursos e ${result.videos_synced} aulas sincronizados!` });
+
+      const skippedMsg = result.skipped_unchanged > 0
+        ? `, ${result.skipped_unchanged} sem alteração`
+        : "";
+
+      if (isCourseSync) {
+        toast({ title: `${result.videos_synced} vídeos sincronizados${skippedMsg}!` });
+        queryClient.invalidateQueries({ queryKey: ["admin-aulas", selectedCurso?.id] });
+      } else {
+        toast({ title: `${result.folders_synced} cursos e ${result.videos_synced} aulas sincronizados${skippedMsg}!` });
+      }
       queryClient.invalidateQueries({ queryKey: ["admin-cursos"] });
     } catch (err: any) {
       toast({ title: "Erro na sincronização", description: err.message, variant: "destructive" });
     } finally {
       setSyncing(false);
+      setSyncingCurso(false);
     }
+  }
+
+  function handleSync() {
+    handlePandaSync();
+  }
+
+  function handleIncrementalSync() {
+    handlePandaSync({ incremental: true });
   }
 
   async function handleSyncCurso() {
