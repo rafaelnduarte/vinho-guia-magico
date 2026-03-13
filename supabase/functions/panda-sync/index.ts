@@ -39,15 +39,15 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
+    const { data: userData, error: userError } = await anonClient.auth.getUser();
+    if (userError || !userData?.user) {
+      console.error("[panda-sync] Auth failed:", userError?.message);
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401, headers: corsHeaders,
       });
     }
 
-    const userId = claimsData.claims.sub;
+    const userId = userData.user.id;
     const { data: roleCheck } = await anonClient.rpc("has_role", {
       _user_id: userId,
       _role: "admin",
@@ -180,11 +180,13 @@ Deno.serve(async (req) => {
       // Assign profile to synced videos
       const profileId = Deno.env.get("PANDA_PROFILE_ID");
       if (profileId && syncedVideoIds.length > 0) {
+        console.log(`[panda-sync] Assigning profile ${profileId} to ${syncedVideoIds.length} videos in folder "${folder.name}"`);
         try {
-          await fetch(`${PANDA_BASE}/profile/?type=set-videos`, {
+          // Try with Bearer prefix first
+          const profileRes = await fetch(`${PANDA_BASE}/profile/?type=set-videos`, {
             method: "POST",
             headers: {
-              Authorization: apiKey,
+              Authorization: `Bearer ${apiKey}`,
               Accept: "application/json",
               "Content-Type": "application/json",
             },
@@ -193,7 +195,35 @@ Deno.serve(async (req) => {
               videos: syncedVideoIds,
             }),
           });
+          const profileStatus = profileRes.status;
+          const profileBody = await profileRes.text();
+          console.log(`[panda-sync] Profile response (Bearer): ${profileStatus} — ${profileBody}`);
+
+          if (!profileRes.ok) {
+            // Fallback: try without Bearer prefix
+            console.log(`[panda-sync] Retrying profile assignment without Bearer prefix...`);
+            const retryRes = await fetch(`${PANDA_BASE}/profile/?type=set-videos`, {
+              method: "POST",
+              headers: {
+                Authorization: apiKey,
+                Accept: "application/json",
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                profile: profileId,
+                videos: syncedVideoIds,
+              }),
+            });
+            const retryStatus = retryRes.status;
+            const retryBody = await retryRes.text();
+            console.log(`[panda-sync] Profile response (no Bearer): ${retryStatus} — ${retryBody}`);
+
+            if (!retryRes.ok) {
+              results.errors.push(`Profile assignment (${retryStatus}): ${retryBody}`);
+            }
+          }
         } catch (profileErr) {
+          console.error(`[panda-sync] Profile assignment error:`, profileErr);
           results.errors.push(`Profile assignment ${folder.name}: ${(profileErr as Error).message}`);
         }
       }
