@@ -105,6 +105,7 @@ Deno.serve(async (req) => {
       folders_synced: 0,
       videos_synced: 0,
       normalized_count: 0,
+      videos_indexed: 0,
       errors: [] as string[],
     };
 
