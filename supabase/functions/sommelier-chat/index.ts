@@ -23,13 +23,34 @@ REGRAS:
 11. Seja sucinto e objetivo. Vá direto ao ponto. Evite introduções longas ou repetições desnecessárias.
 12. NUNCA entregue uma resposta incompleta. Se precisar ser breve, priorize completude sobre detalhe.`;
 
+const MAX_KNOWLEDGE_CHARS = 12_000;
+const MAX_WINES_IN_CONTEXT = 60;
+
+class HttpError extends Error {
+  status: number;
+  code: string;
+
+  constructor(status: number, code: string, message: string) {
+    super(message);
+    this.status = status;
+    this.code = code;
+  }
+}
+
+const normalizeText = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
 serve(async (req) => {
-  if (req.method === "OPTIONS")
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
 
   try {
     const authHeader = req.headers.get("authorization");
-    if (!authHeader) throw new Error("Não autorizado");
+    if (!authHeader) throw new HttpError(401, "unauthorized", "Não autorizado");
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
