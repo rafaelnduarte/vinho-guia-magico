@@ -155,35 +155,9 @@ export default function AdminCursos() {
     handlePandaSync({ incremental: true });
   }
 
-  async function handleSyncCurso() {
+  function handleSyncCurso() {
     if (!selectedCurso?.panda_folder_id) return;
-    setSyncingCurso(true);
-    toast({ title: "Sincronizando vídeos do curso..." });
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData?.session?.access_token;
-      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-      const res = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/panda-sync`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ folder_id: selectedCurso.panda_folder_id }),
-        }
-      );
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "Erro na sincronização");
-      toast({ title: `${result.videos_synced} vídeos sincronizados!` });
-      queryClient.invalidateQueries({ queryKey: ["admin-aulas", selectedCurso.id] });
-      queryClient.invalidateQueries({ queryKey: ["admin-cursos"] });
-    } catch (err: any) {
-      toast({ title: "Erro na sincronização", description: err.message, variant: "destructive" });
-    } finally {
-      setSyncingCurso(false);
-    }
+    handlePandaSync({ folder_id: selectedCurso.panda_folder_id, incremental: true });
   }
 
   async function handleToggleCurso(curso: Curso) {
