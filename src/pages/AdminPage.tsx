@@ -1,6 +1,5 @@
 import { Settings } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import AdminWines from "@/components/admin/AdminWines";
 import AdminPartners from "@/components/admin/AdminPartners";
 import AdminSeals from "@/components/admin/AdminSeals";
@@ -10,8 +9,6 @@ import AdminTutorials from "@/components/admin/AdminTutorials";
 import AdminChat from "@/components/admin/AdminChat";
 import AdminBanners from "@/components/admin/AdminBanners";
 import AdminCursos from "@/components/admin/AdminCursos";
-import AdminPandaDiagnostics from "@/components/admin/AdminPandaDiagnostics";
-
 
 export default function AdminPage() {
   return (
@@ -33,40 +30,18 @@ export default function AdminPage() {
             <TabsTrigger value="tutorials" className="text-xs sm:text-sm px-3 py-2">Tutoriais</TabsTrigger>
             <TabsTrigger value="chat" className="text-xs sm:text-sm px-3 py-2">Jovem AI</TabsTrigger>
             <TabsTrigger value="cursos" className="text-xs sm:text-sm px-3 py-2">Cursos</TabsTrigger>
-            <TabsTrigger value="diagnostics" className="text-xs sm:text-sm px-3 py-2">Diagnóstico</TabsTrigger>
           </TabsList>
         </div>
 
-        <TabsContent value="analytics">
-          <AdminAnalytics />
-        </TabsContent>
-        <TabsContent value="banners">
-          <AdminBanners />
-        </TabsContent>
-        <TabsContent value="wines">
-          <AdminWines />
-        </TabsContent>
-        <TabsContent value="members">
-          <AdminMembers />
-        </TabsContent>
-        <TabsContent value="partners">
-          <AdminPartners />
-        </TabsContent>
-        <TabsContent value="seals">
-          <AdminSeals />
-        </TabsContent>
-        <TabsContent value="tutorials">
-          <AdminTutorials />
-        </TabsContent>
-        <TabsContent value="chat">
-          <AdminChat />
-        </TabsContent>
-        <TabsContent value="cursos">
-          <AdminCursos />
-        </TabsContent>
-        <TabsContent value="diagnostics">
-          <AdminPandaDiagnostics />
-        </TabsContent>
+        <TabsContent value="analytics"><AdminAnalytics /></TabsContent>
+        <TabsContent value="banners"><AdminBanners /></TabsContent>
+        <TabsContent value="wines"><AdminWines /></TabsContent>
+        <TabsContent value="members"><AdminMembers /></TabsContent>
+        <TabsContent value="partners"><AdminPartners /></TabsContent>
+        <TabsContent value="seals"><AdminSeals /></TabsContent>
+        <TabsContent value="tutorials"><AdminTutorials /></TabsContent>
+        <TabsContent value="chat"><AdminChat /></TabsContent>
+        <TabsContent value="cursos"><AdminCursos /></TabsContent>
       </Tabs>
     </div>
   );
