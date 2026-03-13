@@ -44,7 +44,14 @@ export default function PandaPlayer({
         const { data, error } = await supabase.functions.invoke("panda-token", {
           body: { video_id: pandaVideoId, aula_id: aulaId || null },
         });
-        if (!cancelled && data?.token) {
+        if (cancelled) return;
+        if (data?.error === "VIDEO_NOT_FOUND") {
+          console.warn("[PANDA] Video not found in Panda:", pandaVideoId);
+          setPlayerState("not_found");
+          setJwtLoading(false);
+          return;
+        }
+        if (data?.token) {
           setJwt(data.token);
         }
         if (error) {
