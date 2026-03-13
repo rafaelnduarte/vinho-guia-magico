@@ -197,7 +197,12 @@ Deno.serve(async (req) => {
       });
     }
 
+    const PANDA_API_KEY = Deno.env.get("PANDA_API_KEY");
+    const PANDA_WATERMARK_GROUP_ID = Deno.env.get("PANDA_WATERMARK_GROUP_ID");
+    const drmJwt = await fetchDrmJwt(PANDA_API_KEY, PANDA_WATERMARK_GROUP_ID);
+
     console.log("📋 Starting Panda Video Audit...");
+    console.log(`🔐 DRM JWT disponível: ${drmJwt ? "sim" : "não"}`);
 
     // Step 1: Read all aulas with panda_video_id
     const { data: aulas, error: aulasErr } = await adminClient
