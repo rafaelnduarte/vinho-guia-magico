@@ -63,7 +63,7 @@ export default function AulaPage() {
       const [aulaRes, siblingsRes, progressoRes] = await Promise.all([
         supabase
           .from("aulas")
-          .select("id, titulo, descricao, duracao_segundos, panda_video_id, embed_url, sort_order")
+          .select("id, titulo, descricao, duracao_segundos, panda_video_id, embed_url, embed_html, sort_order")
           .eq("id", aulaId)
           .maybeSingle(),
         supabase
