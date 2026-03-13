@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback, lazy, Suspense } from "react";
-import { Loader2, AlertTriangle, ShieldAlert } from "lucide-react";
+import { Loader2, AlertTriangle, ShieldAlert, VideoOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 const HLSPlayer = lazy(() => import("./HLSPlayer"));
