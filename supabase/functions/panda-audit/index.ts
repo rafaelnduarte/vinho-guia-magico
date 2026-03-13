@@ -43,16 +43,111 @@ function computeConfidence(a: string, b: string): number {
   return Math.round((intersection / union) * 100);
 }
 
-async function validateConfig(videoId: string): Promise<{ status: number; ok: boolean }> {
+type ConfigValidationResult = {
+  status: number;
+  ok: boolean;
+  mode: "public" | "drm_jwt" | "api_exists" | "failed";
+};
+
+async function fetchWithPandaAuth(
+  url: string,
+  apiKey: string,
+  init: RequestInit = {}
+): Promise<Response> {
+  const method = init.method ?? "GET";
+  const headers = new Headers(init.headers ?? {});
+  if (!headers.has("Accept")) headers.set("Accept", "application/json");
+
+  let res = await fetch(url, {
+    ...init,
+    method,
+    headers: { ...Object.fromEntries(headers.entries()), Authorization: `Bearer ${apiKey}` },
+  });
+
+  if (res.status === 401) {
+    res = await fetch(url, {
+      ...init,
+      method,
+      headers: { ...Object.fromEntries(headers.entries()), Authorization: apiKey },
+    });
+  }
+
+  return res;
+}
+
+async function fetchDrmJwt(apiKey?: string | null, groupId?: string | null): Promise<string | null> {
+  if (!apiKey || !groupId) return null;
+
+  const expiredAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+  const endpoints = [
+    `https://api.pandavideo.com/watermark/groups/${groupId}/jwt?expiredAtJwt=${encodeURIComponent(expiredAt)}`,
+    `https://api-v2.pandavideo.com.br/drm/videos/${groupId}/jwt?expiredAtJwt=${encodeURIComponent(expiredAt)}`,
+  ];
+
+  for (const url of endpoints) {
+    try {
+      const res = await fetchWithPandaAuth(url, apiKey, { method: "GET" });
+      if (!res.ok) continue;
+      const data = await res.json();
+      const token = data?.jwt || data?.token || null;
+      if (token) return token;
+    } catch {
+      // Try next endpoint
+    }
+  }
+
+  return null;
+}
+
+async function validateVideoExists(videoId: string, pandaApiKey?: string | null): Promise<boolean> {
+  if (!pandaApiKey) return false;
   try {
-    const res = await fetch(
-      `https://config.tv.pandavideo.com.br/embed/v2/${videoId}.json`,
+    const res = await fetchWithPandaAuth(
+      `https://api-v2.pandavideo.com.br/videos/${videoId}`,
+      pandaApiKey,
       { method: "GET" }
     );
-    await res.text();
-    return { status: res.status, ok: res.ok };
+    return res.ok;
   } catch {
-    return { status: 0, ok: false };
+    return false;
+  }
+}
+
+async function validateConfig(
+  videoId: string,
+  options: { jwt?: string | null; pandaApiKey?: string | null }
+): Promise<ConfigValidationResult> {
+  const configBase = `https://config.tv.pandavideo.com.br/embed/v2/${videoId}.json`;
+
+  try {
+    const publicRes = await fetch(configBase, { method: "GET" });
+    if (publicRes.ok) {
+      return { status: publicRes.status, ok: true, mode: "public" };
+    }
+
+    if ([401, 403, 404].includes(publicRes.status) && options.jwt) {
+      const jwtRes = await fetch(`${configBase}?jwt=${encodeURIComponent(options.jwt)}`, {
+        method: "GET",
+      });
+      if (jwtRes.ok) {
+        return { status: jwtRes.status, ok: true, mode: "drm_jwt" };
+      }
+    }
+
+    if ([401, 403, 404].includes(publicRes.status)) {
+      const exists = await validateVideoExists(videoId, options.pandaApiKey);
+      if (exists) {
+        return { status: publicRes.status, ok: true, mode: "api_exists" };
+      }
+    }
+
+    return { status: publicRes.status, ok: false, mode: "failed" };
+  } catch {
+    const exists = await validateVideoExists(videoId, options.pandaApiKey);
+    if (exists) {
+      return { status: 0, ok: true, mode: "api_exists" };
+    }
+    return { status: 0, ok: false, mode: "failed" };
   }
 }
 
