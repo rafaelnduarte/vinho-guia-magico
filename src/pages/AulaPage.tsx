@@ -15,6 +15,7 @@ interface AulaData {
   duracao_segundos: number;
   panda_video_id: string | null;
   embed_url: string | null;
+  embed_html: string | null;
   sort_order: number;
 }
 
