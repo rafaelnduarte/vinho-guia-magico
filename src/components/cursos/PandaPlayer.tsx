@@ -187,7 +187,22 @@ export default function PandaPlayer({
     );
   }
 
-  // DRM/Auth error — do NOT fall back to HLS
+  // Video not found in Panda — distinct from DRM error
+  if (playerState === "not_found") {
+    return (
+      <div className="relative w-full overflow-hidden rounded-xl bg-secondary flex items-center justify-center" style={{ aspectRatio: "16/9" }}>
+        <div className="text-center space-y-3 p-6 max-w-md">
+          <VideoOff className="h-10 w-10 text-muted-foreground mx-auto" />
+          <p className="text-sm font-medium text-foreground">Vídeo temporariamente indisponível</p>
+          <p className="text-xs text-muted-foreground">
+            Este vídeo não foi encontrado na plataforma de streaming. Pode estar em processamento ou requer sincronização pelo administrador.
+          </p>
+          <p className="text-xs text-muted-foreground/60 font-mono">ID: {pandaVideoId}</p>
+        </div>
+      </div>
+    );
+  }
+
   if (playerState === "drm_error") {
     return (
       <div className="relative w-full overflow-hidden rounded-xl bg-secondary flex items-center justify-center" style={{ aspectRatio: "16/9" }}>
