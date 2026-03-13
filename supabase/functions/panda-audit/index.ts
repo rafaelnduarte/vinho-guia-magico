@@ -235,7 +235,6 @@ Deno.serve(async (req) => {
     } else {
       // Fallback: fetch from Panda API
       console.log("📊 panda_videos_index empty, fetching from Panda API...");
-      const PANDA_API_KEY = Deno.env.get("PANDA_API_KEY");
       if (!PANDA_API_KEY) throw new Error("PANDA_API_KEY not configured");
 
       let page = 1;
