@@ -163,7 +163,7 @@ export default function AulaPage() {
     return <p className="text-center py-12 text-muted-foreground">Aula não encontrada.</p>;
   }
 
-  const hasVideo = aula.embed_url || aula.panda_video_id;
+  const hasVideo = aula.embed_html || aula.embed_url || aula.panda_video_id;
 
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6">
