@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { FunctionsHttpError } from "@supabase/supabase-js";
 import { useAuth } from "@/contexts/AuthContext";
 import MemberBadge from "@/components/MemberBadge";
 import { supabase } from "@/integrations/supabase/client";
