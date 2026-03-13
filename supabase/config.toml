@@ -13,5 +13,3 @@ project_id = "hrpnufesbjmaaiqgjwtn"
     verify_jwt = false
   [functions.panda-sync]
     verify_jwt = false
-  [functions.panda-fix]
-    verify_jwt = false
