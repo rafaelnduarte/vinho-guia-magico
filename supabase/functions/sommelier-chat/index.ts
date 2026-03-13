@@ -62,7 +62,7 @@ serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
     const { data: { user }, error: authErr } = await userClient.auth.getUser();
-    if (authErr || !user) throw new Error("Não autorizado");
+    if (authErr || !user) throw new HttpError(401, "unauthorized", "Não autorizado");
 
     // Service client for writes
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
@@ -71,9 +71,11 @@ serve(async (req) => {
     const { message, session_id } = body;
 
     if (!message || typeof message !== "string" || message.trim().length === 0) {
-      throw new Error("Mensagem vazia");
+      throw new HttpError(400, "validation_error", "Mensagem vazia");
     }
-    if (message.length > 2000) throw new Error("Mensagem muito longa (max 2000 chars)");
+    if (message.length > 2000) {
+      throw new HttpError(400, "validation_error", "Mensagem muito longa (max 2000 chars)");
+    }
 
     // 1. Get pricing config (includes system_prompt)
     const { data: pricingArr } = await adminClient
@@ -81,7 +83,7 @@ serve(async (req) => {
       .select("*")
       .limit(1);
     const pricing = pricingArr?.[0];
-    if (!pricing) throw new Error("Configuração de preços não encontrada");
+    if (!pricing) throw new HttpError(500, "server_config", "Configuração de preços não encontrada");
 
     const systemPrompt = pricing.system_prompt || FALLBACK_SYSTEM_PROMPT;
     const maxTokens = pricing.max_tokens_detalhado;
