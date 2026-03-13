@@ -223,26 +223,60 @@ serve(async (req) => {
       conversationMessages = allHistory;
     }
 
-    // 6. RAG: ALWAYS fetch ALL wines first, then add keyword-matched ones with priority
-    // Fetch ALL wines from curadoria and acervo (complete catalog)
+    // 6. RAG enxuto: busca direcionada para evitar payload gigante e erro 402
     const { data: allWines } = await adminClient
       .from("wines")
-      .select("id, name, producer, country, region, vintage, type, grape, importer, price_range, description, tasting_notes, image_url, rating, status")
+      .select("id, name, producer, country, region, vintage, type, grape, importer, price_range, description, tasting_notes, rating, status")
       .in("status", ["curadoria", "acervo"])
       .order("created_at", { ascending: false });
 
     const allWinesList = allWines ?? [];
 
-    // Build context: include ALL wines (compact format for large catalogs)
-    const wineContext = allWinesList;
+    const querySource = normalizeText(
+      `${message} ${conversationMessages.slice(-4).map((m) => m.content).join(" ")}`
+    );
 
-    // Get seals for all wines
-    const wineIds = wineContext.map(w => w.id);
-    let sealMap: Record<string, string[]> = {};
-    let notesMap: Record<string, string[]> = {};
+    const queryTokens = Array.from(
+      new Set(querySource.split(/[^a-z0-9]+/g).filter((token) => token.length >= 3))
+    ).slice(0, 25);
+
+    const scoredWines = allWinesList
+      .map((wine) => {
+        const searchable = normalizeText(
+          [wine.name, wine.producer, wine.country, wine.region, wine.type, wine.grape, wine.importer]
+            .filter(Boolean)
+            .join(" ")
+        );
+
+        let score = 0;
+        for (const token of queryTokens) {
+          if (!searchable.includes(token)) continue;
+          if (normalizeText(wine.name ?? "").includes(token)) score += 5;
+          else if (normalizeText(wine.grape ?? "").includes(token) || normalizeText(wine.type ?? "").includes(token)) score += 3;
+          else score += 1;
+        }
+
+        return { wine, score };
+      })
+      .sort((a, b) => b.score - a.score);
+
+    const matchedWines = scoredWines
+      .filter((item) => item.score > 0)
+      .slice(0, MAX_WINES_IN_CONTEXT)
+      .map((item) => item.wine);
+
+    const fallbackWines = scoredWines
+      .filter((item) => item.score === 0)
+      .slice(0, Math.max(0, MAX_WINES_IN_CONTEXT - matchedWines.length))
+      .map((item) => item.wine);
+
+    const wineContext = [...matchedWines, ...fallbackWines];
+
+    const wineIds = wineContext.map((wine) => wine.id);
+    const sealMap: Record<string, string[]> = {};
+    const notesMap: Record<string, string[]> = {};
 
     if (wineIds.length > 0) {
-      // Batch fetch seals and notes in parallel
       const [{ data: wineSeals }, { data: thomasNotes }] = await Promise.all([
         adminClient
           .from("wine_seals")
@@ -257,36 +291,38 @@ serve(async (req) => {
 
       wineSeals?.forEach((ws: any) => {
         if (!sealMap[ws.wine_id]) sealMap[ws.wine_id] = [];
-        sealMap[ws.wine_id].push(ws.seals?.name ?? "");
+        if (ws.seals?.name) sealMap[ws.wine_id].push(ws.seals.name);
       });
 
-      thomasNotes?.forEach((n: any) => {
-        if (!notesMap[n.wine_id]) notesMap[n.wine_id] = [];
-        notesMap[n.wine_id].push(`[${n.note_type}] ${n.note_text}`);
+      thomasNotes?.forEach((note: any) => {
+        if (!notesMap[note.wine_id]) notesMap[note.wine_id] = [];
+        notesMap[note.wine_id].push(`[${note.note_type}] ${note.note_text}`);
       });
     }
 
-    const contextPack = wineContext.map(w => ({
-      id: w.id,
-      nome: w.name,
-      produtor: w.producer,
-      pais: w.country,
-      regiao: w.region,
-      safra: w.vintage,
-      tipo: w.type,
-      uva: w.grape,
-      importadora: w.importer,
-      preco: w.price_range,
-      descricao: w.description?.slice(0, 200),
-      notas_degustacao: w.tasting_notes?.slice(0, 150),
-      nota: w.rating,
-      status: (w as any).status,
-      selos: sealMap[w.id] ?? [],
-      notas_thomas: notesMap[w.id] ?? [],
+    const contextPack = wineContext.map((wine) => ({
+      id: wine.id,
+      nome: wine.name,
+      produtor: wine.producer,
+      pais: wine.country,
+      regiao: wine.region,
+      safra: wine.vintage,
+      tipo: wine.type,
+      uva: wine.grape,
+      importadora: wine.importer,
+      preco: wine.price_range,
+      descricao: wine.description?.slice(0, 140),
+      notas_degustacao: wine.tasting_notes?.slice(0, 120),
+      nota: wine.rating,
+      status: wine.status,
+      selos: sealMap[wine.id] ?? [],
+      notas_thomas: notesMap[wine.id] ?? [],
     }));
 
+    const allWineNames = allWinesList.map((wine) => wine.name).join(" | ").slice(0, 6000);
+
     const contextMessage = contextPack.length > 0
-      ? `\n\nCATÁLOGO COMPLETO DO PORTAL (${contextPack.length} vinhos — use APENAS estes para recomendações do portal). Vinhos com status "acervo" são históricos e podem não estar disponíveis para compra:\n${JSON.stringify(contextPack, null, 0)}`
+      ? `\n\nCATÁLOGO DO PORTAL: ${allWinesList.length} vinhos cadastrados.\nVinhos em foco para esta pergunta (${contextPack.length}):\n${JSON.stringify(contextPack)}\n\nNomes do catálogo (referência rápida): ${allWineNames}`
       : "\n\nNenhum vinho cadastrado no portal no momento.";
 
     // 7. Save user message
