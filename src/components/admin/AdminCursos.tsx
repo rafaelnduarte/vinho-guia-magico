@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { FolderOpen, Video, CheckCircle2, Clock, Download, ArrowLeft, RefreshCw, XCircle, Loader2, Trash2 } from "lucide-react";
+import { FolderOpen, Video, CheckCircle2, Clock, Download, ArrowLeft, RefreshCw, XCircle, Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -22,16 +22,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 interface Curso {
   id: string;
@@ -73,10 +63,6 @@ export default function AdminCursos() {
   const [syncingCurso, setSyncingCurso] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [togglingAulaId, setTogglingAulaId] = useState<string | null>(null);
-  const [confirmDeleteCurso, setConfirmDeleteCurso] = useState<Curso | null>(null);
-  const [confirmDeleteAula, setConfirmDeleteAula] = useState<Aula | null>(null);
-  const [deletingCursoId, setDeletingCursoId] = useState<string | null>(null);
-  const [deletingAulaId, setDeletingAulaId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   const { data: cursos, isLoading } = useQuery({
@@ -90,8 +76,7 @@ export default function AdminCursos() {
       const { data: counts } = await supabase.from("aulas").select("curso_id");
       const countMap: Record<string, number> = {};
       (counts || []).forEach((a) => { countMap[a.curso_id] = (countMap[a.curso_id] || 0) + 1; });
-      const result = (data || []).map((c) => ({ ...c, aulas_count: countMap[c.id] || 0 })) as Curso[];
-      return result.sort((a, b) => a.titulo.localeCompare(b.titulo, "pt-BR", { numeric: true, sensitivity: "base" }));
+      return (data || []).map((c) => ({ ...c, aulas_count: countMap[c.id] || 0 })) as Curso[];
     },
   });
 
@@ -105,9 +90,7 @@ export default function AdminCursos() {
         .eq("curso_id", selectedCurso!.id)
         .order("sort_order", { ascending: true });
       if (error) throw error;
-      return ((data || []) as Aula[]).sort((a, b) =>
-        a.titulo.localeCompare(b.titulo, "pt-BR", { numeric: true, sensitivity: "base" })
-      );
+      return (data || []) as Aula[];
     },
   });
 
@@ -217,46 +200,6 @@ export default function AdminCursos() {
     }
   }
 
-  async function handleDeleteCurso(curso: Curso) {
-    if (curso.is_published) return;
-    setDeletingCursoId(curso.id);
-    try {
-      // Delete aulas first (explicit cascade)
-      const { error: aulasError } = await supabase.from("aulas").delete().eq("curso_id", curso.id);
-      if (aulasError) throw aulasError;
-
-      const { error } = await supabase.from("cursos").delete().eq("id", curso.id);
-      if (error) throw error;
-
-      toast({ title: "Curso excluído com sucesso." });
-      if (selectedCurso?.id === curso.id) setSelectedCurso(null);
-      queryClient.invalidateQueries({ queryKey: ["admin-cursos"] });
-    } catch (err: any) {
-      toast({ title: "Erro ao excluir curso", description: err.message, variant: "destructive" });
-    } finally {
-      setDeletingCursoId(null);
-      setConfirmDeleteCurso(null);
-    }
-  }
-
-  async function handleDeleteAula(aula: Aula) {
-    if (aula.is_published) return;
-    setDeletingAulaId(aula.id);
-    try {
-      const { error } = await supabase.from("aulas").delete().eq("id", aula.id);
-      if (error) throw error;
-
-      toast({ title: "Aula excluída com sucesso." });
-      queryClient.invalidateQueries({ queryKey: ["admin-aulas", selectedCurso?.id] });
-      queryClient.invalidateQueries({ queryKey: ["admin-cursos"] });
-    } catch (err: any) {
-      toast({ title: "Erro ao excluir aula", description: err.message, variant: "destructive" });
-    } finally {
-      setDeletingAulaId(null);
-      setConfirmDeleteAula(null);
-    }
-  }
-
   function handleCloseModal() {
     setSelectedCurso(null);
     queryClient.invalidateQueries({ queryKey: ["admin-cursos"] });
@@ -316,29 +259,15 @@ export default function AdminCursos() {
                     </Badge>
                   )}
                 </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="flex-1" onClick={() => setSelectedCurso(curso)}>
-                    Ver Vídeos
-                  </Button>
-                  {!curso.is_published && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-destructive hover:bg-destructive/10"
-                      disabled={deletingCursoId === curso.id}
-                      onClick={() => setConfirmDeleteCurso(curso)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
+                <Button variant="outline" size="sm" className="w-full" onClick={() => setSelectedCurso(curso)}>
+                  Ver Vídeos
+                </Button>
               </CardContent>
             </Card>
           ))}
         </div>
       )}
 
-      {/* Dialog de aulas */}
       <Dialog open={!!selectedCurso} onOpenChange={(open) => { if (!open) handleCloseModal(); }}>
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
@@ -393,7 +322,6 @@ export default function AdminCursos() {
                   <TableHead className="w-24">Duração</TableHead>
                   <TableHead className="w-20">Status</TableHead>
                   <TableHead className="w-28">Publicado</TableHead>
-                  <TableHead className="w-16">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -412,19 +340,6 @@ export default function AdminCursos() {
                         onCheckedChange={() => handleToggleAula(aula)}
                       />
                     </TableCell>
-                    <TableCell>
-                      {!aula.is_published && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                          disabled={deletingAulaId === aula.id}
-                          onClick={() => setConfirmDeleteAula(aula)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -432,50 +347,6 @@ export default function AdminCursos() {
           )}
         </DialogContent>
       </Dialog>
-
-      {/* Confirmação excluir curso */}
-      <AlertDialog open={!!confirmDeleteCurso} onOpenChange={(open) => { if (!open) setConfirmDeleteCurso(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir curso?</AlertDialogTitle>
-            <AlertDialogDescription>
-              O curso <strong>"{confirmDeleteCurso?.titulo}"</strong> e todas as suas aulas serão excluídos permanentemente.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={deletingCursoId === confirmDeleteCurso?.id}
-              onClick={() => confirmDeleteCurso && handleDeleteCurso(confirmDeleteCurso)}
-            >
-              {deletingCursoId ? "Excluindo..." : "Excluir"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Confirmação excluir aula */}
-      <AlertDialog open={!!confirmDeleteAula} onOpenChange={(open) => { if (!open) setConfirmDeleteAula(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir aula?</AlertDialogTitle>
-            <AlertDialogDescription>
-              A aula <strong>"{confirmDeleteAula?.titulo}"</strong> será excluída permanentemente.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={deletingAulaId === confirmDeleteAula?.id}
-              onClick={() => confirmDeleteAula && handleDeleteAula(confirmDeleteAula)}
-            >
-              {deletingAulaId ? "Excluindo..." : "Excluir"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
