@@ -34,6 +34,7 @@ export default function PandaPlayer({
   // Keep refs in sync without triggering re-renders
   onProgressRef.current = onProgress;
   onCompleteRef.current = onComplete;
+  totalDurationRef.current = totalDuration;
 
   const useHtml = !!embedHtml;
 
