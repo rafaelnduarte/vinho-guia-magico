@@ -54,7 +54,18 @@ export default function PandaPlayer({
       try {
         const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
 
+        // Mark ready when Panda signals it's fully loaded
+        if (
+          data?.message === "panda_ready" ||
+          data?.event === "panda_ready" ||
+          data?.message === "panda_play" ||
+          data?.event === "panda_play"
+        ) {
+          setReady(true);
+        }
+
         if (data?.message === "panda_timeupdate" || data?.event === "panda_timeupdate") {
+          setReady(true); // also mark ready on first timeupdate as fallback
           const currentTime = data.currentTime ?? data.seconds ?? 0;
           const duration = data.duration ?? 0;
           onProgress?.(currentTime, duration);
