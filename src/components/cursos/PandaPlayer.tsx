@@ -96,13 +96,36 @@ export default function PandaPlayer({
 
     window.addEventListener("message", handleMessage);
 
-    const timer = setTimeout(() => setReady(true), 500);
+    // Fallback: if no panda message arrives within 8s, show content anyway
+    const fallbackTimer = setTimeout(() => setReady(true), 8000);
 
     return () => {
       window.removeEventListener("message", handleMessage);
-      clearTimeout(timer);
+      clearTimeout(fallbackTimer);
     };
   }, [handleMessage, src, useHtml]);
+
+  // For embedHtml: find the injected iframe and listen for its load event
+  useEffect(() => {
+    if (!useHtml || !htmlContainerRef.current) return;
+    const container = htmlContainerRef.current;
+
+    const attachIframeLoad = () => {
+      const iframe = container.querySelector("iframe");
+      if (iframe) {
+        // Don't setReady on iframe load alone — wait for panda postMessage
+        // But ensure the iframe is found for message communication
+        return;
+      }
+    };
+
+    // Use MutationObserver to detect when the iframe is injected
+    const observer = new MutationObserver(() => attachIframeLoad());
+    observer.observe(container, { childList: true, subtree: true });
+    attachIframeLoad(); // check immediately too
+
+    return () => observer.disconnect();
+  }, [useHtml, embedHtml]);
 
   // No video available at all
   if (!src && !useHtml) {
