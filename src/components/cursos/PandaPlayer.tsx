@@ -22,7 +22,6 @@ export default function PandaPlayer({
   onComplete,
 }: PandaPlayerProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const htmlContainerRef = useRef<HTMLDivElement>(null);
   const completedRef = useRef(false);
   const [ready, setReady] = useState(false);
 
@@ -54,18 +53,7 @@ export default function PandaPlayer({
       try {
         const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
 
-        // Mark ready when Panda signals it's fully loaded
-        if (
-          data?.message === "panda_ready" ||
-          data?.event === "panda_ready" ||
-          data?.message === "panda_play" ||
-          data?.event === "panda_play"
-        ) {
-          setReady(true);
-        }
-
         if (data?.message === "panda_timeupdate" || data?.event === "panda_timeupdate") {
-          setReady(true); // also mark ready on first timeupdate as fallback
           const currentTime = data.currentTime ?? data.seconds ?? 0;
           const duration = data.duration ?? 0;
           onProgress?.(currentTime, duration);
@@ -96,36 +84,13 @@ export default function PandaPlayer({
 
     window.addEventListener("message", handleMessage);
 
-    // Fallback: if no panda message arrives within 8s, show content anyway
-    const fallbackTimer = setTimeout(() => setReady(true), 8000);
+    const timer = setTimeout(() => setReady(true), 500);
 
     return () => {
       window.removeEventListener("message", handleMessage);
-      clearTimeout(fallbackTimer);
+      clearTimeout(timer);
     };
   }, [handleMessage, src, useHtml]);
-
-  // For embedHtml: find the injected iframe and listen for its load event
-  useEffect(() => {
-    if (!useHtml || !htmlContainerRef.current) return;
-    const container = htmlContainerRef.current;
-
-    const attachIframeLoad = () => {
-      const iframe = container.querySelector("iframe");
-      if (iframe) {
-        // Don't setReady on iframe load alone — wait for panda postMessage
-        // But ensure the iframe is found for message communication
-        return;
-      }
-    };
-
-    // Use MutationObserver to detect when the iframe is injected
-    const observer = new MutationObserver(() => attachIframeLoad());
-    observer.observe(container, { childList: true, subtree: true });
-    attachIframeLoad(); // check immediately too
-
-    return () => observer.disconnect();
-  }, [useHtml, embedHtml]);
 
   // No video available at all
   if (!src && !useHtml) {
@@ -152,9 +117,9 @@ export default function PandaPlayer({
           </div>
         )}
         <div
-          ref={htmlContainerRef}
           className="absolute inset-0 w-full h-full [&>iframe]:w-full [&>iframe]:h-full [&>iframe]:border-0"
           dangerouslySetInnerHTML={{ __html: embedHtml! }}
+          onLoad={() => setReady(true)}
         />
       </div>
     );
