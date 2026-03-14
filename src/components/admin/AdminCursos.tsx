@@ -90,7 +90,8 @@ export default function AdminCursos() {
       const { data: counts } = await supabase.from("aulas").select("curso_id");
       const countMap: Record<string, number> = {};
       (counts || []).forEach((a) => { countMap[a.curso_id] = (countMap[a.curso_id] || 0) + 1; });
-      return (data || []).map((c) => ({ ...c, aulas_count: countMap[c.id] || 0 })) as Curso[];
+      const result = (data || []).map((c) => ({ ...c, aulas_count: countMap[c.id] || 0 })) as Curso[];
+      return result.sort((a, b) => a.titulo.localeCompare(b.titulo, "pt-BR", { numeric: true, sensitivity: "base" }));
     },
   });
 
@@ -104,7 +105,9 @@ export default function AdminCursos() {
         .eq("curso_id", selectedCurso!.id)
         .order("sort_order", { ascending: true });
       if (error) throw error;
-      return (data || []) as Aula[];
+      return ((data || []) as Aula[]).sort((a, b) =>
+        a.titulo.localeCompare(b.titulo, "pt-BR", { numeric: true, sensitivity: "base" })
+      );
     },
   });
 
