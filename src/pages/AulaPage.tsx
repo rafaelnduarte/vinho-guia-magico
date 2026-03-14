@@ -47,6 +47,9 @@ export default function AulaPage() {
   const [loading, setLoading] = useState(true);
 
   const lastSaveRef = useRef(0);
+  const currentTimeRef = useRef(0);
+  const durationRef = useRef(0);
+  const completedRef = useRef(false);
 
   // Fetch aula data + progress + siblings
   useEffect(() => {
