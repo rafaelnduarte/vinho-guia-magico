@@ -47,14 +47,20 @@ export default function AulaPage() {
   const [loading, setLoading] = useState(true);
 
   const lastSaveRef = useRef(0);
+  const currentTimeRef = useRef(0);
+  const durationRef = useRef(0);
+  const completedRef = useRef(false);
 
   // Fetch aula data + progress + siblings
   useEffect(() => {
     if (!cursoId || !aulaId || !user?.id) return;
     setLoading(true);
     setCompleted(false);
+    completedRef.current = false;
     setCurrentTime(0);
+    currentTimeRef.current = 0;
     setDuration(0);
+    durationRef.current = 0;
     setPrevAulaId(null);
     setNextAulaId(null);
     lastSaveRef.current = 0;
@@ -130,7 +136,11 @@ export default function AulaPage() {
   const handleProgress = useCallback(
     (ct: number, dur: number) => {
       setCurrentTime(ct);
-      if (dur > 0) setDuration(dur);
+      currentTimeRef.current = ct;
+      if (dur > 0) {
+        setDuration(dur);
+        durationRef.current = dur;
+      }
 
       // Save every 30s
       const bucket = Math.floor(ct / 30);
@@ -142,12 +152,14 @@ export default function AulaPage() {
     [saveProgress]
   );
 
+  // Stable callback — never changes identity, reads from refs
   const handleComplete = useCallback(() => {
-    if (completed) return;
+    if (completedRef.current) return;
+    completedRef.current = true;
     setCompleted(true);
-    saveProgress(duration || currentTime, true);
+    saveProgress(durationRef.current || currentTimeRef.current, true);
     toast.success("Parabéns! Aula concluída. 🎉");
-  }, [completed, duration, currentTime, saveProgress]);
+  }, [saveProgress]);
 
   const pct = duration > 0 ? Math.min(100, Math.round((currentTime / duration) * 100)) : 0;
 

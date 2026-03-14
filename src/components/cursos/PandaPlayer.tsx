@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { Loader2, VideoOff } from "lucide-react";
 
 interface PandaPlayerProps {
@@ -22,14 +22,20 @@ export default function PandaPlayer({
   onComplete,
 }: PandaPlayerProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const htmlContainerRef = useRef<HTMLDivElement>(null);
   const completedRef = useRef(false);
+  const onProgressRef = useRef(onProgress);
+  const onCompleteRef = useRef(onComplete);
   const [ready, setReady] = useState(false);
 
-  // If embedHtml is provided, render it directly
+  // Keep refs in sync without triggering re-renders
+  onProgressRef.current = onProgress;
+  onCompleteRef.current = onComplete;
+
   const useHtml = !!embedHtml;
 
-  // Build the iframe src (only used when embedHtml is NOT available)
-  const src = (() => {
+  // Memoize src so it only changes when inputs actually change
+  const src = useMemo(() => {
     if (useHtml) return null;
     if (embedUrl) return embedUrl;
     if (pandaVideoId) {
@@ -43,59 +49,80 @@ export default function PandaPlayer({
       return `https://player-vz-7b95acb0-d42.tv.pandavideo.com.br/embed/?${params.toString()}`;
     }
     return null;
-  })();
+  }, [useHtml, embedUrl, pandaVideoId, startAt]);
 
-  // Listen for postMessage from Panda iframe
-  const handleMessage = useCallback(
-    (event: MessageEvent) => {
+  // Attach postMessage listener ONCE (reads callbacks from refs)
+  useEffect(() => {
+    if (!src && !useHtml) return;
+    completedRef.current = false;
+
+    const handleMessage = (event: MessageEvent) => {
       if (!event.origin.includes("pandavideo.com")) return;
-
       try {
         const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
 
         if (data?.message === "panda_timeupdate" || data?.event === "panda_timeupdate") {
           const currentTime = data.currentTime ?? data.seconds ?? 0;
           const duration = data.duration ?? 0;
-          onProgress?.(currentTime, duration);
+          onProgressRef.current?.(currentTime, duration);
 
           if (duration > 0 && currentTime / duration > 0.9 && !completedRef.current) {
             completedRef.current = true;
-            onComplete?.();
+            onCompleteRef.current?.();
           }
         }
 
         if (data?.message === "panda_ended" || data?.event === "panda_ended") {
           if (!completedRef.current) {
             completedRef.current = true;
-            onComplete?.();
+            onCompleteRef.current?.();
           }
         }
       } catch {
         // Ignore non-JSON messages
       }
-    },
-    [onProgress, onComplete]
-  );
+    };
 
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [src, useHtml]);
+
+  // For embed_html: inject HTML imperatively once so React never recreates the iframe
   useEffect(() => {
-    if (!src && !useHtml) return;
+    if (!useHtml || !embedHtml || !htmlContainerRef.current) return;
     completedRef.current = false;
     setReady(false);
 
-    window.addEventListener("message", handleMessage);
+    const container = htmlContainerRef.current;
+    container.innerHTML = embedHtml;
 
-    const timer = setTimeout(() => setReady(true), 500);
+    // Style any injected iframes
+    const iframes = container.querySelectorAll("iframe");
+    iframes.forEach((iframe) => {
+      iframe.style.position = "absolute";
+      iframe.style.top = "0";
+      iframe.style.left = "0";
+      iframe.style.width = "100%";
+      iframe.style.height = "100%";
+      iframe.style.border = "0";
+      iframe.addEventListener("load", () => setReady(true), { once: true });
+    });
+
+    // Fallback ready after 2s if no load event fires
+    const fallback = setTimeout(() => setReady(true), 2000);
 
     return () => {
-      window.removeEventListener("message", handleMessage);
-      clearTimeout(timer);
+      clearTimeout(fallback);
     };
-  }, [handleMessage, src, useHtml]);
+  }, [useHtml, embedHtml]);
 
-  // No video available at all
+  // No video available
   if (!src && !useHtml) {
     return (
-      <div className="relative w-full overflow-hidden rounded-xl bg-secondary flex items-center justify-center" style={{ aspectRatio: "16/9" }}>
+      <div
+        className="relative w-full overflow-hidden rounded-xl bg-secondary flex items-center justify-center"
+        style={{ aspectRatio: "16/9", minHeight: 360 }}
+      >
         <div className="text-center space-y-3 p-6 max-w-md">
           <VideoOff className="h-10 w-10 text-muted-foreground mx-auto" />
           <p className="text-sm font-medium text-foreground">Vídeo não disponível</p>
@@ -107,19 +134,21 @@ export default function PandaPlayer({
     );
   }
 
-  // Render embed_html via dangerouslySetInnerHTML
+  // Render embed_html via imperative ref (no dangerouslySetInnerHTML)
   if (useHtml) {
     return (
-      <div className="relative w-full overflow-hidden rounded-xl bg-secondary" style={{ aspectRatio: "16/9" }}>
+      <div
+        className="relative w-full overflow-hidden rounded-xl bg-secondary"
+        style={{ aspectRatio: "16/9", minHeight: 360 }}
+      >
         {!ready && (
           <div className="absolute inset-0 flex items-center justify-center bg-secondary z-10">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         )}
         <div
-          className="absolute inset-0 w-full h-full [&>iframe]:w-full [&>iframe]:h-full [&>iframe]:border-0"
-          dangerouslySetInnerHTML={{ __html: embedHtml! }}
-          onLoad={() => setReady(true)}
+          ref={htmlContainerRef}
+          className="absolute inset-0 w-full h-full"
         />
       </div>
     );
@@ -127,7 +156,10 @@ export default function PandaPlayer({
 
   // Render via iframe src
   return (
-    <div className="relative w-full overflow-hidden rounded-xl bg-secondary" style={{ aspectRatio: "16/9" }}>
+    <div
+      className="relative w-full overflow-hidden rounded-xl bg-secondary"
+      style={{ aspectRatio: "16/9", minHeight: 360 }}
+    >
       {!ready && (
         <div className="absolute inset-0 flex items-center justify-center bg-secondary z-10">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
