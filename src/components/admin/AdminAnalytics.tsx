@@ -394,6 +394,9 @@ export default function AdminAnalytics() {
               </table>
             </ScrollArea>
           </div>
+
+          {/* Consumption KPIs section */}
+          <AdminConsumptionKPIs profileMap={profileMap} adminUserIds={adminUserIds} />
         </>
       )}
     </div>
