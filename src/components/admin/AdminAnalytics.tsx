@@ -17,6 +17,7 @@ import {
   Search, ThumbsUp, ThumbsDown, MessageSquare, User, Download,
 } from "lucide-react";
 import { exportToCsv } from "@/lib/exportCsv";
+import AdminConsumptionKPIs from "./AdminConsumptionKPIs";
 
 type Period = "7d" | "30d" | "90d" | "mtd" | "all";
 
