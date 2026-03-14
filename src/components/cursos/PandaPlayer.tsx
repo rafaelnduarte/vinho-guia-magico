@@ -18,10 +18,12 @@ export default function PandaPlayer({
   embedUrl,
   embedHtml,
   pandaVideoId,
+  totalDuration = 0,
   startAt = 0,
   onProgress,
   onComplete,
 }: PandaPlayerProps) {
+  const totalDurationRef = useRef(totalDuration);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const htmlContainerRef = useRef<HTMLDivElement>(null);
   const completedRef = useRef(false);
