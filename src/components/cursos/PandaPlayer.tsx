@@ -5,6 +5,7 @@ interface PandaPlayerProps {
   embedUrl?: string | null;
   embedHtml?: string | null;
   pandaVideoId?: string;
+  totalDuration?: number;
   startAt?: number;
   userId?: string;
   aulaId?: string;
@@ -17,10 +18,12 @@ export default function PandaPlayer({
   embedUrl,
   embedHtml,
   pandaVideoId,
+  totalDuration = 0,
   startAt = 0,
   onProgress,
   onComplete,
 }: PandaPlayerProps) {
+  const totalDurationRef = useRef(totalDuration);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const htmlContainerRef = useRef<HTMLDivElement>(null);
   const completedRef = useRef(false);
@@ -31,6 +34,7 @@ export default function PandaPlayer({
   // Keep refs in sync without triggering re-renders
   onProgressRef.current = onProgress;
   onCompleteRef.current = onComplete;
+  totalDurationRef.current = totalDuration;
 
   const useHtml = !!embedHtml;
 
@@ -63,7 +67,7 @@ export default function PandaPlayer({
 
         if (data?.message === "panda_timeupdate" || data?.event === "panda_timeupdate") {
           const currentTime = data.currentTime ?? data.seconds ?? 0;
-          const duration = data.duration ?? 0;
+          const duration = data.duration || totalDurationRef.current || 0;
           onProgressRef.current?.(currentTime, duration);
 
           if (duration > 0 && currentTime / duration > 0.9 && !completedRef.current) {

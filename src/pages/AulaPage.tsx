@@ -161,7 +161,8 @@ export default function AulaPage() {
     toast.success("Parabéns! Aula concluída. 🎉");
   }, [saveProgress]);
 
-  const pct = duration > 0 ? Math.min(100, Math.round((currentTime / duration) * 100)) : 0;
+  const effectiveDuration = duration || (aula?.duracao_segundos ?? 0);
+  const pct = completed ? 100 : effectiveDuration > 0 ? Math.min(100, Math.round((currentTime / effectiveDuration) * 100)) : 0;
 
   if (loading) {
     return (
@@ -186,10 +187,11 @@ export default function AulaPage() {
 
       {/* Player */}
       {hasVideo ? (
-        <PandaPlayer
+      <PandaPlayer
           embedUrl={aula.embed_url}
           embedHtml={aula.embed_html}
           pandaVideoId={aula.panda_video_id || undefined}
+          totalDuration={aula.duracao_segundos}
           startAt={startAt}
           userId={user?.id}
           aulaId={aulaId}
@@ -210,7 +212,7 @@ export default function AulaPage() {
       <div className="space-y-1">
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>
-            Assistido: {formatTime(currentTime)} / {formatTime(duration || aula.duracao_segundos)}
+            Assistido: {formatTime(currentTime)} / {formatTime(effectiveDuration)}
           </span>
           <span>{pct}%</span>
         </div>
