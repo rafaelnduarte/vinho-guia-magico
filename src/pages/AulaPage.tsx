@@ -161,7 +161,8 @@ export default function AulaPage() {
     toast.success("Parabéns! Aula concluída. 🎉");
   }, [saveProgress]);
 
-  const pct = duration > 0 ? Math.min(100, Math.round((currentTime / duration) * 100)) : 0;
+  const effectiveDuration = duration || (aula?.duracao_segundos ?? 0);
+  const pct = completed ? 100 : effectiveDuration > 0 ? Math.min(100, Math.round((currentTime / effectiveDuration) * 100)) : 0;
 
   if (loading) {
     return (
