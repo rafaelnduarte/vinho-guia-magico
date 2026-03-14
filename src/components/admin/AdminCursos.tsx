@@ -105,7 +105,9 @@ export default function AdminCursos() {
         .eq("curso_id", selectedCurso!.id)
         .order("sort_order", { ascending: true });
       if (error) throw error;
-      return (data || []) as Aula[];
+      return ((data || []) as Aula[]).sort((a, b) =>
+        a.titulo.localeCompare(b.titulo, "pt-BR", { numeric: true, sensitivity: "base" })
+      );
     },
   });
 
