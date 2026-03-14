@@ -152,9 +152,9 @@ export default function PandaPlayer({
           </div>
         )}
         <div
+          ref={htmlContainerRef}
           className="absolute inset-0 w-full h-full [&>iframe]:w-full [&>iframe]:h-full [&>iframe]:border-0"
           dangerouslySetInnerHTML={{ __html: embedHtml! }}
-          onLoad={() => setReady(true)}
         />
       </div>
     );
