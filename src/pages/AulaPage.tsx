@@ -188,7 +188,7 @@ export default function AulaPage() {
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6">
       {/* Breadcrumb */}
-      <Button variant="ghost" size="sm" onClick={() => navigate(`/cursos/${cursoId}`)}>
+      <Button variant="ghost" size="sm" onClick={handleBack}>
         <ArrowLeft className="h-4 w-4 mr-1" /> Voltar ao curso
       </Button>
 
