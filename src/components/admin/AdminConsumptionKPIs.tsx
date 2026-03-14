@@ -50,10 +50,7 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props
   const isLoading = loadingProgresso || loadingAulas || loadingCursos;
 
   // Filter out admin progress
-  const progresso = useMemo(
-    () => (progressoRaw ?? []).filter((p) => !adminUserIds.has(p.user_id)),
-    [progressoRaw, adminUserIds]
-  );
+  const progresso = useMemo(() => progressoRaw ?? [], [progressoRaw]);
   const aulas = useMemo(() => aulasRaw ?? [], [aulasRaw]);
   const cursos = useMemo(() => cursosRaw ?? [], [cursosRaw]);
 
