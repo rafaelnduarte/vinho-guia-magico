@@ -186,10 +186,11 @@ export default function AulaPage() {
 
       {/* Player */}
       {hasVideo ? (
-        <PandaPlayer
+      <PandaPlayer
           embedUrl={aula.embed_url}
           embedHtml={aula.embed_html}
           pandaVideoId={aula.panda_video_id || undefined}
+          totalDuration={aula.duracao_segundos}
           startAt={startAt}
           userId={user?.id}
           aulaId={aulaId}
