@@ -67,7 +67,7 @@ export default function PandaPlayer({
 
         if (data?.message === "panda_timeupdate" || data?.event === "panda_timeupdate") {
           const currentTime = data.currentTime ?? data.seconds ?? 0;
-          const duration = data.duration ?? 0;
+          const duration = data.duration || totalDurationRef.current || 0;
           onProgressRef.current?.(currentTime, duration);
 
           if (duration > 0 && currentTime / duration > 0.9 && !completedRef.current) {

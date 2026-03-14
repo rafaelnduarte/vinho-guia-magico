@@ -212,7 +212,7 @@ export default function AulaPage() {
       <div className="space-y-1">
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>
-            Assistido: {formatTime(currentTime)} / {formatTime(duration || aula.duracao_segundos)}
+            Assistido: {formatTime(currentTime)} / {formatTime(effectiveDuration)}
           </span>
           <span>{pct}%</span>
         </div>
