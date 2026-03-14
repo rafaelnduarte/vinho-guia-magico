@@ -151,14 +151,22 @@ export default function AulaPage() {
     [saveProgress]
   );
 
-  // Stable callback — never changes identity, reads from refs
-  const handleComplete = useCallback(() => {
+  // Stable callback — awaits DB write before toast
+  const handleComplete = useCallback(async () => {
     if (completedRef.current) return;
     completedRef.current = true;
     setCompleted(true);
-    saveProgress(durationRef.current || currentTimeRef.current, true);
+    await saveProgress(durationRef.current || currentTimeRef.current, true);
     toast.success("Parabéns! Aula concluída. 🎉");
   }, [saveProgress]);
+
+  // Navigate back only after saving progress
+  const handleBack = useCallback(async () => {
+    if (currentTimeRef.current > 0) {
+      await saveProgress(currentTimeRef.current, completedRef.current);
+    }
+    navigate(`/cursos/${cursoId}`);
+  }, [saveProgress, navigate, cursoId]);
 
   const effectiveDuration = duration || (aula?.duracao_segundos ?? 0);
   const pct = completed ? 100 : effectiveDuration > 0 ? Math.min(100, Math.round((currentTime / effectiveDuration) * 100)) : 0;
