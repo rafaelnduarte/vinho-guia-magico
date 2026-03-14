@@ -123,15 +123,14 @@ export default function AulaPage() {
     [user?.id, aulaId, cursoId]
   );
 
-  // Save on unmount
+  // Save on unmount — uses refs to avoid stale closures
   useEffect(() => {
     return () => {
-      if (currentTime > 0) {
-        saveProgress(currentTime, completed);
+      if (currentTimeRef.current > 0) {
+        saveProgress(currentTimeRef.current, completedRef.current);
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [saveProgress]);
 
   const handleProgress = useCallback(
     (ct: number, dur: number) => {
@@ -152,14 +151,22 @@ export default function AulaPage() {
     [saveProgress]
   );
 
-  // Stable callback — never changes identity, reads from refs
-  const handleComplete = useCallback(() => {
+  // Stable callback — awaits DB write before toast
+  const handleComplete = useCallback(async () => {
     if (completedRef.current) return;
     completedRef.current = true;
     setCompleted(true);
-    saveProgress(durationRef.current || currentTimeRef.current, true);
+    await saveProgress(durationRef.current || currentTimeRef.current, true);
     toast.success("Parabéns! Aula concluída. 🎉");
   }, [saveProgress]);
+
+  // Navigate back only after saving progress
+  const handleBack = useCallback(async () => {
+    if (currentTimeRef.current > 0) {
+      await saveProgress(currentTimeRef.current, completedRef.current);
+    }
+    navigate(`/cursos/${cursoId}`);
+  }, [saveProgress, navigate, cursoId]);
 
   const effectiveDuration = duration || (aula?.duracao_segundos ?? 0);
   const pct = completed ? 100 : effectiveDuration > 0 ? Math.min(100, Math.round((currentTime / effectiveDuration) * 100)) : 0;
@@ -181,7 +188,7 @@ export default function AulaPage() {
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6">
       {/* Breadcrumb */}
-      <Button variant="ghost" size="sm" onClick={() => navigate(`/cursos/${cursoId}`)}>
+      <Button variant="ghost" size="sm" onClick={handleBack}>
         <ArrowLeft className="h-4 w-4 mr-1" /> Voltar ao curso
       </Button>
 
