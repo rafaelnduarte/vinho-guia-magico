@@ -123,15 +123,14 @@ export default function AulaPage() {
     [user?.id, aulaId, cursoId]
   );
 
-  // Save on unmount
+  // Save on unmount — uses refs to avoid stale closures
   useEffect(() => {
     return () => {
-      if (currentTime > 0) {
-        saveProgress(currentTime, completed);
+      if (currentTimeRef.current > 0) {
+        saveProgress(currentTimeRef.current, completedRef.current);
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [saveProgress]);
 
   const handleProgress = useCallback(
     (ct: number, dur: number) => {
