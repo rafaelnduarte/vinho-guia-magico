@@ -56,8 +56,11 @@ export default function AulaPage() {
     if (!cursoId || !aulaId || !user?.id) return;
     setLoading(true);
     setCompleted(false);
+    completedRef.current = false;
     setCurrentTime(0);
+    currentTimeRef.current = 0;
     setDuration(0);
+    durationRef.current = 0;
     setPrevAulaId(null);
     setNextAulaId(null);
     lastSaveRef.current = 0;
