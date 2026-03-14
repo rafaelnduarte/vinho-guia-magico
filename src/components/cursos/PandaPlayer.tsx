@@ -5,6 +5,7 @@ interface PandaPlayerProps {
   embedUrl?: string | null;
   embedHtml?: string | null;
   pandaVideoId?: string;
+  totalDuration?: number;
   startAt?: number;
   userId?: string;
   aulaId?: string;
