@@ -22,6 +22,7 @@ export default function PandaPlayer({
   onComplete,
 }: PandaPlayerProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const htmlContainerRef = useRef<HTMLDivElement>(null);
   const completedRef = useRef(false);
   const [ready, setReady] = useState(false);
 
