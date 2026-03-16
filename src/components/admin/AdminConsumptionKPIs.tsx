@@ -220,41 +220,6 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props
       ? paceGaps.reduce((a, b) => a + b, 0) / paceGaps.length
       : 0;
 
-    // KPI 15: Funil de consumo (pick the first curso with most data)
-    const cursoWithMostProgress = Object.entries(
-      progresso.reduce<Record<string, number>>((acc, p) => {
-        acc[p.curso_id] = (acc[p.curso_id] || 0) + 1;
-        return acc;
-      }, {})
-    ).sort((a, b) => b[1] - a[1])[0];
-
-    let funnelData: { name: string; value: number; fill: string }[] = [];
-    if (cursoWithMostProgress) {
-      const fCursoId = cursoWithMostProgress[0];
-      const fAulas = (aulasByCurso[fCursoId] || []).slice(0, 5); // limit to 5 lessons for funnel
-      const fProgresso = progresso.filter((p) => p.curso_id === fCursoId);
-      const usersAccessed = new Set(fProgresso.map((p) => p.user_id)).size;
-
-      const colors = ["hsl(var(--primary))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))"];
-      funnelData = [
-        { name: "Acessaram curso", value: usersAccessed, fill: colors[0] },
-      ];
-      fAulas.forEach((aula, i) => {
-        const started = fProgresso.filter((p) => p.aula_id === aula.id).length;
-        const finished = fProgresso.filter((p) => p.aula_id === aula.id && p.concluido).length;
-        funnelData.push({
-          name: `Iniciou "${cleanTitle(aula.titulo).slice(0, 20)}"`,
-          value: started,
-          fill: colors[(i * 2 + 1) % colors.length],
-        });
-        funnelData.push({
-          name: `Concluiu "${cleanTitle(aula.titulo).slice(0, 20)}"`,
-          value: finished,
-          fill: colors[(i * 2 + 2) % colors.length],
-        });
-      });
-    }
-
     // Detailed table per aula
     const detailedAulas = aulas.map((aula) => {
       const aulaProgress = progresso.filter((p) => p.aula_id === aula.id);
