@@ -11,6 +11,7 @@ interface Aula {
   descricao: string | null;
   duracao_segundos: number;
   sort_order: number;
+  thumbnail_url: string | null;
   concluido: boolean;
 }
 
