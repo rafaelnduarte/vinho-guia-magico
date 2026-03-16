@@ -80,7 +80,7 @@ export default function AdminCursos() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("cursos")
-        .select("id, titulo, descricao, is_published, panda_folder_id, sort_order, created_at")
+        .select("id, titulo, descricao, is_published, panda_folder_id, sort_order, created_at, capa_url")
         .order("created_at", { ascending: true });
       if (error) throw error;
       const { data: counts } = await supabase.from("aulas").select("curso_id");
