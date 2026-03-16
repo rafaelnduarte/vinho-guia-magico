@@ -100,18 +100,32 @@ export default function CursosPage() {
               <button
                 key={curso.id}
                 onClick={() => navigate(`/cursos/${curso.id}`)}
-                className="text-left rounded-xl border border-border bg-card p-5 shadow-sm hover:shadow-md hover:border-accent/40 transition-all space-y-3"
+                className="relative text-left rounded-xl border border-border overflow-hidden shadow-sm hover:shadow-md hover:border-accent/40 transition-all"
+                style={{
+                  aspectRatio: "500 / 834",
+                  backgroundImage: curso.capa_url ? `url(${curso.capa_url})` : undefined,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                  backgroundColor: curso.capa_url ? undefined : "hsl(var(--muted))",
+                }}
               >
-                <h2 className="font-display text-lg text-foreground leading-tight">{curso.titulo}</h2>
-                {curso.descricao && (
-                  <p className="text-sm text-muted-foreground line-clamp-2">{curso.descricao}</p>
+                {!curso.capa_url && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <GraduationCap className="h-12 w-12 text-muted-foreground/40" />
+                  </div>
                 )}
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <BookOpen className="h-3.5 w-3.5" />
-                  <span>{curso.totalAulas} aulas</span>
-                  <span className="ml-auto font-medium text-accent-foreground">{pct}%</span>
+                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/50 to-transparent p-4 space-y-2">
+                  <h2 className="font-display text-lg text-white leading-tight line-clamp-2">{curso.titulo}</h2>
+                  {curso.descricao && (
+                    <p className="text-xs text-white/70 line-clamp-2">{curso.descricao}</p>
+                  )}
+                  <div className="flex items-center gap-2 text-xs text-white/80">
+                    <BookOpen className="h-3.5 w-3.5" />
+                    <span>{curso.totalAulas} aulas</span>
+                    <span className="ml-auto font-medium text-white">{pct}%</span>
+                  </div>
+                  <Progress value={pct} className="h-1.5" />
                 </div>
-                <Progress value={pct} className="h-1.5" />
               </button>
             );
           })}
