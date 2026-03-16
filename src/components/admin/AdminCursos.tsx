@@ -33,6 +33,7 @@ interface Curso {
   panda_folder_id: string | null;
   sort_order: number;
   aulas_count?: number;
+  capa_url: string | null;
 }
 
 interface Aula {
