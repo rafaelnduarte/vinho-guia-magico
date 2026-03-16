@@ -254,6 +254,47 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props
     }).filter((a) => a.students > 0)
       .sort((a, b) => b.totalMinutes - a.totalMinutes);
 
+    // KPI: Consumo por Aluno
+    const studentMap: Record<string, {
+      watched: number;
+      abandoned: number;
+      cursoCompletion: Record<string, { total: number; completed: number }>;
+    }> = {};
+
+    progresso.forEach((p) => {
+      if (!studentMap[p.user_id]) {
+        studentMap[p.user_id] = { watched: 0, abandoned: 0, cursoCompletion: {} };
+      }
+      const s = studentMap[p.user_id];
+      if (p.concluido) {
+        s.watched++;
+      } else {
+        s.abandoned++;
+      }
+      if (!s.cursoCompletion[p.curso_id]) {
+        s.cursoCompletion[p.curso_id] = { total: aulasByCurso[p.curso_id]?.length || 1, completed: 0 };
+      }
+      if (p.concluido) {
+        s.cursoCompletion[p.curso_id].completed++;
+      }
+    });
+
+    const studentConsumption = Object.entries(studentMap)
+      .map(([userId, data]) => {
+        const cursoDetails = Object.entries(data.cursoCompletion).map(([cursoId, c]) => ({
+          curso: cursoMap[cursoId] ?? "Desconhecido",
+          pct: Math.min((c.completed / c.total) * 100, 100),
+        }));
+        return {
+          userId,
+          name: profileMap[userId] ?? userId.slice(0, 8),
+          watched: data.watched,
+          abandoned: data.abandoned,
+          cursos: cursoDetails,
+        };
+      })
+      .sort((a, b) => b.watched - a.watched);
+
     return {
       avgCourseCompletion,
       leastCompleted,
@@ -268,6 +309,7 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props
       mau: uniqueMonth.size,
       avgPaceHours,
       detailedAulas,
+      studentConsumption,
     };
   }, [progresso, aulas, cursos, aulaMap, cursoMap, aulasByCurso]);
 
@@ -446,7 +488,53 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props
         </ScrollArea>
       </div>
 
-      {/* Unavailable KPI note */}
+      {/* Consumo por Aluno */}
+      <div className="rounded-lg border border-border overflow-hidden">
+        <div className="px-4 py-3 bg-muted/50 flex items-center gap-2">
+          <Users className="h-4 w-4 text-muted-foreground" />
+          <h3 className="text-sm font-medium text-foreground">Consumo por Aluno</h3>
+        </div>
+        <ScrollArea className="max-h-[500px]">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/30 text-left sticky top-0">
+              <tr>
+                <th className="px-4 py-2 font-medium">Aluno</th>
+                <th className="px-4 py-2 font-medium text-right">Assistidas</th>
+                <th className="px-4 py-2 font-medium text-right">Abandonadas</th>
+                <th className="px-4 py-2 font-medium">% Conclusão por Curso</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {kpis.studentConsumption.map((s) => (
+                <tr key={s.userId} className="hover:bg-muted/20">
+                  <td className="px-4 py-2 text-foreground max-w-[200px] truncate">{s.name}</td>
+                  <td className="px-4 py-2 text-right text-foreground">{s.watched}</td>
+                  <td className="px-4 py-2 text-right text-foreground">{s.abandoned}</td>
+                  <td className="px-4 py-2">
+                    <div className="flex flex-wrap gap-1">
+                      {s.cursos.map((c, i) => (
+                        <Badge
+                          key={i}
+                          variant={c.pct >= 70 ? "default" : c.pct >= 40 ? "secondary" : "destructive"}
+                          className="text-[10px] whitespace-nowrap"
+                          title={c.curso}
+                        >
+                          {c.curso.length > 20 ? c.curso.slice(0, 20) + "…" : c.curso}: {c.pct.toFixed(0)}%
+                        </Badge>
+                      ))}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {kpis.studentConsumption.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">Sem dados.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </ScrollArea>
+      </div>
       <div className="rounded-lg border border-border bg-muted/20 p-4 text-xs text-muted-foreground flex items-start gap-2">
         <Info className="h-4 w-4 shrink-0 mt-0.5" />
         <div>
