@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   BookOpen, Clock, TrendingUp, Users, AlertTriangle, Award,
-  BarChart3, Activity, Smartphone, RefreshCw, Info,
+  BarChart3, Activity, Smartphone, Info,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -357,7 +357,7 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <KpiCard icon={AlertTriangle} label="Drop-off Médio" value={formatSeconds(kpis.avgDropOffSeconds)} />
         <KpiCard icon={Activity} label="Ritmo entre Aulas" value={kpis.avgPaceHours > 0 ? `${kpis.avgPaceHours.toFixed(1)}h` : "—"} />
-        <UnavailableCard icon={RefreshCw} label="Rewatch Rate" reason="Requer tracking de plays" />
+        
         <UnavailableCard icon={Smartphone} label="Engajamento / Dispositivo" reason="Requer tracking de device" />
       </div>
 
@@ -538,8 +538,8 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props
       <div className="rounded-lg border border-border bg-muted/20 p-4 text-xs text-muted-foreground flex items-start gap-2">
         <Info className="h-4 w-4 shrink-0 mt-0.5" />
         <div>
-          <strong>KPIs indisponíveis:</strong> Rewatch Rate, Engajamento por Dispositivo e Sessões por Aluno requerem
-          tracking adicional (contagem de plays, dados de device, session tracking) que não está implementado no schema atual.
+          <strong>KPIs indisponíveis:</strong> Engajamento por Dispositivo e Sessões por Aluno requerem
+          tracking adicional (dados de device, session tracking) que não está implementado no schema atual.
         </div>
       </div>
     </div>
