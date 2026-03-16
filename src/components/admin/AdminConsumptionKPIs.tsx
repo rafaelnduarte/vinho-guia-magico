@@ -261,8 +261,7 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props
       wau: uniqueWeek.size,
       mau: uniqueMonth.size,
       avgPaceHours,
-      funnelData,
-      funnelCursoName: cursoWithMostProgress ? cursoMap[cursoWithMostProgress[0]] : null,
+      detailedAulas,
       detailedAulas,
     };
   }, [progresso, aulas, cursos, aulaMap, cursoMap, aulasByCurso]);
