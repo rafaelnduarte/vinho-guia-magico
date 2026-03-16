@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   BookOpen, Clock, TrendingUp, Users, AlertTriangle, Award,
-  BarChart3, Activity, Smartphone, RefreshCw, Info,
+  BarChart3, Activity, Smartphone, Info,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
