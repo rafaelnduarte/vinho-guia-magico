@@ -262,7 +262,6 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props
       mau: uniqueMonth.size,
       avgPaceHours,
       detailedAulas,
-      detailedAulas,
     };
   }, [progresso, aulas, cursos, aulaMap, cursoMap, aulasByCurso]);
 
