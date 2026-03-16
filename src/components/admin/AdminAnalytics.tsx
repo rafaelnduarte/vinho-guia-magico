@@ -396,7 +396,7 @@ export default function AdminAnalytics() {
           </div>
 
           {/* Consumption KPIs section */}
-          <AdminConsumptionKPIs profileMap={profileMap} adminUserIds={adminUserIds} />
+          <AdminConsumptionKPIs profileMap={profileMap} adminUserIds={adminUserIds} period={period} />
         </>
       )}
     </div>

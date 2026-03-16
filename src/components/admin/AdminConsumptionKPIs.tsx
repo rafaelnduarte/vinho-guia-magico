@@ -59,8 +59,13 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds, period 
 
   const isLoading = loadingProgresso || loadingAulas || loadingCursos;
 
-  // Filter out admin progress
-  const progresso = useMemo(() => progressoRaw ?? [], [progressoRaw]);
+  // Filter out admin progress and apply period filter
+  const progresso = useMemo(() => {
+    const start = getPeriodStart(period);
+    let items = progressoRaw ?? [];
+    if (start) items = items.filter((p) => p.updated_at >= start);
+    return items;
+  }, [progressoRaw, period]);
   const aulas = useMemo(() => aulasRaw ?? [], [aulasRaw]);
   const cursos = useMemo(() => cursosRaw ?? [], [cursosRaw]);
 
