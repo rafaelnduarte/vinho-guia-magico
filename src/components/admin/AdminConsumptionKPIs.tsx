@@ -157,16 +157,21 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props
       .sort((a, b) => a.rate - b.rate)
       .slice(0, 5);
 
-    // KPI 10: Heatmap de horários (bar chart by hour)
-    const hourCounts = new Array(24).fill(0);
+    // KPI 10: Consumo por dia
+    const dayCounts: Record<string, number> = {};
     progresso.forEach((p) => {
-      const h = new Date(p.updated_at).getHours();
-      hourCounts[h]++;
+      const d = new Date(p.updated_at);
+      const key = `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1).toString().padStart(2, "0")}`;
+      dayCounts[key] = (dayCounts[key] || 0) + 1;
     });
-    const heatmapData = hourCounts.map((count, hour) => ({
-      hour: `${hour.toString().padStart(2, "0")}h`,
-      count,
-    }));
+    // Sort by date (parse back to compare)
+    const heatmapData = Object.entries(dayCounts)
+      .map(([day, count]) => ({ day, count }))
+      .sort((a, b) => {
+        const [da, ma] = a.day.split("/").map(Number);
+        const [db, mb] = b.day.split("/").map(Number);
+        return ma !== mb ? ma - mb : da - db;
+      });
 
     // KPI 11: Aulas mais assistidas (by total seconds)
     const aulaWatched: Record<string, number> = {};
