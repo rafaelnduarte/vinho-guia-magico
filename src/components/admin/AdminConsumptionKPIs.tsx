@@ -243,12 +243,12 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props
         const started = fProgresso.filter((p) => p.aula_id === aula.id).length;
         const finished = fProgresso.filter((p) => p.aula_id === aula.id && p.concluido).length;
         funnelData.push({
-          name: `Iniciou "${aula.titulo.slice(0, 20)}"`,
+          name: `Iniciou "${cleanTitle(aula.titulo).slice(0, 20)}"`,
           value: started,
           fill: colors[(i * 2 + 1) % colors.length],
         });
         funnelData.push({
-          name: `Concluiu "${aula.titulo.slice(0, 20)}"`,
+          name: `Concluiu "${cleanTitle(aula.titulo).slice(0, 20)}"`,
           value: finished,
           fill: colors[(i * 2 + 2) % colors.length],
         });
