@@ -5,11 +5,10 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
-  FunnelChart, Funnel, LabelList,
 } from "recharts";
 import {
   BookOpen, Clock, TrendingUp, Users, AlertTriangle, Award,
-  BarChart3, Activity, Smartphone, RefreshCw, Layers, Info,
+  BarChart3, Activity, Smartphone, RefreshCw, Info,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -220,41 +219,6 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props
       ? paceGaps.reduce((a, b) => a + b, 0) / paceGaps.length
       : 0;
 
-    // KPI 15: Funil de consumo (pick the first curso with most data)
-    const cursoWithMostProgress = Object.entries(
-      progresso.reduce<Record<string, number>>((acc, p) => {
-        acc[p.curso_id] = (acc[p.curso_id] || 0) + 1;
-        return acc;
-      }, {})
-    ).sort((a, b) => b[1] - a[1])[0];
-
-    let funnelData: { name: string; value: number; fill: string }[] = [];
-    if (cursoWithMostProgress) {
-      const fCursoId = cursoWithMostProgress[0];
-      const fAulas = (aulasByCurso[fCursoId] || []).slice(0, 5); // limit to 5 lessons for funnel
-      const fProgresso = progresso.filter((p) => p.curso_id === fCursoId);
-      const usersAccessed = new Set(fProgresso.map((p) => p.user_id)).size;
-
-      const colors = ["hsl(var(--primary))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))"];
-      funnelData = [
-        { name: "Acessaram curso", value: usersAccessed, fill: colors[0] },
-      ];
-      fAulas.forEach((aula, i) => {
-        const started = fProgresso.filter((p) => p.aula_id === aula.id).length;
-        const finished = fProgresso.filter((p) => p.aula_id === aula.id && p.concluido).length;
-        funnelData.push({
-          name: `Iniciou "${cleanTitle(aula.titulo).slice(0, 20)}"`,
-          value: started,
-          fill: colors[(i * 2 + 1) % colors.length],
-        });
-        funnelData.push({
-          name: `Concluiu "${cleanTitle(aula.titulo).slice(0, 20)}"`,
-          value: finished,
-          fill: colors[(i * 2 + 2) % colors.length],
-        });
-      });
-    }
-
     // Detailed table per aula
     const detailedAulas = aulas.map((aula) => {
       const aulaProgress = progresso.filter((p) => p.aula_id === aula.id);
@@ -296,8 +260,6 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props
       wau: uniqueWeek.size,
       mau: uniqueMonth.size,
       avgPaceHours,
-      funnelData,
-      funnelCursoName: cursoWithMostProgress ? cursoMap[cursoWithMostProgress[0]] : null,
       detailedAulas,
     };
   }, [progresso, aulas, cursos, aulaMap, cursoMap, aulasByCurso]);
@@ -380,70 +342,32 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props
         />
       </div>
 
-      {/* Charts row */}
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Heatmap de horários */}
-        <div className="rounded-lg border border-border overflow-hidden">
-          <div className="px-4 py-3 bg-muted/50 flex items-center gap-2">
-            <Clock className="h-4 w-4 text-muted-foreground" />
-            <h3 className="text-sm font-medium text-foreground">Horários de Maior Consumo</h3>
-          </div>
-          <div className="p-4 h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={kpis.heatmapData}>
-                <XAxis dataKey="hour" tick={{ fontSize: 10 }} interval={2} />
-                <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
-                <Tooltip
-                  contentStyle={{ fontSize: 12 }}
-                  formatter={(value: number) => [`${value} atividades`, "Qtd"]}
-                />
-                <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                  {kpis.heatmapData.map((entry, i) => (
-                    <Cell
-                      key={i}
-                      fill={entry.count > 0 ? "hsl(var(--primary))" : "hsl(var(--muted))"}
-                      fillOpacity={entry.count > 0 ? Math.max(0.3, Math.min(1, entry.count / Math.max(...kpis.heatmapData.map((d) => d.count)))) : 0.2}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+      {/* Heatmap de horários */}
+      <div className="rounded-lg border border-border overflow-hidden">
+        <div className="px-4 py-3 bg-muted/50 flex items-center gap-2">
+          <Clock className="h-4 w-4 text-muted-foreground" />
+          <h3 className="text-sm font-medium text-foreground">Horários de Maior Consumo</h3>
         </div>
-
-        {/* Funil de consumo */}
-        <div className="rounded-lg border border-border overflow-hidden">
-          <div className="px-4 py-3 bg-muted/50 flex items-center gap-2">
-            <Layers className="h-4 w-4 text-muted-foreground" />
-            <h3 className="text-sm font-medium text-foreground">
-              Funil de Consumo{kpis.funnelCursoName ? ` — ${kpis.funnelCursoName}` : ""}
-            </h3>
-          </div>
-          <div className="p-4">
-            {kpis.funnelData.length > 0 ? (
-              <div className="space-y-2">
-                {kpis.funnelData.map((step, i) => {
-                  const maxVal = kpis.funnelData[0].value || 1;
-                  const widthPct = Math.max(5, (step.value / maxVal) * 100);
-                  return (
-                    <div key={i} className="flex items-center gap-3">
-                      <div className="w-44 text-xs text-muted-foreground truncate text-right">{step.name}</div>
-                      <div className="flex-1 flex items-center gap-2">
-                        <div
-                          className="h-6 rounded bg-primary/80 flex items-center justify-end px-2 transition-all"
-                          style={{ width: `${widthPct}%`, backgroundColor: step.fill }}
-                        >
-                          <span className="text-xs font-medium text-primary-foreground">{step.value}</span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground text-center py-8">Sem dados suficientes para o funil.</p>
-            )}
-          </div>
+        <div className="p-4 h-64">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={kpis.heatmapData}>
+              <XAxis dataKey="hour" tick={{ fontSize: 10 }} interval={2} />
+              <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+              <Tooltip
+                contentStyle={{ fontSize: 12 }}
+                formatter={(value: number) => [`${value} atividades`, "Qtd"]}
+              />
+              <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                {kpis.heatmapData.map((entry, i) => (
+                  <Cell
+                    key={i}
+                    fill={entry.count > 0 ? "hsl(var(--primary))" : "hsl(var(--muted))"}
+                    fillOpacity={entry.count > 0 ? Math.max(0.3, Math.min(1, entry.count / Math.max(...kpis.heatmapData.map((d) => d.count)))) : 0.2}
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       </div>
 
