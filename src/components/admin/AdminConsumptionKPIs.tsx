@@ -173,26 +173,38 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds, period 
       .sort((a, b) => a.rate - b.rate)
       .slice(0, 5);
 
-    // KPI 10: Heatmap dia × hora (mês atual)
-    const now2 = new Date();
-    const currentMonth = now2.getMonth();
-    const currentYear = now2.getFullYear();
-    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-    const monthLabel = (currentMonth + 1).toString().padStart(2, "0");
-
-    // Build day×hour matrix
+    // KPI 10: Heatmap dia × hora (based on filtered period)
+    // Find the date range from filtered progresso
+    const dates = progresso.map((p) => new Date(p.updated_at));
+    const minDate = dates.length ? new Date(Math.min(...dates.map((d) => d.getTime()))) : new Date();
+    const maxDate = dates.length ? new Date(Math.max(...dates.map((d) => d.getTime()))) : new Date();
+    
+    // For period-based heatmap, use the start of the period or earliest data
+    const heatStart = new Date(minDate.getFullYear(), minDate.getMonth(), minDate.getDate());
+    const heatEnd = new Date(maxDate.getFullYear(), maxDate.getMonth(), maxDate.getDate());
+    const totalDays = Math.max(1, Math.ceil((heatEnd.getTime() - heatStart.getTime()) / 86400000) + 1);
+    
+    // Build day×hour matrix using day index from heatStart
     const heatMatrix: Record<string, number> = {};
+    const heatDayLabels: string[] = [];
     let heatMax = 0;
+    
+    for (let i = 0; i < totalDays; i++) {
+      const d = new Date(heatStart.getTime() + i * 86400000);
+      heatDayLabels.push(`${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1).toString().padStart(2, "0")}`);
+    }
+    
     progresso.forEach((p) => {
       const d = new Date(p.updated_at);
-      if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
-        const key = `${d.getDate()}-${d.getHours()}`;
+      const dayIdx = Math.floor((d.getTime() - heatStart.getTime()) / 86400000);
+      if (dayIdx >= 0 && dayIdx < totalDays) {
+        const key = `${dayIdx}-${d.getHours()}`;
         heatMatrix[key] = (heatMatrix[key] || 0) + 1;
         if (heatMatrix[key] > heatMax) heatMax = heatMatrix[key];
       }
     });
 
-    const heatmapGrid = { daysInMonth, monthLabel, matrix: heatMatrix, max: heatMax };
+    const heatmapGrid = { totalDays, dayLabels: heatDayLabels, matrix: heatMatrix, max: heatMax };
 
     // KPI 11: Aulas mais assistidas (by total seconds)
     const aulaWatched: Record<string, number> = {};
