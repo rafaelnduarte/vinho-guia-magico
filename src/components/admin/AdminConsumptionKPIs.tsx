@@ -176,7 +176,7 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props
     });
     const mostWatched = Object.entries(aulaWatched)
       .map(([aulaId, secs]) => ({
-        titulo: aulaMap[aulaId]?.titulo ?? "Desconhecida",
+        titulo: cleanTitle(aulaMap[aulaId]?.titulo ?? "Desconhecida"),
         minutes: Math.round(secs / 60),
       }))
       .sort((a, b) => b.minutes - a.minutes)
