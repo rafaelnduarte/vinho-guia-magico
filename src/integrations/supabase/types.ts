@@ -305,6 +305,7 @@ export type Database = {
       }
       cursos: {
         Row: {
+          capa_url: string | null
           created_at: string
           descricao: string | null
           id: string
@@ -318,6 +319,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          capa_url?: string | null
           created_at?: string
           descricao?: string | null
           id?: string
@@ -331,6 +333,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          capa_url?: string | null
           created_at?: string
           descricao?: string | null
           id?: string
