@@ -119,7 +119,7 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props
     const aulaCompletionList = Object.entries(aulaCompletionMap)
       .map(([aulaId, { total, completed }]) => ({
         aulaId,
-        titulo: aulaMap[aulaId]?.titulo ?? "Desconhecida",
+        titulo: cleanTitle(aulaMap[aulaId]?.titulo ?? "Desconhecida"),
         curso: cursoMap[aulaMap[aulaId]?.curso_id ?? ""] ?? "",
         rate: total > 0 ? (completed / total) * 100 : 0,
         total,
@@ -176,7 +176,7 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props
     });
     const mostWatched = Object.entries(aulaWatched)
       .map(([aulaId, secs]) => ({
-        titulo: aulaMap[aulaId]?.titulo ?? "Desconhecida",
+        titulo: cleanTitle(aulaMap[aulaId]?.titulo ?? "Desconhecida"),
         minutes: Math.round(secs / 60),
       }))
       .sort((a, b) => b.minutes - a.minutes)
@@ -243,12 +243,12 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props
         const started = fProgresso.filter((p) => p.aula_id === aula.id).length;
         const finished = fProgresso.filter((p) => p.aula_id === aula.id && p.concluido).length;
         funnelData.push({
-          name: `Iniciou "${aula.titulo.slice(0, 20)}"`,
+          name: `Iniciou "${cleanTitle(aula.titulo).slice(0, 20)}"`,
           value: started,
           fill: colors[(i * 2 + 1) % colors.length],
         });
         funnelData.push({
-          name: `Concluiu "${aula.titulo.slice(0, 20)}"`,
+          name: `Concluiu "${cleanTitle(aula.titulo).slice(0, 20)}"`,
           value: finished,
           fill: colors[(i * 2 + 2) % colors.length],
         });
@@ -272,7 +272,7 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props
 
       return {
         id: aula.id,
-        titulo: aula.titulo,
+        titulo: cleanTitle(aula.titulo),
         curso: cursoMap[aula.curso_id] ?? "",
         completionRate,
         avgTimeSeconds: avgTime,
@@ -561,6 +561,10 @@ function RankingList({
       </div>
     </div>
   );
+}
+
+function cleanTitle(t: string): string {
+  return t.replace(/\.mp4$/i, "");
 }
 
 function formatSeconds(s: number): string {
