@@ -119,7 +119,7 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props
     const aulaCompletionList = Object.entries(aulaCompletionMap)
       .map(([aulaId, { total, completed }]) => ({
         aulaId,
-        titulo: aulaMap[aulaId]?.titulo ?? "Desconhecida",
+        titulo: cleanTitle(aulaMap[aulaId]?.titulo ?? "Desconhecida"),
         curso: cursoMap[aulaMap[aulaId]?.curso_id ?? ""] ?? "",
         rate: total > 0 ? (completed / total) * 100 : 0,
         total,
