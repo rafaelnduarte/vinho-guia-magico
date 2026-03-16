@@ -5,11 +5,10 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
-  FunnelChart, Funnel, LabelList,
 } from "recharts";
 import {
   BookOpen, Clock, TrendingUp, Users, AlertTriangle, Award,
-  BarChart3, Activity, Smartphone, RefreshCw, Layers, Info,
+  BarChart3, Activity, Smartphone, RefreshCw, Info,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
