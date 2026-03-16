@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { ArrowLeft, CheckCircle2, Clock, PlayCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface Aula {
@@ -11,6 +11,7 @@ interface Aula {
   descricao: string | null;
   duracao_segundos: number;
   sort_order: number;
+  thumbnail_url: string | null;
   concluido: boolean;
 }
 
@@ -40,7 +41,7 @@ export default function CursoDetailPage() {
         supabase.from("cursos").select("titulo").eq("id", cursoId).maybeSingle(),
         supabase
           .from("aulas")
-          .select("id, titulo, descricao, duracao_segundos, sort_order")
+          .select("id, titulo, descricao, duracao_segundos, sort_order, thumbnail_url")
           .eq("curso_id", cursoId)
           .eq("is_published", true)
           .order("titulo", { ascending: true }),
@@ -90,31 +91,30 @@ export default function CursoDetailPage() {
       {aulas.length === 0 ? (
         <p className="text-muted-foreground text-center py-12">Nenhuma aula publicada neste curso.</p>
       ) : (
-        <div className="space-y-2">
-          {aulas.map((aula, i) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {aulas.map((aula) => (
             <button
               key={aula.id}
               onClick={() => navigate(`/cursos/${cursoId}/aula/${aula.id}`)}
-              className="w-full flex items-center gap-4 rounded-lg border border-border bg-card px-4 py-3 hover:border-accent/40 hover:shadow-sm transition-all text-left"
+              className="rounded-lg border border-border overflow-hidden hover:border-accent/40 hover:shadow-sm transition-all text-left"
             >
-              <div className="flex items-center justify-center h-8 w-8 rounded-full bg-secondary text-secondary-foreground text-sm font-bold shrink-0">
-                {aula.concluido ? (
-                  <CheckCircle2 className="h-5 w-5 text-accent" />
-                ) : (
-                  <span>{String(i + 1).padStart(2, "0")}</span>
+              <div
+                className="relative aspect-video bg-muted bg-cover bg-center"
+                style={aula.thumbnail_url ? { backgroundImage: `url(${aula.thumbnail_url})` } : undefined}
+              >
+                {aula.concluido && (
+                  <div className="absolute top-2 right-2 bg-accent rounded-full p-0.5">
+                    <CheckCircle2 className="h-4 w-4 text-accent-foreground" />
+                  </div>
                 )}
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-foreground truncate">{sanitizarTitulo(aula.titulo)}</p>
-                {aula.descricao && (
-                  <p className="text-xs text-muted-foreground truncate mt-0.5">{aula.descricao}</p>
-                )}
+              <div className="p-3 space-y-1 bg-card">
+                <p className="font-medium text-sm text-foreground line-clamp-2">{sanitizarTitulo(aula.titulo)}</p>
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Clock className="h-3.5 w-3.5" />
+                  {formatDuration(aula.duracao_segundos)}
+                </div>
               </div>
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0">
-                <Clock className="h-3.5 w-3.5" />
-                {formatDuration(aula.duracao_segundos)}
-              </div>
-              <PlayCircle className="h-5 w-5 text-accent shrink-0" />
             </button>
           ))}
         </div>
