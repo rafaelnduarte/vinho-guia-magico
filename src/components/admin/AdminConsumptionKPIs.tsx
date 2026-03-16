@@ -344,70 +344,32 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props
         />
       </div>
 
-      {/* Charts row */}
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Heatmap de horários */}
-        <div className="rounded-lg border border-border overflow-hidden">
-          <div className="px-4 py-3 bg-muted/50 flex items-center gap-2">
-            <Clock className="h-4 w-4 text-muted-foreground" />
-            <h3 className="text-sm font-medium text-foreground">Horários de Maior Consumo</h3>
-          </div>
-          <div className="p-4 h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={kpis.heatmapData}>
-                <XAxis dataKey="hour" tick={{ fontSize: 10 }} interval={2} />
-                <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
-                <Tooltip
-                  contentStyle={{ fontSize: 12 }}
-                  formatter={(value: number) => [`${value} atividades`, "Qtd"]}
-                />
-                <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                  {kpis.heatmapData.map((entry, i) => (
-                    <Cell
-                      key={i}
-                      fill={entry.count > 0 ? "hsl(var(--primary))" : "hsl(var(--muted))"}
-                      fillOpacity={entry.count > 0 ? Math.max(0.3, Math.min(1, entry.count / Math.max(...kpis.heatmapData.map((d) => d.count)))) : 0.2}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+      {/* Heatmap de horários */}
+      <div className="rounded-lg border border-border overflow-hidden">
+        <div className="px-4 py-3 bg-muted/50 flex items-center gap-2">
+          <Clock className="h-4 w-4 text-muted-foreground" />
+          <h3 className="text-sm font-medium text-foreground">Horários de Maior Consumo</h3>
         </div>
-
-        {/* Funil de consumo */}
-        <div className="rounded-lg border border-border overflow-hidden">
-          <div className="px-4 py-3 bg-muted/50 flex items-center gap-2">
-            <Layers className="h-4 w-4 text-muted-foreground" />
-            <h3 className="text-sm font-medium text-foreground">
-              Funil de Consumo{kpis.funnelCursoName ? ` — ${kpis.funnelCursoName}` : ""}
-            </h3>
-          </div>
-          <div className="p-4">
-            {kpis.funnelData.length > 0 ? (
-              <div className="space-y-2">
-                {kpis.funnelData.map((step, i) => {
-                  const maxVal = kpis.funnelData[0].value || 1;
-                  const widthPct = Math.max(5, (step.value / maxVal) * 100);
-                  return (
-                    <div key={i} className="flex items-center gap-3">
-                      <div className="w-44 text-xs text-muted-foreground truncate text-right">{step.name}</div>
-                      <div className="flex-1 flex items-center gap-2">
-                        <div
-                          className="h-6 rounded bg-primary/80 flex items-center justify-end px-2 transition-all"
-                          style={{ width: `${widthPct}%`, backgroundColor: step.fill }}
-                        >
-                          <span className="text-xs font-medium text-primary-foreground">{step.value}</span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground text-center py-8">Sem dados suficientes para o funil.</p>
-            )}
-          </div>
+        <div className="p-4 h-64">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={kpis.heatmapData}>
+              <XAxis dataKey="hour" tick={{ fontSize: 10 }} interval={2} />
+              <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+              <Tooltip
+                contentStyle={{ fontSize: 12 }}
+                formatter={(value: number) => [`${value} atividades`, "Qtd"]}
+              />
+              <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                {kpis.heatmapData.map((entry, i) => (
+                  <Cell
+                    key={i}
+                    fill={entry.count > 0 ? "hsl(var(--primary))" : "hsl(var(--muted))"}
+                    fillOpacity={entry.count > 0 ? Math.max(0.3, Math.min(1, entry.count / Math.max(...kpis.heatmapData.map((d) => d.count)))) : 0.2}
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       </div>
 
