@@ -28,7 +28,7 @@ interface Props {
   period: Period;
 }
 
-export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props) {
+export default function AdminConsumptionKPIs({ profileMap, adminUserIds, period }: Props) {
   // --- Queries ---
   const { data: progressoRaw, isLoading: loadingProgresso } = useQuery({
     queryKey: ["admin-kpi-progresso"],
