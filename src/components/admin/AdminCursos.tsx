@@ -70,6 +70,9 @@ export default function AdminCursos() {
   const [confirmDeleteAula, setConfirmDeleteAula] = useState<Aula | null>(null);
   const [deletingCursoId, setDeletingCursoId] = useState<string | null>(null);
   const [deletingAulaId, setDeletingAulaId] = useState<string | null>(null);
+  const [uploadingCapaId, setUploadingCapaId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadCursoRef = useRef<Curso | null>(null);
   const queryClient = useQueryClient();
 
   const { data: cursos, isLoading } = useQuery({
