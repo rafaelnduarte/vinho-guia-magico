@@ -254,6 +254,47 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props
     }).filter((a) => a.students > 0)
       .sort((a, b) => b.totalMinutes - a.totalMinutes);
 
+    // KPI: Consumo por Aluno
+    const studentMap: Record<string, {
+      watched: number;
+      abandoned: number;
+      cursoCompletion: Record<string, { total: number; completed: number }>;
+    }> = {};
+
+    progresso.forEach((p) => {
+      if (!studentMap[p.user_id]) {
+        studentMap[p.user_id] = { watched: 0, abandoned: 0, cursoCompletion: {} };
+      }
+      const s = studentMap[p.user_id];
+      if (p.concluido) {
+        s.watched++;
+      } else {
+        s.abandoned++;
+      }
+      if (!s.cursoCompletion[p.curso_id]) {
+        s.cursoCompletion[p.curso_id] = { total: aulasByCurso[p.curso_id]?.length || 1, completed: 0 };
+      }
+      if (p.concluido) {
+        s.cursoCompletion[p.curso_id].completed++;
+      }
+    });
+
+    const studentConsumption = Object.entries(studentMap)
+      .map(([userId, data]) => {
+        const cursoDetails = Object.entries(data.cursoCompletion).map(([cursoId, c]) => ({
+          curso: cursoMap[cursoId] ?? "Desconhecido",
+          pct: Math.min((c.completed / c.total) * 100, 100),
+        }));
+        return {
+          userId,
+          name: profileMap[userId] ?? userId.slice(0, 8),
+          watched: data.watched,
+          abandoned: data.abandoned,
+          cursos: cursoDetails,
+        };
+      })
+      .sort((a, b) => b.watched - a.watched);
+
     return {
       avgCourseCompletion,
       leastCompleted,
@@ -268,6 +309,7 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props
       mau: uniqueMonth.size,
       avgPaceHours,
       detailedAulas,
+      studentConsumption,
     };
   }, [progresso, aulas, cursos, aulaMap, cursoMap, aulasByCurso]);
 
