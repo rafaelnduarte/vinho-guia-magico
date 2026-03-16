@@ -264,7 +264,7 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props
       totalHours,
       avgDropOffSeconds,
       highestAbandonment,
-      heatmapData,
+      heatmapGrid,
       mostWatched,
       dau: uniqueDay.size,
       wau: uniqueWeek.size,
