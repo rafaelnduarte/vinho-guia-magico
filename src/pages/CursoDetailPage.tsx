@@ -41,7 +41,7 @@ export default function CursoDetailPage() {
         supabase.from("cursos").select("titulo").eq("id", cursoId).maybeSingle(),
         supabase
           .from("aulas")
-          .select("id, titulo, descricao, duracao_segundos, sort_order")
+          .select("id, titulo, descricao, duracao_segundos, sort_order, thumbnail_url")
           .eq("curso_id", cursoId)
           .eq("is_published", true)
           .order("titulo", { ascending: true }),
