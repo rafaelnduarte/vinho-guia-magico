@@ -157,21 +157,28 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props
       .sort((a, b) => a.rate - b.rate)
       .slice(0, 5);
 
-    // KPI 10: Consumo por dia
-    const dayCounts: Record<string, number> = {};
+    // KPI 10: Consumo por dia (todos os dias do mês atual)
+    const now2 = new Date();
+    const currentMonth = now2.getMonth();
+    const currentYear = now2.getFullYear();
+    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const monthLabel = (currentMonth + 1).toString().padStart(2, "0");
+
+    // Initialize all days of the month
+    const dayCountsMap: Record<number, number> = {};
+    for (let d = 1; d <= daysInMonth; d++) dayCountsMap[d] = 0;
+
     progresso.forEach((p) => {
       const d = new Date(p.updated_at);
-      const key = `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1).toString().padStart(2, "0")}`;
-      dayCounts[key] = (dayCounts[key] || 0) + 1;
+      if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
+        dayCountsMap[d.getDate()] = (dayCountsMap[d.getDate()] || 0) + 1;
+      }
     });
-    // Sort by date (parse back to compare)
-    const heatmapData = Object.entries(dayCounts)
-      .map(([day, count]) => ({ day, count }))
-      .sort((a, b) => {
-        const [da, ma] = a.day.split("/").map(Number);
-        const [db, mb] = b.day.split("/").map(Number);
-        return ma !== mb ? ma - mb : da - db;
-      });
+
+    const heatmapData = Array.from({ length: daysInMonth }, (_, i) => ({
+      day: `${(i + 1).toString().padStart(2, "0")}/${monthLabel}`,
+      count: dayCountsMap[i + 1] || 0,
+    }));
 
     // KPI 11: Aulas mais assistidas (by total seconds)
     const aulaWatched: Record<string, number> = {};
