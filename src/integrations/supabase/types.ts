@@ -1049,6 +1049,14 @@ export type Database = {
       }
     }
     Functions: {
+      get_member_ai_limits: {
+        Args: never
+        Returns: {
+          monthly_cap_brl: number
+          rate_limit_per_5min: number
+          rate_limit_per_day: number
+        }[]
+      }
       get_rankings: {
         Args: { period?: string }
         Returns: {
