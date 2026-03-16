@@ -157,16 +157,21 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props
       .sort((a, b) => a.rate - b.rate)
       .slice(0, 5);
 
-    // KPI 10: Heatmap de horários (bar chart by hour)
-    const hourCounts = new Array(24).fill(0);
+    // KPI 10: Consumo por dia
+    const dayCounts: Record<string, number> = {};
     progresso.forEach((p) => {
-      const h = new Date(p.updated_at).getHours();
-      hourCounts[h]++;
+      const d = new Date(p.updated_at);
+      const key = `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1).toString().padStart(2, "0")}`;
+      dayCounts[key] = (dayCounts[key] || 0) + 1;
     });
-    const heatmapData = hourCounts.map((count, hour) => ({
-      hour: `${hour.toString().padStart(2, "0")}h`,
-      count,
-    }));
+    // Sort by date (parse back to compare)
+    const heatmapData = Object.entries(dayCounts)
+      .map(([day, count]) => ({ day, count }))
+      .sort((a, b) => {
+        const [da, ma] = a.day.split("/").map(Number);
+        const [db, mb] = b.day.split("/").map(Number);
+        return ma !== mb ? ma - mb : da - db;
+      });
 
     // KPI 11: Aulas mais assistidas (by total seconds)
     const aulaWatched: Record<string, number> = {};
@@ -346,12 +351,12 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props
       <div className="rounded-lg border border-border overflow-hidden">
         <div className="px-4 py-3 bg-muted/50 flex items-center gap-2">
           <Clock className="h-4 w-4 text-muted-foreground" />
-          <h3 className="text-sm font-medium text-foreground">Horários de Maior Consumo</h3>
+          <h3 className="text-sm font-medium text-foreground">Consumo por Dia</h3>
         </div>
         <div className="p-4 h-64">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={kpis.heatmapData}>
-              <XAxis dataKey="hour" tick={{ fontSize: 10 }} interval={2} />
+              <XAxis dataKey="day" tick={{ fontSize: 10 }} interval={Math.max(0, Math.floor(kpis.heatmapData.length / 15))} angle={-45} textAnchor="end" height={50} />
               <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
               <Tooltip
                 contentStyle={{ fontSize: 12 }}
