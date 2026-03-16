@@ -10,6 +10,7 @@ interface CursoCard {
   titulo: string;
   descricao: string | null;
   nivel: string;
+  capa_url: string | null;
   totalAulas: number;
   completedAulas: number;
 }
