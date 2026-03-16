@@ -9,12 +9,26 @@ import {
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
+type Period = "7d" | "30d" | "90d" | "mtd" | "all";
+
+function getPeriodStart(period: Period): string | null {
+  const now = new Date();
+  switch (period) {
+    case "7d": return new Date(now.getTime() - 7 * 86400000).toISOString();
+    case "30d": return new Date(now.getTime() - 30 * 86400000).toISOString();
+    case "90d": return new Date(now.getTime() - 90 * 86400000).toISOString();
+    case "mtd": return new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    case "all": return null;
+  }
+}
+
 interface Props {
   profileMap: Record<string, string>;
   adminUserIds: Set<string>;
+  period: Period;
 }
 
-export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props) {
+export default function AdminConsumptionKPIs({ profileMap, adminUserIds, period }: Props) {
   // --- Queries ---
   const { data: progressoRaw, isLoading: loadingProgresso } = useQuery({
     queryKey: ["admin-kpi-progresso"],
@@ -45,8 +59,13 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props
 
   const isLoading = loadingProgresso || loadingAulas || loadingCursos;
 
-  // Filter out admin progress
-  const progresso = useMemo(() => progressoRaw ?? [], [progressoRaw]);
+  // Filter out admin progress and apply period filter
+  const progresso = useMemo(() => {
+    const start = getPeriodStart(period);
+    let items = progressoRaw ?? [];
+    if (start) items = items.filter((p) => p.updated_at >= start);
+    return items;
+  }, [progressoRaw, period]);
   const aulas = useMemo(() => aulasRaw ?? [], [aulasRaw]);
   const cursos = useMemo(() => cursosRaw ?? [], [cursosRaw]);
 
@@ -154,26 +173,38 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props
       .sort((a, b) => a.rate - b.rate)
       .slice(0, 5);
 
-    // KPI 10: Heatmap dia × hora (mês atual)
-    const now2 = new Date();
-    const currentMonth = now2.getMonth();
-    const currentYear = now2.getFullYear();
-    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-    const monthLabel = (currentMonth + 1).toString().padStart(2, "0");
-
-    // Build day×hour matrix
+    // KPI 10: Heatmap dia × hora (based on filtered period)
+    // Find the date range from filtered progresso
+    const dates = progresso.map((p) => new Date(p.updated_at));
+    const minDate = dates.length ? new Date(Math.min(...dates.map((d) => d.getTime()))) : new Date();
+    const maxDate = dates.length ? new Date(Math.max(...dates.map((d) => d.getTime()))) : new Date();
+    
+    // For period-based heatmap, use the start of the period or earliest data
+    const heatStart = new Date(minDate.getFullYear(), minDate.getMonth(), minDate.getDate());
+    const heatEnd = new Date(maxDate.getFullYear(), maxDate.getMonth(), maxDate.getDate());
+    const totalDays = Math.max(1, Math.ceil((heatEnd.getTime() - heatStart.getTime()) / 86400000) + 1);
+    
+    // Build day×hour matrix using day index from heatStart
     const heatMatrix: Record<string, number> = {};
+    const heatDayLabels: string[] = [];
     let heatMax = 0;
+    
+    for (let i = 0; i < totalDays; i++) {
+      const d = new Date(heatStart.getTime() + i * 86400000);
+      heatDayLabels.push(`${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1).toString().padStart(2, "0")}`);
+    }
+    
     progresso.forEach((p) => {
       const d = new Date(p.updated_at);
-      if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
-        const key = `${d.getDate()}-${d.getHours()}`;
+      const dayIdx = Math.floor((d.getTime() - heatStart.getTime()) / 86400000);
+      if (dayIdx >= 0 && dayIdx < totalDays) {
+        const key = `${dayIdx}-${d.getHours()}`;
         heatMatrix[key] = (heatMatrix[key] || 0) + 1;
         if (heatMatrix[key] > heatMax) heatMax = heatMatrix[key];
       }
     });
 
-    const heatmapGrid = { daysInMonth, monthLabel, matrix: heatMatrix, max: heatMax };
+    const heatmapGrid = { totalDays, dayLabels: heatDayLabels, matrix: heatMatrix, max: heatMax };
 
     // KPI 11: Aulas mais assistidas (by total seconds)
     const aulaWatched: Record<string, number> = {};
@@ -402,9 +433,9 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props
             {/* Header row: days */}
             <div className="flex">
               <div className="w-10 shrink-0" />
-              {Array.from({ length: kpis.heatmapGrid.daysInMonth }, (_, i) => (
+              {Array.from({ length: kpis.heatmapGrid.totalDays }, (_, i) => (
                 <div key={i} className="flex-1 text-center text-[9px] text-muted-foreground font-medium min-w-[18px]">
-                  {(i + 1).toString().padStart(2, "0")}
+                  {kpis.heatmapGrid.dayLabels[i]?.split("/")[0]}
                 </div>
               ))}
             </div>
@@ -414,8 +445,8 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props
                 <div className="w-10 shrink-0 text-[10px] text-muted-foreground text-right pr-2">
                   {h.toString().padStart(2, "0")}h
                 </div>
-                {Array.from({ length: kpis.heatmapGrid.daysInMonth }, (_, d) => {
-                  const count = kpis.heatmapGrid.matrix[`${d + 1}-${h}`] || 0;
+                {Array.from({ length: kpis.heatmapGrid.totalDays }, (_, d) => {
+                  const count = kpis.heatmapGrid.matrix[`${d}-${h}`] || 0;
                   const opacity = kpis.heatmapGrid.max > 0 && count > 0
                     ? Math.max(0.25, count / kpis.heatmapGrid.max)
                     : 0;
@@ -431,7 +462,7 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props
                     >
                       {count > 0 && (
                         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-10 bg-popover text-popover-foreground text-[10px] px-2 py-1 rounded shadow-md whitespace-nowrap border border-border">
-                          {(d + 1).toString().padStart(2, "0")}/{kpis.heatmapGrid.monthLabel} às {h.toString().padStart(2, "0")}h — {count} atividade{count > 1 ? "s" : ""}
+                          {kpis.heatmapGrid.dayLabels[d]} às {h.toString().padStart(2, "0")}h — {count} atividade{count > 1 ? "s" : ""}
                         </div>
                       )}
                     </div>
