@@ -15,14 +15,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -385,50 +377,63 @@ export default function AdminCursos() {
           ) : !aulas || aulas.length === 0 ? (
             <p className="text-muted-foreground text-center py-8">Nenhuma aula neste curso.</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-10">#</TableHead>
-                  <TableHead>Título</TableHead>
-                  <TableHead className="w-24">Duração</TableHead>
-                  <TableHead className="w-20">Status</TableHead>
-                  <TableHead className="w-28">Publicado</TableHead>
-                  <TableHead className="w-16">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {aulas.map((aula, idx) => (
-                  <TableRow key={aula.id}>
-                    <TableCell className="font-mono text-muted-foreground">{idx + 1}</TableCell>
-                    <TableCell className="font-medium">{aula.titulo || "Sem título"}</TableCell>
-                    <TableCell>{aula.duracao_segundos ? formatDuration(aula.duracao_segundos) : "—"}</TableCell>
-                    <TableCell>
-                      <StatusIcon status={aula.status || "processing"} />
-                    </TableCell>
-                    <TableCell>
-                      <Switch
-                        checked={aula.is_published}
-                        disabled={togglingAulaId === aula.id}
-                        onCheckedChange={() => handleToggleAula(aula)}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      {!aula.is_published && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                          disabled={deletingAulaId === aula.id}
-                          onClick={() => setConfirmDeleteAula(aula)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {aulas.map((aula, idx) => (
+                <div
+                  key={aula.id}
+                  className="relative aspect-video rounded-lg overflow-hidden border border-border group"
+                  style={{
+                    backgroundImage: aula.thumbnail_url
+                      ? `url(${aula.thumbnail_url})`
+                      : undefined,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                    backgroundColor: aula.thumbnail_url ? undefined : "hsl(var(--muted))",
+                  }}
+                >
+                  <div className="absolute inset-0 bg-black/60 group-hover:bg-black/50 transition-colors" />
+                  <div className="relative z-10 flex flex-col justify-between h-full p-3 text-white">
+                    <div>
+                      <span className="text-xs font-mono opacity-70">#{idx + 1}</span>
+                      <p className="font-semibold text-sm leading-tight line-clamp-2 mt-0.5">
+                        {aula.titulo || "Sem título"}
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-xs opacity-80">
+                        {aula.duracao_segundos ? (
+                          <span>{formatDuration(aula.duracao_segundos)}</span>
+                        ) : (
+                          <span>—</span>
+                        )}
+                        <StatusIcon status={aula.status || "processing"} />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+                          <Switch
+                            checked={aula.is_published}
+                            disabled={togglingAulaId === aula.id}
+                            onCheckedChange={() => handleToggleAula(aula)}
+                          />
+                          <span className="opacity-80">Publicado</span>
+                        </label>
+                        {!aula.is_published && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-white hover:bg-destructive/30 hover:text-destructive-foreground"
+                            disabled={deletingAulaId === aula.id}
+                            onClick={() => setConfirmDeleteAula(aula)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </DialogContent>
       </Dialog>
