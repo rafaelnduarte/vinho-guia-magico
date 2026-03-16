@@ -333,8 +333,9 @@ export default function AdminCursos() {
             <div key={curso.id} className="rounded-lg border border-border overflow-hidden hover:shadow-md transition-shadow">
               {/* Cover image */}
               <div
-                className="aspect-video relative"
+                className="relative"
                 style={{
+                  aspectRatio: '500 / 834',
                   backgroundImage: curso.capa_url ? `url(${curso.capa_url})` : undefined,
                   backgroundSize: "cover",
                   backgroundPosition: "center",
