@@ -379,56 +379,55 @@ export default function AdminCursos() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {aulas.map((aula, idx) => (
-                <div
-                  key={aula.id}
-                  className="relative aspect-video rounded-lg overflow-hidden border border-border group"
-                  style={{
-                    backgroundImage: aula.thumbnail_url
-                      ? `url(${aula.thumbnail_url})`
-                      : undefined,
-                    backgroundSize: "cover",
-                    backgroundPosition: "center",
-                    backgroundColor: aula.thumbnail_url ? undefined : "hsl(var(--muted))",
-                  }}
-                >
-                  <div className="absolute inset-0 bg-black/60 group-hover:bg-black/50 transition-colors" />
-                  <div className="relative z-10 flex flex-col justify-between h-full p-3 text-white">
-                    <div>
-                      <span className="text-xs font-mono opacity-70">#{idx + 1}</span>
-                      <p className="font-semibold text-sm leading-tight line-clamp-2 mt-0.5">
+                <div key={aula.id} className="rounded-lg border border-border overflow-hidden">
+                  {/* Thumbnail */}
+                  <div
+                    className="aspect-video"
+                    style={{
+                      backgroundImage: aula.thumbnail_url
+                        ? `url(${aula.thumbnail_url})`
+                        : undefined,
+                      backgroundSize: "cover",
+                      backgroundPosition: "center",
+                      backgroundColor: aula.thumbnail_url ? undefined : "hsl(var(--muted))",
+                    }}
+                  />
+                  {/* Info below card */}
+                  <div className="p-3 space-y-2 bg-card">
+                    <div className="flex items-start gap-2">
+                      <span className="text-xs font-mono text-muted-foreground shrink-0">#{idx + 1}</span>
+                      <p className="font-semibold text-sm leading-tight line-clamp-2 text-foreground">
                         {aula.titulo || "Sem título"}
                       </p>
                     </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-xs opacity-80">
-                        {aula.duracao_segundos ? (
-                          <span>{formatDuration(aula.duracao_segundos)}</span>
-                        ) : (
-                          <span>—</span>
-                        )}
-                        <StatusIcon status={aula.status || "processing"} />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <label className="flex items-center gap-1.5 text-xs cursor-pointer">
-                          <Switch
-                            checked={aula.is_published}
-                            disabled={togglingAulaId === aula.id}
-                            onCheckedChange={() => handleToggleAula(aula)}
-                          />
-                          <span className="opacity-80">Publicado</span>
-                        </label>
-                        {!aula.is_published && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-white hover:bg-destructive/30 hover:text-destructive-foreground"
-                            disabled={deletingAulaId === aula.id}
-                            onClick={() => setConfirmDeleteAula(aula)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      {aula.duracao_segundos ? (
+                        <span>{formatDuration(aula.duracao_segundos)}</span>
+                      ) : (
+                        <span>—</span>
+                      )}
+                      <StatusIcon status={aula.status || "processing"} />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
+                        <Switch
+                          checked={aula.is_published}
+                          disabled={togglingAulaId === aula.id}
+                          onCheckedChange={() => handleToggleAula(aula)}
+                        />
+                        <span>Publicado</span>
+                      </label>
+                      {!aula.is_published && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive hover:bg-destructive/10"
+                          disabled={deletingAulaId === aula.id}
+                          onClick={() => setConfirmDeleteAula(aula)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>
