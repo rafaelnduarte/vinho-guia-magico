@@ -433,9 +433,9 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds, period 
             {/* Header row: days */}
             <div className="flex">
               <div className="w-10 shrink-0" />
-              {Array.from({ length: kpis.heatmapGrid.daysInMonth }, (_, i) => (
+              {Array.from({ length: kpis.heatmapGrid.totalDays }, (_, i) => (
                 <div key={i} className="flex-1 text-center text-[9px] text-muted-foreground font-medium min-w-[18px]">
-                  {(i + 1).toString().padStart(2, "0")}
+                  {kpis.heatmapGrid.dayLabels[i]?.split("/")[0]}
                 </div>
               ))}
             </div>
@@ -445,8 +445,8 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds, period 
                 <div className="w-10 shrink-0 text-[10px] text-muted-foreground text-right pr-2">
                   {h.toString().padStart(2, "0")}h
                 </div>
-                {Array.from({ length: kpis.heatmapGrid.daysInMonth }, (_, d) => {
-                  const count = kpis.heatmapGrid.matrix[`${d + 1}-${h}`] || 0;
+                {Array.from({ length: kpis.heatmapGrid.totalDays }, (_, d) => {
+                  const count = kpis.heatmapGrid.matrix[`${d}-${h}`] || 0;
                   const opacity = kpis.heatmapGrid.max > 0 && count > 0
                     ? Math.max(0.25, count / kpis.heatmapGrid.max)
                     : 0;
@@ -462,7 +462,7 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds, period 
                     >
                       {count > 0 && (
                         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-10 bg-popover text-popover-foreground text-[10px] px-2 py-1 rounded shadow-md whitespace-nowrap border border-border">
-                          {(d + 1).toString().padStart(2, "0")}/{kpis.heatmapGrid.monthLabel} às {h.toString().padStart(2, "0")}h — {count} atividade{count > 1 ? "s" : ""}
+                          {kpis.heatmapGrid.dayLabels[d]} às {h.toString().padStart(2, "0")}h — {count} atividade{count > 1 ? "s" : ""}
                         </div>
                       )}
                     </div>
