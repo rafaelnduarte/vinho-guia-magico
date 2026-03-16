@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { FolderOpen, Video, CheckCircle2, Clock, Download, ArrowLeft, RefreshCw, XCircle, Loader2, Trash2 } from "lucide-react";
+import { FolderOpen, Video, CheckCircle2, Clock, Download, ArrowLeft, RefreshCw, XCircle, Loader2, Trash2, Camera } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +33,7 @@ interface Curso {
   panda_folder_id: string | null;
   sort_order: number;
   aulas_count?: number;
+  capa_url: string | null;
 }
 
 interface Aula {
@@ -69,6 +70,9 @@ export default function AdminCursos() {
   const [confirmDeleteAula, setConfirmDeleteAula] = useState<Aula | null>(null);
   const [deletingCursoId, setDeletingCursoId] = useState<string | null>(null);
   const [deletingAulaId, setDeletingAulaId] = useState<string | null>(null);
+  const [uploadingCapaId, setUploadingCapaId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadCursoRef = useRef<Curso | null>(null);
   const queryClient = useQueryClient();
 
   const { data: cursos, isLoading } = useQuery({
@@ -76,7 +80,7 @@ export default function AdminCursos() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("cursos")
-        .select("id, titulo, descricao, is_published, panda_folder_id, sort_order, created_at")
+        .select("id, titulo, descricao, is_published, panda_folder_id, sort_order, created_at, capa_url")
         .order("created_at", { ascending: true });
       if (error) throw error;
       const { data: counts } = await supabase.from("aulas").select("curso_id");
@@ -254,10 +258,59 @@ export default function AdminCursos() {
     queryClient.invalidateQueries({ queryKey: ["admin-cursos"] });
   }
 
+  function triggerUploadCapa(curso: Curso) {
+    uploadCursoRef.current = curso;
+    fileInputRef.current?.click();
+  }
+
+  async function handleCapaFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    const curso = uploadCursoRef.current;
+    if (!file || !curso) return;
+    e.target.value = "";
+
+    const ext = file.name.split(".").pop() || "jpg";
+    const path = `${curso.id}.${ext}`;
+
+    setUploadingCapaId(curso.id);
+    try {
+      const { error: upErr } = await supabase.storage
+        .from("course-covers")
+        .upload(path, file, { upsert: true });
+      if (upErr) throw upErr;
+
+      const { data: urlData } = supabase.storage
+        .from("course-covers")
+        .getPublicUrl(path);
+
+      const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+
+      const { error: dbErr } = await supabase
+        .from("cursos")
+        .update({ capa_url: publicUrl })
+        .eq("id", curso.id);
+      if (dbErr) throw dbErr;
+
+      toast({ title: "Capa atualizada com sucesso!" });
+      queryClient.invalidateQueries({ queryKey: ["admin-cursos"] });
+    } catch (err: any) {
+      toast({ title: "Erro ao enviar capa", description: err.message, variant: "destructive" });
+    } finally {
+      setUploadingCapaId(null);
+    }
+  }
+
   const cursoList = cursos || [];
 
   return (
     <div className="space-y-6">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleCapaFileChange}
+      />
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-foreground">
           CURSOS {cursoList.length > 0 && `(${cursoList.length})`}
@@ -270,25 +323,50 @@ export default function AdminCursos() {
 
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-36 rounded-lg" />)}
+          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-56 rounded-lg" />)}
         </div>
       ) : cursoList.length === 0 ? (
         <p className="text-muted-foreground text-center py-12">Nenhum curso encontrado. Sincronize com o Panda.</p>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {cursoList.map((curso) => (
-            <Card key={curso.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="p-5 space-y-3">
-                <div className="flex items-start gap-3">
-                  <FolderOpen className="h-6 w-6 text-primary shrink-0 mt-0.5" />
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-foreground truncate">{curso.titulo}</p>
-                    <Badge variant="secondary" className="text-xs mt-1.5">
-                      <Video className="h-3 w-3 mr-1" />
-                      {curso.aulas_count} aulas
-                    </Badge>
+            <div key={curso.id} className="rounded-lg border border-border overflow-hidden hover:shadow-md transition-shadow">
+              {/* Cover image */}
+              <div
+                className="aspect-video relative"
+                style={{
+                  backgroundImage: curso.capa_url ? `url(${curso.capa_url})` : undefined,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                  backgroundColor: curso.capa_url ? undefined : "hsl(var(--muted))",
+                }}
+              >
+                {!curso.capa_url && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <FolderOpen className="h-12 w-12 text-muted-foreground/40" />
                   </div>
-                </div>
+                )}
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  className="absolute bottom-2 right-2 h-8 w-8 opacity-80 hover:opacity-100"
+                  disabled={uploadingCapaId === curso.id}
+                  onClick={() => triggerUploadCapa(curso)}
+                >
+                  {uploadingCapaId === curso.id ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Camera className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+              {/* Info */}
+              <div className="p-3 space-y-2 bg-card">
+                <p className="font-semibold text-foreground truncate">{curso.titulo}</p>
+                <Badge variant="secondary" className="text-xs">
+                  <Video className="h-3 w-3 mr-1" />
+                  {curso.aulas_count} aulas
+                </Badge>
                 <div className="flex items-center justify-between">
                   <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
                     <Switch
@@ -324,8 +402,8 @@ export default function AdminCursos() {
                     </Button>
                   )}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           ))}
         </div>
       )}
