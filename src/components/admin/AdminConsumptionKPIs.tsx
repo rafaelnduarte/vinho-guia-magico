@@ -9,9 +9,23 @@ import {
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
+type Period = "7d" | "30d" | "90d" | "mtd" | "all";
+
+function getPeriodStart(period: Period): string | null {
+  const now = new Date();
+  switch (period) {
+    case "7d": return new Date(now.getTime() - 7 * 86400000).toISOString();
+    case "30d": return new Date(now.getTime() - 30 * 86400000).toISOString();
+    case "90d": return new Date(now.getTime() - 90 * 86400000).toISOString();
+    case "mtd": return new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    case "all": return null;
+  }
+}
+
 interface Props {
   profileMap: Record<string, string>;
   adminUserIds: Set<string>;
+  period: Period;
 }
 
 export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props) {
