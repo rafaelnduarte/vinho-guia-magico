@@ -563,6 +563,10 @@ function RankingList({
   );
 }
 
+function cleanTitle(t: string): string {
+  return t.replace(/\.mp4$/i, "");
+}
+
 function formatSeconds(s: number): string {
   if (s < 60) return `${Math.round(s)}s`;
   const m = Math.floor(s / 60);
