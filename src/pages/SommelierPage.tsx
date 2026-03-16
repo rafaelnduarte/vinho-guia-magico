@@ -128,10 +128,7 @@ export default function SommelierPage() {
   useQuery({
     queryKey: ["chat-pricing"],
     queryFn: async () => {
-      const { data } = await supabase
-        .from("ai_pricing_config")
-        .select("monthly_cap_brl")
-        .limit(1);
+      const { data } = await supabase.rpc("get_member_ai_limits");
       if (data?.[0]) setCapBrl(Number(data[0].monthly_cap_brl));
       return data;
     },
