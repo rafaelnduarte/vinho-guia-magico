@@ -157,28 +157,26 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props
       .sort((a, b) => a.rate - b.rate)
       .slice(0, 5);
 
-    // KPI 10: Consumo por dia (todos os dias do mês atual)
+    // KPI 10: Heatmap dia × hora (mês atual)
     const now2 = new Date();
     const currentMonth = now2.getMonth();
     const currentYear = now2.getFullYear();
     const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
     const monthLabel = (currentMonth + 1).toString().padStart(2, "0");
 
-    // Initialize all days of the month
-    const dayCountsMap: Record<number, number> = {};
-    for (let d = 1; d <= daysInMonth; d++) dayCountsMap[d] = 0;
-
+    // Build day×hour matrix
+    const heatMatrix: Record<string, number> = {};
+    let heatMax = 0;
     progresso.forEach((p) => {
       const d = new Date(p.updated_at);
       if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
-        dayCountsMap[d.getDate()] = (dayCountsMap[d.getDate()] || 0) + 1;
+        const key = `${d.getDate()}-${d.getHours()}`;
+        heatMatrix[key] = (heatMatrix[key] || 0) + 1;
+        if (heatMatrix[key] > heatMax) heatMax = heatMatrix[key];
       }
     });
 
-    const heatmapData = Array.from({ length: daysInMonth }, (_, i) => ({
-      day: `${(i + 1).toString().padStart(2, "0")}/${monthLabel}`,
-      count: dayCountsMap[i + 1] || 0,
-    }));
+    const heatmapGrid = { daysInMonth, monthLabel, matrix: heatMatrix, max: heatMax };
 
     // KPI 11: Aulas mais assistidas (by total seconds)
     const aulaWatched: Record<string, number> = {};
