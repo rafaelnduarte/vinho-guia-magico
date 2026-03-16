@@ -4,9 +4,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
-} from "recharts";
-import {
   BookOpen, Clock, TrendingUp, Users, AlertTriangle, Award,
   BarChart3, Activity, Smartphone, RefreshCw, Info,
 } from "lucide-react";
@@ -157,28 +154,26 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props
       .sort((a, b) => a.rate - b.rate)
       .slice(0, 5);
 
-    // KPI 10: Consumo por dia (todos os dias do mês atual)
+    // KPI 10: Heatmap dia × hora (mês atual)
     const now2 = new Date();
     const currentMonth = now2.getMonth();
     const currentYear = now2.getFullYear();
     const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
     const monthLabel = (currentMonth + 1).toString().padStart(2, "0");
 
-    // Initialize all days of the month
-    const dayCountsMap: Record<number, number> = {};
-    for (let d = 1; d <= daysInMonth; d++) dayCountsMap[d] = 0;
-
+    // Build day×hour matrix
+    const heatMatrix: Record<string, number> = {};
+    let heatMax = 0;
     progresso.forEach((p) => {
       const d = new Date(p.updated_at);
       if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
-        dayCountsMap[d.getDate()] = (dayCountsMap[d.getDate()] || 0) + 1;
+        const key = `${d.getDate()}-${d.getHours()}`;
+        heatMatrix[key] = (heatMatrix[key] || 0) + 1;
+        if (heatMatrix[key] > heatMax) heatMax = heatMatrix[key];
       }
     });
 
-    const heatmapData = Array.from({ length: daysInMonth }, (_, i) => ({
-      day: `${(i + 1).toString().padStart(2, "0")}/${monthLabel}`,
-      count: dayCountsMap[i + 1] || 0,
-    }));
+    const heatmapGrid = { daysInMonth, monthLabel, matrix: heatMatrix, max: heatMax };
 
     // KPI 11: Aulas mais assistidas (by total seconds)
     const aulaWatched: Record<string, number> = {};
@@ -266,7 +261,7 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props
       totalHours,
       avgDropOffSeconds,
       highestAbandonment,
-      heatmapData,
+      heatmapGrid,
       mostWatched,
       dau: uniqueDay.size,
       wau: uniqueWeek.size,
@@ -354,33 +349,56 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props
         />
       </div>
 
-      {/* Heatmap de horários */}
+      {/* Heatmap dia × hora */}
       <div className="rounded-lg border border-border overflow-hidden">
         <div className="px-4 py-3 bg-muted/50 flex items-center gap-2">
           <Clock className="h-4 w-4 text-muted-foreground" />
-          <h3 className="text-sm font-medium text-foreground">Consumo por Dia</h3>
+          <h3 className="text-sm font-medium text-foreground">Consumo por Dia × Horário</h3>
         </div>
-        <div className="p-4 h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={kpis.heatmapData}>
-              <XAxis dataKey="day" tick={{ fontSize: 10 }} interval={Math.max(0, Math.floor(kpis.heatmapData.length / 15))} angle={-45} textAnchor="end" height={50} />
-              <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
-              <Tooltip
-                contentStyle={{ fontSize: 12 }}
-                formatter={(value: number) => [`${value} atividades`, "Qtd"]}
-              />
-              <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                {kpis.heatmapData.map((entry, i) => (
-                  <Cell
-                    key={i}
-                    fill={entry.count > 0 ? "hsl(var(--primary))" : "hsl(var(--muted))"}
-                    fillOpacity={entry.count > 0 ? Math.max(0.3, Math.min(1, entry.count / Math.max(...kpis.heatmapData.map((d) => d.count)))) : 0.2}
-                  />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        <ScrollArea className="w-full">
+          <div className="p-4 min-w-[700px]">
+            {/* Header row: days */}
+            <div className="flex">
+              <div className="w-10 shrink-0" />
+              {Array.from({ length: kpis.heatmapGrid.daysInMonth }, (_, i) => (
+                <div key={i} className="flex-1 text-center text-[9px] text-muted-foreground font-medium min-w-[18px]">
+                  {(i + 1).toString().padStart(2, "0")}
+                </div>
+              ))}
+            </div>
+            {/* Rows: hours 0-23 */}
+            {Array.from({ length: 24 }, (_, h) => (
+              <div key={h} className="flex items-center">
+                <div className="w-10 shrink-0 text-[10px] text-muted-foreground text-right pr-2">
+                  {h.toString().padStart(2, "0")}h
+                </div>
+                {Array.from({ length: kpis.heatmapGrid.daysInMonth }, (_, d) => {
+                  const count = kpis.heatmapGrid.matrix[`${d + 1}-${h}`] || 0;
+                  const opacity = kpis.heatmapGrid.max > 0 && count > 0
+                    ? Math.max(0.25, count / kpis.heatmapGrid.max)
+                    : 0;
+                  return (
+                    <div
+                      key={d}
+                      className="flex-1 min-w-[18px] aspect-square m-[1px] rounded-sm relative group cursor-default"
+                      style={{
+                        backgroundColor: count > 0
+                          ? `hsl(var(--primary) / ${opacity})`
+                          : "hsl(var(--muted) / 0.3)",
+                      }}
+                    >
+                      {count > 0 && (
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-10 bg-popover text-popover-foreground text-[10px] px-2 py-1 rounded shadow-md whitespace-nowrap border border-border">
+                          {(d + 1).toString().padStart(2, "0")}/{kpis.heatmapGrid.monthLabel} às {h.toString().padStart(2, "0")}h — {count} atividade{count > 1 ? "s" : ""}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </ScrollArea>
       </div>
 
       {/* Detailed table */}
