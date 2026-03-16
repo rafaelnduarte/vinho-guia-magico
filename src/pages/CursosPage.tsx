@@ -27,7 +27,7 @@ export default function CursosPage() {
     const fetchCursos = async () => {
       const { data: cursosData } = await supabase
         .from("cursos")
-        .select("id, titulo, descricao, nivel")
+        .select("id, titulo, descricao, nivel, capa_url")
         .eq("is_published", true)
         .order("titulo", { ascending: true });
 
