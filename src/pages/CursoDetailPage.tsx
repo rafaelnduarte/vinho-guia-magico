@@ -80,7 +80,7 @@ export default function CursoDetailPage() {
   }
 
   return (
-    <div className="p-4 md:p-8 max-w-3xl mx-auto space-y-6">
+    <div className="p-4 md:p-8 max-w-5xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => navigate("/cursos")}>
           <ArrowLeft className="h-5 w-5" />
@@ -91,7 +91,7 @@ export default function CursoDetailPage() {
       {aulas.length === 0 ? (
         <p className="text-muted-foreground text-center py-12">Nenhuma aula publicada neste curso.</p>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {aulas.map((aula) => (
             <button
               key={aula.id}
