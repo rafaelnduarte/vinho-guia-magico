@@ -272,7 +272,7 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props
 
       return {
         id: aula.id,
-        titulo: aula.titulo,
+        titulo: cleanTitle(aula.titulo),
         curso: cursoMap[aula.curso_id] ?? "",
         completionRate,
         avgTimeSeconds: avgTime,
