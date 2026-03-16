@@ -258,6 +258,48 @@ export default function AdminCursos() {
     queryClient.invalidateQueries({ queryKey: ["admin-cursos"] });
   }
 
+  function triggerUploadCapa(curso: Curso) {
+    uploadCursoRef.current = curso;
+    fileInputRef.current?.click();
+  }
+
+  async function handleCapaFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    const curso = uploadCursoRef.current;
+    if (!file || !curso) return;
+    e.target.value = "";
+
+    const ext = file.name.split(".").pop() || "jpg";
+    const path = `${curso.id}.${ext}`;
+
+    setUploadingCapaId(curso.id);
+    try {
+      const { error: upErr } = await supabase.storage
+        .from("course-covers")
+        .upload(path, file, { upsert: true });
+      if (upErr) throw upErr;
+
+      const { data: urlData } = supabase.storage
+        .from("course-covers")
+        .getPublicUrl(path);
+
+      const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+
+      const { error: dbErr } = await supabase
+        .from("cursos")
+        .update({ capa_url: publicUrl })
+        .eq("id", curso.id);
+      if (dbErr) throw dbErr;
+
+      toast({ title: "Capa atualizada com sucesso!" });
+      queryClient.invalidateQueries({ queryKey: ["admin-cursos"] });
+    } catch (err: any) {
+      toast({ title: "Erro ao enviar capa", description: err.message, variant: "destructive" });
+    } finally {
+      setUploadingCapaId(null);
+    }
+  }
+
   const cursoList = cursos || [];
 
   return (
