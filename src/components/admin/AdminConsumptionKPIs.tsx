@@ -357,7 +357,7 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <KpiCard icon={AlertTriangle} label="Drop-off Médio" value={formatSeconds(kpis.avgDropOffSeconds)} />
         <KpiCard icon={Activity} label="Ritmo entre Aulas" value={kpis.avgPaceHours > 0 ? `${kpis.avgPaceHours.toFixed(1)}h` : "—"} />
-        <UnavailableCard icon={RefreshCw} label="Rewatch Rate" reason="Requer tracking de plays" />
+        
         <UnavailableCard icon={Smartphone} label="Engajamento / Dispositivo" reason="Requer tracking de device" />
       </div>
 
