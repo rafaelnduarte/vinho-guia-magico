@@ -538,8 +538,8 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds }: Props
       <div className="rounded-lg border border-border bg-muted/20 p-4 text-xs text-muted-foreground flex items-start gap-2">
         <Info className="h-4 w-4 shrink-0 mt-0.5" />
         <div>
-          <strong>KPIs indisponíveis:</strong> Rewatch Rate, Engajamento por Dispositivo e Sessões por Aluno requerem
-          tracking adicional (contagem de plays, dados de device, session tracking) que não está implementado no schema atual.
+          <strong>KPIs indisponíveis:</strong> Engajamento por Dispositivo e Sessões por Aluno requerem
+          tracking adicional (dados de device, session tracking) que não está implementado no schema atual.
         </div>
       </div>
     </div>
