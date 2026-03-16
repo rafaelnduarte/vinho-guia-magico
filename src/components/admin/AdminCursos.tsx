@@ -334,8 +334,8 @@ export default function AdminCursos() {
               {/* Cover image */}
               <div
                 className="relative"
-                style={{ aspectRatio: '500 / 834' }}
                 style={{
+                  aspectRatio: '500 / 834',
                   backgroundImage: curso.capa_url ? `url(${curso.capa_url})` : undefined,
                   backgroundSize: "cover",
                   backgroundPosition: "center",
