@@ -659,7 +659,7 @@ function MemberDetail({ userId, onBack }: { userId: string; onBack: () => void }
               </Select>
             </div>
             <div className="space-y-1">
-              <Label>GBD</Label>
+              <Label>GDB</Label>
               <Select value={editForm.gdb} onValueChange={(v) => setEditForm(f => ({ ...f, gdb: v }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
