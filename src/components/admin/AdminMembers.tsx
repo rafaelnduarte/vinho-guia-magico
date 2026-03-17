@@ -410,6 +410,7 @@ function MemberDetail({ userId, onBack }: { userId: string; onBack: () => void }
       full_name: editForm.full_name.trim(),
       status: editForm.status,
       membership_type: editForm.membership_type,
+      gdb: editForm.gdb === "true",
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-member-detail", userId] });
