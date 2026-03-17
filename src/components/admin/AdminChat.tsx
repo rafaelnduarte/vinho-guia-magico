@@ -822,3 +822,4 @@ function KnowledgeBase() {
       </div>
     </div>
   );
+}
