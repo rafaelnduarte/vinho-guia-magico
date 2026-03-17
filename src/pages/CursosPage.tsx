@@ -179,9 +179,9 @@ export default function CursosPage() {
                       </div>
                     )}
                     <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/50 to-transparent p-4 space-y-2">
-                      <h3 className="font-display text-lg text-white leading-tight line-clamp-2">{curso.titulo}</h3>
+                      <h3 className="font-display text-sm text-white leading-tight line-clamp-2">{curso.titulo}</h3>
                       {curso.descricao && (
-                        <p className="text-xs text-white/70 line-clamp-2">{curso.descricao}</p>
+                        <p className="text-[10px] text-white/70 line-clamp-2">{curso.descricao}</p>
                       )}
                       <div className="flex items-center gap-2 text-xs text-white/80">
                         <BookOpen className="h-3.5 w-3.5" />
