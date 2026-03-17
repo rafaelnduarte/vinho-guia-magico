@@ -1,5 +1,4 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { encodeBase64 } from "https://deno.land/std@0.224.0/encoding/base64.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,7 +6,18 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const MAX_PDF_SIZE_MB = 15;
+const MAX_PDF_SIZE_MB = 20;
+
+// Efficient base64 encoder that processes in chunks to avoid memory spikes
+function toBase64Chunked(bytes: Uint8Array): string {
+  const CHUNK = 32768; // 32KB chunks
+  const parts: string[] = [];
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    const slice = bytes.subarray(i, Math.min(i + CHUNK, bytes.length));
+    parts.push(String.fromCharCode(...slice));
+  }
+  return btoa(parts.join(""));
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS")
@@ -83,21 +93,51 @@ Deno.serve(async (req) => {
         );
       }
 
-      const arrayBuffer = await fileData.arrayBuffer();
-      const fileSizeMB = arrayBuffer.byteLength / (1024 * 1024);
+      // Read bytes and immediately release the Blob
+      const bytes = new Uint8Array(await fileData.arrayBuffer());
+      const fileSizeMB = bytes.byteLength / (1024 * 1024);
       console.log(`Processing PDF: ${file_name}, size: ${fileSizeMB.toFixed(1)}MB`);
 
       if (fileSizeMB > MAX_PDF_SIZE_MB) {
         return new Response(
           JSON.stringify({
-            error: `PDF muito grande (${fileSizeMB.toFixed(0)}MB). O limite é ${MAX_PDF_SIZE_MB}MB. Reduza o tamanho do arquivo ou converta para .txt antes de importar.`,
+            error: `PDF muito grande (${fileSizeMB.toFixed(0)}MB). O limite é ${MAX_PDF_SIZE_MB}MB.`,
           }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      // Use Deno's standard base64 encoder (efficient, no stack overflow)
-      const base64 = encodeBase64(new Uint8Array(arrayBuffer));
+      // Encode to base64 then release the raw bytes
+      const base64 = toBase64Chunked(bytes);
+      // bytes is now eligible for GC
+
+      // Build the request body as a string to control memory
+      const bodyStr = JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          {
+            role: "system",
+            content:
+              "Você é um extrator de texto. Extraia TODO o texto do documento PDF fornecido, preservando a estrutura e formatação. Retorne APENAS o texto extraído, sem comentários adicionais.",
+          },
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: `Extraia todo o texto deste PDF chamado "${file_name || file_path}". Preserve parágrafos, listas e estrutura.`,
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: `data:application/pdf;base64,${base64}`,
+                },
+              },
+            ],
+          },
+        ],
+        max_tokens: 32000,
+      });
 
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 5 * 60 * 1000);
@@ -110,32 +150,7 @@ Deno.serve(async (req) => {
             "Content-Type": "application/json",
           },
           signal: controller.signal,
-          body: JSON.stringify({
-            model: "google/gemini-2.5-flash",
-            messages: [
-              {
-                role: "system",
-                content:
-                  "Você é um extrator de texto. Extraia TODO o texto do documento PDF fornecido, preservando a estrutura e formatação. Retorne APENAS o texto extraído, sem comentários adicionais.",
-              },
-              {
-                role: "user",
-                content: [
-                  {
-                    type: "text",
-                    text: `Extraia todo o texto deste PDF chamado "${file_name || file_path}". Preserve parágrafos, listas e estrutura.`,
-                  },
-                  {
-                    type: "image_url",
-                    image_url: {
-                      url: `data:application/pdf;base64,${base64}`,
-                    },
-                  },
-                ],
-              },
-            ],
-            max_tokens: 32000,
-          }),
+          body: bodyStr,
         });
 
         if (!aiResponse.ok) {
