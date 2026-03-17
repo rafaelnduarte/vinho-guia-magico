@@ -168,7 +168,13 @@ export default function CursosPage() {
                 return (
                   <button
                     key={curso.id}
-                    onClick={() => navigate(`/cursos/${curso.id}`)}
+                    onClick={() => {
+                      if (hasGdb) {
+                        navigate(`/cursos/${curso.id}`);
+                      } else {
+                        window.open("https://pay.hub.la/6PFtjLOp0SUVmQvr9ym1?utm_source=item-bloqueado-app", "_blank");
+                      }
+                    }}
                     className="relative text-left rounded-xl border border-border overflow-hidden shadow-sm hover:shadow-md hover:border-accent/40 transition-all"
                     style={{
                       aspectRatio: "500 / 834",
@@ -186,6 +192,13 @@ export default function CursosPage() {
                     {!curso.capa_url && (
                       <div className="absolute inset-0 flex items-center justify-center">
                         <GraduationCap className="h-12 w-12 text-muted-foreground/40" />
+                      </div>
+                    )}
+                    {/* Lock overlay when user has no GDB access */}
+                    {!hasGdb && (
+                      <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center z-10">
+                        <Lock className="h-10 w-10 text-white/80 mb-2" />
+                        <span className="text-xs text-white/70 font-medium">Bloqueado</span>
                       </div>
                     )}
                     <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/50 to-transparent p-4 space-y-2">
