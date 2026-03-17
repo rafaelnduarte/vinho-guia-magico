@@ -30,7 +30,6 @@ export default function AdminChat() {
             <TabsTrigger value="config" className="text-xs px-3 py-2">Configuração</TabsTrigger>
             <TabsTrigger value="prompt" className="text-xs px-3 py-2">System Prompt</TabsTrigger>
             <TabsTrigger value="knowledge" className="text-xs px-3 py-2">Base de Conhecimento</TabsTrigger>
-            <TabsTrigger value="thomas" className="text-xs px-3 py-2">Notas Thomas</TabsTrigger>
           </TabsList>
         </div>
         <TabsContent value="metrics"><ChatMetrics /></TabsContent>
