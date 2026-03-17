@@ -254,7 +254,7 @@ export default function AdminMembers() {
                     <th className="px-4 py-3 font-medium">Membro</th>
                     <th className="px-4 py-3 font-medium hidden md:table-cell">Origem</th>
                     <th className="px-4 py-3 font-medium">Status</th>
-                    <th className="px-4 py-3 font-medium hidden md:table-cell">GBD</th>
+                    <th className="px-4 py-3 font-medium hidden md:table-cell">GDB</th>
                     <th className="px-4 py-3 font-medium hidden lg:table-cell">Desde</th>
                     <th className="px-4 py-3 font-medium text-right">Ações</th>
                   </tr>
@@ -549,7 +549,7 @@ function MemberDetail({ userId, onBack }: { userId: string; onBack: () => void }
           </Badge>
         </div>
         <div className="rounded-lg border border-border bg-card p-4">
-          <p className="text-xs text-muted-foreground mb-1">GBD</p>
+          <p className="text-xs text-muted-foreground mb-1">GDB</p>
           <Badge variant={data.membership?.gdb ? "default" : "secondary"}>
             {data.membership?.gdb ? "Tem acesso" : "Sem acesso"}
           </Badge>
@@ -659,7 +659,7 @@ function MemberDetail({ userId, onBack }: { userId: string; onBack: () => void }
               </Select>
             </div>
             <div className="space-y-1">
-              <Label>GBD</Label>
+              <Label>GDB</Label>
               <Select value={editForm.gdb} onValueChange={(v) => setEditForm(f => ({ ...f, gdb: v }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
