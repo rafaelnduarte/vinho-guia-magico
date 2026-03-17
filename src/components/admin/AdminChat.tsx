@@ -9,10 +9,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   BarChart3, DollarSign, Users, MessageSquare, Settings,
-  Loader2, Save, Wine, Plus, Trash2, Edit2, Check, X,
+  Loader2, Save, Plus, Trash2, Edit2, Check, X,
   BookOpen, FileText, ToggleLeft, ToggleRight, Download, Clock,
-  Upload, File
+  Upload, File, CheckCircle2, AlertCircle
 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -29,7 +30,6 @@ export default function AdminChat() {
             <TabsTrigger value="config" className="text-xs px-3 py-2">Configuração</TabsTrigger>
             <TabsTrigger value="prompt" className="text-xs px-3 py-2">System Prompt</TabsTrigger>
             <TabsTrigger value="knowledge" className="text-xs px-3 py-2">Base de Conhecimento</TabsTrigger>
-            <TabsTrigger value="thomas" className="text-xs px-3 py-2">Notas Thomas</TabsTrigger>
           </TabsList>
         </div>
         <TabsContent value="metrics"><ChatMetrics /></TabsContent>
@@ -37,7 +37,6 @@ export default function AdminChat() {
         <TabsContent value="config"><ChatConfig /></TabsContent>
         <TabsContent value="prompt"><SystemPromptEditor /></TabsContent>
         <TabsContent value="knowledge"><KnowledgeBase /></TabsContent>
-        <TabsContent value="thomas"><ThomasNotes /></TabsContent>
       </Tabs>
     </div>
   );
@@ -512,8 +511,9 @@ function KnowledgeBase() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ title: "", content: "", category: "geral" });
   const [newEntry, setNewEntry] = useState({ title: "", content: "", category: "geral" });
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [batchFiles, setBatchFiles] = useState<{ file: File; status: "pending" | "uploading" | "done" | "error"; error?: string }[]>([]);
+  const [isBatchProcessing, setIsBatchProcessing] = useState(false);
+  const [batchCategory, setBatchCategory] = useState("geral");
 
   const { data: entries, isLoading } = useQuery({
     queryKey: ["admin-knowledge-base"],
@@ -537,7 +537,6 @@ function KnowledgeBase() {
     onSuccess: () => {
       toast({ title: "Documento adicionado!" });
       setNewEntry({ title: "", content: "", category: "geral" });
-      setUploadedFileName(null);
       queryClient.invalidateQueries({ queryKey: ["admin-knowledge-base"] });
     },
     onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
@@ -585,89 +584,134 @@ function KnowledgeBase() {
     onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
   });
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const maxSize = 100 * 1024 * 1024; // 100MB
-    if (file.size > maxSize) {
-      toast({ title: "Arquivo muito grande", description: "Máximo 100MB", variant: "destructive" });
-      return;
-    }
-
+  const processSingleFile = async (file: File): Promise<{ title: string; content: string }> => {
     const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
-    const supportedExts = ["txt", "md", "csv", "tsv", "pdf"];
-    if (!supportedExts.includes(ext)) {
-      toast({ title: "Formato não suportado", description: "Use .txt, .md, .csv ou .pdf", variant: "destructive" });
-      return;
+
+    if (["txt", "md", "csv", "tsv"].includes(ext)) {
+      const text = await file.text();
+      return { title: file.name.replace(/\.[^/.]+$/, ""), content: text };
     }
 
-    setIsUploading(true);
-    setUploadedFileName(file.name);
+    // PDF: upload to storage, then call edge function
+    const filePath = `${crypto.randomUUID()}-${file.name}`;
+    const { error: uploadErr } = await supabase.storage
+      .from("knowledge-files")
+      .upload(filePath, file);
+    if (uploadErr) throw new Error(`Upload falhou: ${uploadErr.message}`);
 
-    try {
-      // For text files, read directly in browser
-      if (["txt", "md", "csv", "tsv"].includes(ext)) {
-        const text = await file.text();
-        setNewEntry(p => ({
-          ...p,
-          content: text,
-          title: p.title || file.name.replace(/\.[^/.]+$/, ""),
-        }));
-        toast({ title: "Arquivo carregado", description: `${text.length} caracteres extraídos` });
-      } else {
-        // PDF: upload to storage, then call edge function to extract text
-        const filePath = `${crypto.randomUUID()}-${file.name}`;
-        const { error: uploadErr } = await supabase.storage
-          .from("knowledge-files")
-          .upload(filePath, file);
+    const { data: session } = await supabase.auth.getSession();
+    const token = session?.session?.access_token;
 
-        if (uploadErr) throw new Error(`Upload falhou: ${uploadErr.message}`);
-
-        // Call parse function
-        const { data: session } = await supabase.auth.getSession();
-        const token = session?.session?.access_token;
-
-        // Use long timeout (5 min) for large files
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000);
-
-        const resp = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-knowledge-file`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({ file_path: filePath, file_name: file.name }),
-            signal: controller.signal,
-          }
-        );
-
-        clearTimeout(timeoutId);
-
-        if (!resp.ok) {
-          const err = await resp.json().catch(() => ({ error: "Erro desconhecido" }));
-          throw new Error(err.error || `Erro ${resp.status}`);
-        }
-
-        const { text } = await resp.json();
-        setNewEntry(p => ({
-          ...p,
-          content: text,
-          title: p.title || file.name.replace(/\.[^/.]+$/, ""),
-        }));
-        toast({ title: "PDF processado", description: `${text.length} caracteres extraídos via IA` });
+    const resp = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-knowledge-file`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ file_path: filePath, file_name: file.name }),
       }
-    } catch (err: any) {
-      toast({ title: "Erro ao processar arquivo", description: err.message, variant: "destructive" });
-      setUploadedFileName(null);
-    } finally {
-      setIsUploading(false);
-      // Reset file input
-      e.target.value = "";
+    );
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ error: "Erro desconhecido" }));
+      throw new Error(err.error || `Erro ${resp.status}`);
     }
+
+    const { text } = await resp.json();
+    return { title: file.name.replace(/\.[^/.]+$/, ""), content: text };
+  };
+
+  const handleBatchUpload = async () => {
+    if (batchFiles.length === 0) return;
+    setIsBatchProcessing(true);
+
+    const BATCH_SIZE = 5;
+    const files = [...batchFiles];
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (let i = 0; i < files.length; i += BATCH_SIZE) {
+      const batch = files.slice(i, i + BATCH_SIZE);
+      const batchIndices = batch.map((_, j) => i + j);
+
+      // Mark batch as uploading
+      setBatchFiles(prev => {
+        const next = [...prev];
+        batchIndices.forEach(idx => { if (next[idx]) next[idx] = { ...next[idx], status: "uploading" }; });
+        return next;
+      });
+
+      // Process batch concurrently
+      const results = await Promise.allSettled(
+        batch.map(async (item) => {
+          const result = await processSingleFile(item.file);
+          // Save to DB immediately
+          const { error } = await supabase.from("ai_knowledge_base").insert({
+            title: result.title,
+            content: result.content,
+            category: batchCategory,
+          });
+          if (error) throw error;
+          return result;
+        })
+      );
+
+      // Update statuses
+      setBatchFiles(prev => {
+        const next = [...prev];
+        results.forEach((r, j) => {
+          const idx = batchIndices[j];
+          if (r.status === "fulfilled") {
+            next[idx] = { ...next[idx], status: "done" };
+            successCount++;
+          } else {
+            next[idx] = { ...next[idx], status: "error", error: (r.reason as Error).message };
+            errorCount++;
+          }
+        });
+        return next;
+      });
+    }
+
+    queryClient.invalidateQueries({ queryKey: ["admin-knowledge-base"] });
+    toast({
+      title: `Upload concluído`,
+      description: `${successCount} processado(s)${errorCount > 0 ? `, ${errorCount} erro(s)` : ""}`,
+      variant: errorCount > 0 ? "destructive" : "default",
+    });
+    setIsBatchProcessing(false);
+  };
+
+  const handleFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = e.target.files;
+    if (!fileList || fileList.length === 0) return;
+
+    const supportedExts = ["txt", "md", "csv", "tsv", "pdf"];
+    const maxSize = 100 * 1024 * 1024;
+    const newFiles: typeof batchFiles = [];
+
+    for (let i = 0; i < fileList.length; i++) {
+      const file = fileList[i];
+      const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+      if (!supportedExts.includes(ext)) {
+        toast({ title: `${file.name}: formato não suportado`, variant: "destructive" });
+        continue;
+      }
+      if (file.size > maxSize) {
+        toast({ title: `${file.name}: muito grande (max 100MB)`, variant: "destructive" });
+        continue;
+      }
+      newFiles.push({ file, status: "pending" });
+    }
+
+    setBatchFiles(prev => [...prev, ...newFiles]);
+    e.target.value = "";
+  };
+
+  const removeBatchFile = (index: number) => {
+    setBatchFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const categories = [
@@ -692,13 +736,94 @@ function KnowledgeBase() {
         Você pode digitar o conteúdo ou fazer upload de arquivos (.txt, .md, .csv, .pdf).
       </p>
 
-      {/* Add new entry */}
+      {/* Batch upload area */}
       <div className="rounded-lg border border-border p-3 space-y-3 bg-card">
-        <p className="text-xs font-medium text-muted-foreground">Novo documento</p>
+        <p className="text-xs font-medium text-muted-foreground">Upload em lote (múltiplos arquivos)</p>
+        <Select value={batchCategory} onValueChange={setBatchCategory}>
+          <SelectTrigger className="text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {categories.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+          </SelectContent>
+        </Select>
+
+        <label>
+          <div className="flex items-center gap-2 px-3 py-3 rounded-md border border-dashed border-border cursor-pointer hover:bg-accent/50 transition-colors">
+            <Upload className="h-4 w-4 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">
+              Clique para selecionar arquivos (.txt, .md, .csv, .pdf) — múltiplos permitidos
+            </span>
+          </div>
+          <input
+            type="file"
+            accept=".txt,.md,.csv,.tsv,.pdf"
+            className="hidden"
+            multiple
+            onChange={handleFilesSelected}
+            disabled={isBatchProcessing}
+          />
+        </label>
+
+        {batchFiles.length > 0 && (
+          <div className="space-y-1.5 max-h-[200px] overflow-y-auto">
+            {batchFiles.map((item, i) => (
+              <div key={i} className="flex items-center gap-2 text-xs px-2 py-1.5 rounded bg-muted/50">
+                {item.status === "pending" && <File className="h-3 w-3 text-muted-foreground shrink-0" />}
+                {item.status === "uploading" && <Loader2 className="h-3 w-3 animate-spin text-primary shrink-0" />}
+                {item.status === "done" && <CheckCircle2 className="h-3 w-3 text-green-600 shrink-0" />}
+                {item.status === "error" && <AlertCircle className="h-3 w-3 text-destructive shrink-0" />}
+                <span className="truncate flex-1 text-foreground">{item.file.name}</span>
+                {item.status === "error" && (
+                  <span className="text-destructive truncate max-w-[150px]" title={item.error}>{item.error}</span>
+                )}
+                {!isBatchProcessing && (
+                  <Button size="icon" variant="ghost" className="h-5 w-5 shrink-0" onClick={() => removeBatchFile(i)}>
+                    <X className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {batchFiles.length > 0 && (
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">
+              {batchFiles.filter(f => f.status === "done").length}/{batchFiles.length} processado(s)
+              {isBatchProcessing && " — processando em lotes de 5..."}
+            </span>
+            <div className="flex gap-2">
+              {!isBatchProcessing && (
+                <Button size="sm" variant="outline" onClick={() => setBatchFiles([])} className="text-xs">
+                  Limpar
+                </Button>
+              )}
+              <Button
+                size="sm"
+                onClick={handleBatchUpload}
+                disabled={isBatchProcessing || batchFiles.every(f => f.status === "done")}
+                className="gap-1 text-xs"
+              >
+                {isBatchProcessing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+                {isBatchProcessing ? "Processando..." : `Processar ${batchFiles.filter(f => f.status === "pending" || f.status === "error").length} arquivo(s)`}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {isBatchProcessing && (
+          <Progress value={(batchFiles.filter(f => f.status === "done" || f.status === "error").length / batchFiles.length) * 100} className="h-2" />
+        )}
+      </div>
+
+      {/* Add single entry manually */}
+      <div className="rounded-lg border border-border p-3 space-y-3 bg-card">
+        <p className="text-xs font-medium text-muted-foreground">Adicionar manualmente</p>
         <Input
           value={newEntry.title}
           onChange={e => setNewEntry(p => ({ ...p, title: e.target.value }))}
-          placeholder="Título do documento (ex: Guia de Harmonização)"
+          placeholder="Título do documento"
         />
         <Select value={newEntry.category} onValueChange={v => setNewEntry(p => ({ ...p, category: v }))}>
           <SelectTrigger className="text-sm">
@@ -708,42 +833,11 @@ function KnowledgeBase() {
             {categories.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
           </SelectContent>
         </Select>
-
-        {/* File upload area */}
-        <div className="flex items-center gap-2">
-          <label className="flex-1">
-            <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-dashed border-border cursor-pointer hover:bg-accent/50 transition-colors">
-              {isUploading ? (
-                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-              ) : (
-                <Upload className="h-4 w-4 text-muted-foreground" />
-              )}
-              <span className="text-xs text-muted-foreground">
-                {isUploading
-                  ? "Processando arquivo..."
-                  : uploadedFileName
-                    ? uploadedFileName
-                    : "Upload de arquivo (.txt, .md, .csv, .pdf)"}
-              </span>
-              {uploadedFileName && !isUploading && (
-                <File className="h-3 w-3 text-primary ml-auto" />
-              )}
-            </div>
-            <input
-              type="file"
-              accept=".txt,.md,.csv,.tsv,.pdf"
-              className="hidden"
-              onChange={handleFileUpload}
-              disabled={isUploading}
-            />
-          </label>
-        </div>
-
         <Textarea
           value={newEntry.content}
           onChange={e => setNewEntry(p => ({ ...p, content: e.target.value }))}
-          placeholder="Cole aqui o conteúdo ou faça upload de um arquivo acima..."
-          rows={6}
+          placeholder="Cole aqui o conteúdo..."
+          rows={4}
         />
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted-foreground">{newEntry.content.length} caracteres</span>
@@ -819,158 +913,6 @@ function KnowledgeBase() {
         ))}
         {(!entries || entries.length === 0) && (
           <p className="text-sm text-muted-foreground text-center py-4">Nenhum documento na base de conhecimento</p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ---- THOMAS NOTES ----
-function ThomasNotes() {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editText, setEditText] = useState("");
-  const [newNote, setNewNote] = useState({ wine_id: "", note_text: "", note_type: "opinion" });
-
-  const { data: wines } = useQuery({
-    queryKey: ["admin-wines-for-notes"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("wines").select("id, name").order("name");
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
-
-  const { data: notes, isLoading } = useQuery({
-    queryKey: ["admin-thomas-notes"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("thomas_notes")
-        .select("*, wines(name)")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
-
-  const addMutation = useMutation({
-    mutationFn: async () => {
-      if (!newNote.wine_id || !newNote.note_text.trim()) throw new Error("Preencha todos os campos");
-      const { error } = await supabase.from("thomas_notes").insert(newNote);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast({ title: "Nota adicionada!" });
-      setNewNote({ wine_id: "", note_text: "", note_type: "opinion" });
-      queryClient.invalidateQueries({ queryKey: ["admin-thomas-notes"] });
-    },
-    onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("thomas_notes").update({ note_text: editText }).eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast({ title: "Nota atualizada!" });
-      setEditingId(null);
-      queryClient.invalidateQueries({ queryKey: ["admin-thomas-notes"] });
-    },
-    onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("thomas_notes").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast({ title: "Nota removida" });
-      queryClient.invalidateQueries({ queryKey: ["admin-thomas-notes"] });
-    },
-    onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
-  });
-
-  if (isLoading) return <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>;
-
-  return (
-    <div className="space-y-4">
-      <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
-        <Wine className="h-4 w-4" /> Notas do Thomas
-      </h3>
-
-      <div className="rounded-lg border border-border p-3 space-y-3 bg-card">
-        <p className="text-xs font-medium text-muted-foreground">Nova nota</p>
-        <Select value={newNote.wine_id} onValueChange={v => setNewNote(p => ({ ...p, wine_id: v }))}>
-          <SelectTrigger className="text-sm">
-            <SelectValue placeholder="Selecione um vinho" />
-          </SelectTrigger>
-          <SelectContent>
-            {wines?.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={newNote.note_type} onValueChange={v => setNewNote(p => ({ ...p, note_type: v }))}>
-          <SelectTrigger className="text-sm">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="opinion">Opinião</SelectItem>
-            <SelectItem value="harmonization">Harmonização</SelectItem>
-            <SelectItem value="tip">Dica</SelectItem>
-          </SelectContent>
-        </Select>
-        <Textarea
-          value={newNote.note_text}
-          onChange={e => setNewNote(p => ({ ...p, note_text: e.target.value }))}
-          placeholder="Escreva a nota do Thomas..."
-          rows={2}
-        />
-        <Button size="sm" onClick={() => addMutation.mutate()} disabled={addMutation.isPending} className="gap-1">
-          <Plus className="h-3 w-3" /> Adicionar
-        </Button>
-      </div>
-
-      <div className="space-y-2">
-        {notes?.map((n: any) => (
-          <div key={n.id} className="rounded-lg border border-border p-3 bg-card">
-            <div className="flex items-start justify-between gap-2 mb-1">
-              <div>
-                <span className="text-sm font-medium text-foreground">{n.wines?.name}</span>
-                <Badge variant="outline" className="ml-2 text-xs">{n.note_type}</Badge>
-              </div>
-              <div className="flex gap-1 shrink-0">
-                {editingId === n.id ? (
-                  <>
-                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => updateMutation.mutate(n.id)}>
-                      <Check className="h-3 w-3" />
-                    </Button>
-                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingId(null)}>
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setEditingId(n.id); setEditText(n.note_text); }}>
-                      <Edit2 className="h-3 w-3" />
-                    </Button>
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => deleteMutation.mutate(n.id)}>
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </>
-                )}
-              </div>
-            </div>
-            {editingId === n.id ? (
-              <Textarea value={editText} onChange={e => setEditText(e.target.value)} rows={2} />
-            ) : (
-              <p className="text-sm text-muted-foreground">{n.note_text}</p>
-            )}
-          </div>
-        ))}
-        {(!notes || notes.length === 0) && (
-          <p className="text-sm text-muted-foreground text-center py-4">Nenhuma nota cadastrada</p>
         )}
       </div>
     </div>
