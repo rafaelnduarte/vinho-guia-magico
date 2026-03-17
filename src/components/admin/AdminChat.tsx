@@ -36,7 +36,7 @@ export default function AdminChat() {
         <TabsContent value="logs"><ChatLogs /></TabsContent>
         <TabsContent value="config"><ChatConfig /></TabsContent>
         <TabsContent value="prompt"><SystemPromptEditor /></TabsContent>
-        <TabsContent value="knowledge"><KnowledgeBase /></TabsContent>
+        <TabsContent value="knowledge" forceMount className="data-[state=inactive]:hidden"><KnowledgeBase /></TabsContent>
       </Tabs>
     </div>
   );
