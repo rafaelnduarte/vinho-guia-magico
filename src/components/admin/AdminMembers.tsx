@@ -397,7 +397,7 @@ function MemberDetail({ userId, onBack }: { userId: string; onBack: () => void }
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
-  const [editForm, setEditForm] = useState({ full_name: "", status: "", membership_type: "comunidade" });
+  const [editForm, setEditForm] = useState({ full_name: "", status: "", membership_type: "comunidade", gdb: "false" });
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-member-detail", userId],
@@ -410,6 +410,7 @@ function MemberDetail({ userId, onBack }: { userId: string; onBack: () => void }
       full_name: editForm.full_name.trim(),
       status: editForm.status,
       membership_type: editForm.membership_type,
+      gdb: editForm.gdb === "true",
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-member-detail", userId] });
@@ -470,6 +471,7 @@ function MemberDetail({ userId, onBack }: { userId: string; onBack: () => void }
       full_name: data.profile?.full_name ?? "",
       status: data.membership?.status ?? "active",
       membership_type: data.membership?.membership_type ?? "comunidade",
+      gdb: data.membership?.gdb ? "true" : "false",
     });
     setEditOpen(true);
   };
@@ -653,6 +655,16 @@ function MemberDetail({ userId, onBack }: { userId: string; onBack: () => void }
                 <SelectContent>
                   <SelectItem value="radar">Radar</SelectItem>
                   <SelectItem value="comunidade">Comunidade</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>GBD</Label>
+              <Select value={editForm.gdb} onValueChange={(v) => setEditForm(f => ({ ...f, gdb: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="true">Com acesso</SelectItem>
+                  <SelectItem value="false">Sem acesso</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -232,13 +232,14 @@ Deno.serve(async (req) => {
       }
 
       case "update_member": {
-        const { userId, full_name, status, membership_type } = params;
+        const { userId, full_name, status, membership_type, gdb } = params;
         if (full_name !== undefined) {
           await adminClient.from("profiles").update({ full_name }).eq("user_id", userId);
         }
         const membershipUpdate: Record<string, any> = {};
         if (status !== undefined) membershipUpdate.status = status;
         if (membership_type !== undefined) membershipUpdate.membership_type = membership_type;
+        if (gdb !== undefined) membershipUpdate.gdb = gdb;
         if (Object.keys(membershipUpdate).length > 0) {
           await adminClient.from("memberships").update(membershipUpdate).eq("user_id", userId);
         }
