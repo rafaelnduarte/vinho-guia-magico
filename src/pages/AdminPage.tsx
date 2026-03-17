@@ -31,6 +31,7 @@ export default function AdminPage() {
             <TabsTrigger value="tutorials" className="text-xs sm:text-sm px-3 py-2">Tutoriais</TabsTrigger>
             <TabsTrigger value="chat" className="text-xs sm:text-sm px-3 py-2">Jovem AI</TabsTrigger>
             <TabsTrigger value="cursos" className="text-xs sm:text-sm px-3 py-2">Cursos</TabsTrigger>
+            <TabsTrigger value="trilhas" className="text-xs sm:text-sm px-3 py-2">Trilhas</TabsTrigger>
           </TabsList>
         </div>
 
