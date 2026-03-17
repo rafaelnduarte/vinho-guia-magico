@@ -76,7 +76,7 @@ serve(async (req) => {
     const { data: { user }, error: authErr } = await userClient.auth.getUser();
     if (authErr || !user) throw new HttpError(401, "unauthorized", "Não autorizado");
 
-    // Service client for writes
+    // Service client for writes & membership check
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
 
     const body = await req.json();
