@@ -388,46 +388,10 @@ export default function CuradoriaPage() {
             })}
           </div>
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-1.5 mt-8">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={safePage <= 1}
-                onClick={() => set({ page: safePage - 1 })}
-                className="h-9 px-3"
-              >
-                Anterior
-              </Button>
-              <div className="flex items-center gap-0.5">
-                {getPaginationRange(safePage, totalPages).map((item, idx) =>
-                  item === "..." ? (
-                    <span key={`dots-${idx}`} className="w-9 h-9 flex items-center justify-center text-muted-foreground text-sm">
-                      …
-                    </span>
-                  ) : (
-                    <Button
-                      key={item}
-                      variant={item === safePage ? "default" : "ghost"}
-                      size="sm"
-                      className="w-9 h-9"
-                      onClick={() => set({ page: item as number })}
-                    >
-                      {item}
-                    </Button>
-                  )
-                )}
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={safePage >= totalPages}
-                onClick={() => set({ page: safePage + 1 })}
-                className="h-9 px-3"
-              >
-                Próxima
-              </Button>
+          {/* Infinite scroll sentinel */}
+          {hasMore && (
+            <div ref={sentinelRef} className="flex justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
             </div>
           )}
         </>
