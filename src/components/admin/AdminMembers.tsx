@@ -254,6 +254,7 @@ export default function AdminMembers() {
                     <th className="px-4 py-3 font-medium">Membro</th>
                     <th className="px-4 py-3 font-medium hidden md:table-cell">Origem</th>
                     <th className="px-4 py-3 font-medium">Status</th>
+                    <th className="px-4 py-3 font-medium hidden md:table-cell">GBD</th>
                     <th className="px-4 py-3 font-medium hidden lg:table-cell">Desde</th>
                     <th className="px-4 py-3 font-medium text-right">Ações</th>
                   </tr>
