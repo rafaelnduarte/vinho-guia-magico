@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { encode as base64Encode } from "https://deno.land/std@0.224.0/encoding/base64.ts";
+import { encodeBase64 } from "https://deno.land/std@0.224.0/encoding/base64.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -97,7 +97,7 @@ Deno.serve(async (req) => {
       }
 
       // Use Deno's standard base64 encoder (efficient, no stack overflow)
-      const base64 = base64Encode(new Uint8Array(arrayBuffer));
+      const base64 = encodeBase64(new Uint8Array(arrayBuffer));
 
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 5 * 60 * 1000);
