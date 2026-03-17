@@ -9,6 +9,7 @@ import AdminTutorials from "@/components/admin/AdminTutorials";
 import AdminChat from "@/components/admin/AdminChat";
 import AdminBanners from "@/components/admin/AdminBanners";
 import AdminCursos from "@/components/admin/AdminCursos";
+import AdminTrilhas from "@/components/admin/AdminTrilhas";
 
 export default function AdminPage() {
   return (
@@ -30,6 +31,7 @@ export default function AdminPage() {
             <TabsTrigger value="tutorials" className="text-xs sm:text-sm px-3 py-2">Tutoriais</TabsTrigger>
             <TabsTrigger value="chat" className="text-xs sm:text-sm px-3 py-2">Jovem AI</TabsTrigger>
             <TabsTrigger value="cursos" className="text-xs sm:text-sm px-3 py-2">Cursos</TabsTrigger>
+            <TabsTrigger value="trilhas" className="text-xs sm:text-sm px-3 py-2">Trilhas</TabsTrigger>
           </TabsList>
         </div>
 
@@ -42,6 +44,7 @@ export default function AdminPage() {
         <TabsContent value="tutorials"><AdminTutorials /></TabsContent>
         <TabsContent value="chat"><AdminChat /></TabsContent>
         <TabsContent value="cursos"><AdminCursos /></TabsContent>
+        <TabsContent value="trilhas"><AdminTrilhas /></TabsContent>
       </Tabs>
     </div>
   );
