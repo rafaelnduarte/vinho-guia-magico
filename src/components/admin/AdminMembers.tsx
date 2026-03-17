@@ -168,11 +168,12 @@ export default function AdminMembers() {
         "", // email not available from DB function
         m.status === "active" ? "Ativo" : "Inativo",
         m.membership_type || "comunidade",
+        m.gdb ? "Tem acesso" : "Sem acesso",
         m.role || "member",
         m.source || "",
         m.started_at ? new Date(m.started_at).toLocaleDateString("pt-BR") : "",
       ]);
-      exportToCsv(`membros-${new Date().toISOString().slice(0, 10)}.csv`, ["Nome", "Email", "Status", "Tipo", "Role", "Origem", "Membro desde"], rows);
+      exportToCsv(`membros-${new Date().toISOString().slice(0, 10)}.csv`, ["Nome", "Email", "Status", "Tipo", "GDB", "Role", "Origem", "Membro desde"], rows);
     } catch (e: any) {
       toast({ title: "Erro ao exportar", description: e.message, variant: "destructive" });
     }
