@@ -185,6 +185,7 @@ Deno.serve(async (req) => {
             const membershipType = row.membership_type?.toLowerCase() || "radar";
             const status = row.status?.toLowerCase() || "active";
             const source = row.source || "csv";
+            const gdb = row.gdb === true || row.gdb === "true";
 
             const { data: existingMembership } = await adminClient
               .from("memberships")
@@ -193,9 +194,9 @@ Deno.serve(async (req) => {
               .maybeSingle();
 
             if (existingMembership) {
-              await adminClient.from("memberships").update({ status, source, membership_type: membershipType }).eq("id", existingMembership.id);
+              await adminClient.from("memberships").update({ status, source, membership_type: membershipType, gdb }).eq("id", existingMembership.id);
             } else {
-              await adminClient.from("memberships").insert({ user_id: userId, status, source, membership_type: membershipType });
+              await adminClient.from("memberships").insert({ user_id: userId, status, source, membership_type: membershipType, gdb });
             }
 
             // Update profile name

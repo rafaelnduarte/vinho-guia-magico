@@ -20,6 +20,7 @@ const memberColumns: CsvColumn[] = [
   { key: "full_name", label: "Nome Completo", required: true },
   { key: "status", label: "Status", validate: (v) => ["active", "inactive"].includes(v.toLowerCase()) ? null : "Use 'active' ou 'inactive'" },
   { key: "membership_type", label: "Tipo", validate: (v) => ["radar", "comunidade"].includes(v.toLowerCase()) ? null : "Use 'radar' ou 'comunidade'" },
+  { key: "gdb", label: "GDB", validate: (v) => ["tem acesso", "sem acesso"].includes(v.toLowerCase()) ? null : "Use 'Tem acesso' ou 'Sem acesso'" },
   { key: "role", label: "Role", validate: (v) => ["admin", "member"].includes(v.toLowerCase()) ? null : "Use 'admin' ou 'member'" },
   { key: "source", label: "Origem" },
   { key: "external_id", label: "ID Externo" },
@@ -110,6 +111,7 @@ export default function AdminMembers() {
       full_name: row.full_name,
       status: row.status?.toLowerCase() || "active",
       membership_type: row.membership_type?.toLowerCase() || "radar",
+      gdb: row.gdb ? row.gdb.toLowerCase() === "tem acesso" : false,
       role: row.role?.toLowerCase() || "member",
       source: row.source || "csv",
       external_id: row.external_id || null,
@@ -166,11 +168,12 @@ export default function AdminMembers() {
         "", // email not available from DB function
         m.status === "active" ? "Ativo" : "Inativo",
         m.membership_type || "comunidade",
+        m.gdb ? "Tem acesso" : "Sem acesso",
         m.role || "member",
         m.source || "",
         m.started_at ? new Date(m.started_at).toLocaleDateString("pt-BR") : "",
       ]);
-      exportToCsv(`membros-${new Date().toISOString().slice(0, 10)}.csv`, ["Nome", "Email", "Status", "Tipo", "Role", "Origem", "Membro desde"], rows);
+      exportToCsv(`membros-${new Date().toISOString().slice(0, 10)}.csv`, ["Nome", "Email", "Status", "Tipo", "GDB", "Role", "Origem", "Membro desde"], rows);
     } catch (e: any) {
       toast({ title: "Erro ao exportar", description: e.message, variant: "destructive" });
     }
