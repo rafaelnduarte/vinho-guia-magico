@@ -41,6 +41,8 @@ export default function CuradoriaPage() {
   const sealFilter = get("selo", "all");
   const sort = get("ordem", "price_asc");
   const page = getNum("page", 1);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   // Track filter usage
   useEffect(() => {
