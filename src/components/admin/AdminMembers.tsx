@@ -397,7 +397,7 @@ function MemberDetail({ userId, onBack }: { userId: string; onBack: () => void }
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
-  const [editForm, setEditForm] = useState({ full_name: "", status: "", membership_type: "comunidade" });
+  const [editForm, setEditForm] = useState({ full_name: "", status: "", membership_type: "comunidade", gdb: "false" });
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-member-detail", userId],
