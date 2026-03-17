@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useRef } from "react";
+import { useMemo, useEffect, useRef, useState, useCallback } from "react";
 import { Wine as WineIcon, Search, Loader2, ArrowUpDown, X, ThumbsUp } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ import WineCard from "@/components/curadoria/WineCard";
 import { useFilterParams } from "@/hooks/useFilterParams";
 import { useAnalytics } from "@/hooks/useAnalytics";
 
-const PAGE_SIZE = 9;
+const PAGE_SIZE = 50;
 
 const SORT_OPTIONS = [
   { value: "newest", label: "Mais recentes" },
@@ -41,6 +41,8 @@ export default function CuradoriaPage() {
   const sealFilter = get("selo", "all");
   const sort = get("ordem", "price_asc");
   const page = getNum("page", 1);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   // Track filter usage
   useEffect(() => {
@@ -185,9 +187,28 @@ export default function CuradoriaPage() {
     return result;
   }, [wines, search, tab, typeFilter, countryFilter, importerFilter, regionFilter, sealFilter, sort, wineSealsData]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const safePage = Math.min(page, totalPages);
-  const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  // Reset visible count when filters change
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [search, tab, typeFilter, countryFilter, importerFilter, regionFilter, sealFilter, sort]);
+
+  const paginated = filtered.slice(0, visibleCount);
+  const hasMore = visibleCount < filtered.length;
+
+  // Infinite scroll observer
+  useEffect(() => {
+    if (!sentinelRef.current) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore) {
+          setVisibleCount((prev) => Math.min(prev + PAGE_SIZE, filtered.length));
+        }
+      },
+      { rootMargin: "200px" }
+    );
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [hasMore, filtered.length]);
 
   const hasActiveFilters = search || typeFilter !== "all" || countryFilter !== "all" || importerFilter !== "all" || regionFilter !== "all" || sealFilter !== "all";
 
@@ -367,46 +388,10 @@ export default function CuradoriaPage() {
             })}
           </div>
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-1.5 mt-8">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={safePage <= 1}
-                onClick={() => set({ page: safePage - 1 })}
-                className="h-9 px-3"
-              >
-                Anterior
-              </Button>
-              <div className="flex items-center gap-0.5">
-                {getPaginationRange(safePage, totalPages).map((item, idx) =>
-                  item === "..." ? (
-                    <span key={`dots-${idx}`} className="w-9 h-9 flex items-center justify-center text-muted-foreground text-sm">
-                      …
-                    </span>
-                  ) : (
-                    <Button
-                      key={item}
-                      variant={item === safePage ? "default" : "ghost"}
-                      size="sm"
-                      className="w-9 h-9"
-                      onClick={() => set({ page: item as number })}
-                    >
-                      {item}
-                    </Button>
-                  )
-                )}
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={safePage >= totalPages}
-                onClick={() => set({ page: safePage + 1 })}
-                className="h-9 px-3"
-              >
-                Próxima
-              </Button>
+          {/* Infinite scroll sentinel */}
+          {hasMore && (
+            <div ref={sentinelRef} className="flex justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
             </div>
           )}
         </>
@@ -423,17 +408,4 @@ function parsePrice(price: string | null): number {
   if (!price) return 0;
   const cleaned = price.replace(/[^\d,]/g, "").replace(",", ".");
   return parseFloat(cleaned) || 0;
-}
-
-function getPaginationRange(current: number, total: number): (number | "...")[] {
-  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
-  const range: (number | "...")[] = [];
-  range.push(1);
-  if (current > 3) range.push("...");
-  const start = Math.max(2, current - 1);
-  const end = Math.min(total - 1, current + 1);
-  for (let i = start; i <= end; i++) range.push(i);
-  if (current < total - 2) range.push("...");
-  range.push(total);
-  return range;
 }

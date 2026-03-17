@@ -71,14 +71,14 @@ export default function WineCard({ wine, likeCount = 0, commentCount = 0, isArch
               <img
                 src={drinkerIcon}
                 alt={wine.seal_drinker_type}
-                className="h-7 w-7 sm:h-9 sm:w-9 drop-shadow-md"
+                className="h-9 w-9 sm:h-12 sm:w-12 drop-shadow-md"
               />
             )}
             {wineIcon && (
               <img
                 src={wineIcon}
                 alt={wine.seal_wine_type}
-                className="h-7 w-7 sm:h-9 sm:w-9 drop-shadow-md"
+                className="h-9 w-9 sm:h-12 sm:w-12 drop-shadow-md"
               />
             )}
           </div>
@@ -93,9 +93,6 @@ export default function WineCard({ wine, likeCount = 0, commentCount = 0, isArch
           </h3>
           {isArchive && <Badge variant="secondary" className="text-[9px] px-1 py-0 shrink-0">Acervo</Badge>}
         </div>
-        <p className="text-[10px] sm:text-xs text-muted-foreground mb-0.5 truncate">
-          {wine.producer} {wine.vintage ? `· ${wine.vintage}` : ""}
-        </p>
         {wine.grape && (
           <p className="text-[10px] sm:text-xs text-muted-foreground/70 mb-1 truncate flex items-center gap-1">
             <Grape className="h-2.5 w-2.5 shrink-0" /> {wine.grape}
