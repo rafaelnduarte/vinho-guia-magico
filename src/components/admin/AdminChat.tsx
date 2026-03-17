@@ -802,9 +802,14 @@ function KnowledgeBase() {
                   Limpar
                 </Button>
               )}
+              {!isBatchProcessing && batchFiles.some(f => f.status === "error") && (
+                <Button size="sm" variant="outline" onClick={() => handleBatchUpload(true)} className="gap-1 text-xs">
+                  <AlertCircle className="h-3 w-3" /> Reprocessar com erro ({batchFiles.filter(f => f.status === "error").length})
+                </Button>
+              )}
               <Button
                 size="sm"
-                onClick={handleBatchUpload}
+                onClick={() => handleBatchUpload(false)}
                 disabled={isBatchProcessing || batchFiles.every(f => f.status === "done")}
                 className="gap-1 text-xs"
               >
