@@ -623,11 +623,21 @@ function KnowledgeBase() {
     return { title: file.name.replace(/\.[^/.]+$/, ""), content: text };
   };
 
+  // Warn user before leaving page during processing
+  useEffect(() => {
+    if (!isBatchProcessing) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "Upload em andamento. Tem certeza que deseja sair?";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isBatchProcessing]);
+
   const handleBatchUpload = async (retryOnly = false) => {
     if (batchFiles.length === 0) return;
     setIsBatchProcessing(true);
 
-    const BATCH_SIZE = 5;
     const files = [...batchFiles];
     let successCount = 0;
     let errorCount = 0;
@@ -637,46 +647,57 @@ function KnowledgeBase() {
       .map((f, i) => i)
       .filter(i => retryOnly ? files[i].status === "error" : (files[i].status === "pending" || files[i].status === "error"));
 
-    for (let batchStart = 0; batchStart < indicesToProcess.length; batchStart += BATCH_SIZE) {
-      const batchIndices = indicesToProcess.slice(batchStart, batchStart + BATCH_SIZE);
+    // Separate PDFs (batch 1) from text files (batch 5) to avoid memory issues
+    const pdfIndices = indicesToProcess.filter(i => files[i].file.name.toLowerCase().endsWith(".pdf"));
+    const textIndices = indicesToProcess.filter(i => !files[i].file.name.toLowerCase().endsWith(".pdf"));
 
-      // Mark batch as uploading
-      setBatchFiles(prev => {
-        const next = [...prev];
-        batchIndices.forEach(idx => { if (next[idx]) next[idx] = { ...next[idx], status: "uploading", error: undefined }; });
-        return next;
-      });
+    const processGroup = async (indices: number[], batchSize: number) => {
+      for (let batchStart = 0; batchStart < indices.length; batchStart += batchSize) {
+        const batchIndices = indices.slice(batchStart, batchStart + batchSize);
 
-      // Process batch concurrently
-      const results = await Promise.allSettled(
-        batchIndices.map(async (idx) => {
-          const result = await processSingleFile(files[idx].file);
-          const { error } = await supabase.from("ai_knowledge_base").insert({
-            title: result.title,
-            content: result.content,
-            category: batchCategory,
-          });
-          if (error) throw error;
-          return result;
-        })
-      );
-
-      // Update statuses
-      setBatchFiles(prev => {
-        const next = [...prev];
-        results.forEach((r, j) => {
-          const idx = batchIndices[j];
-          if (r.status === "fulfilled") {
-            next[idx] = { ...next[idx], status: "done" };
-            successCount++;
-          } else {
-            next[idx] = { ...next[idx], status: "error", error: (r.reason as Error).message };
-            errorCount++;
-          }
+        // Mark batch as uploading
+        setBatchFiles(prev => {
+          const next = [...prev];
+          batchIndices.forEach(idx => { if (next[idx]) next[idx] = { ...next[idx], status: "uploading", error: undefined }; });
+          return next;
         });
-        return next;
-      });
-    }
+
+        // Process batch concurrently
+        const results = await Promise.allSettled(
+          batchIndices.map(async (idx) => {
+            const result = await processSingleFile(files[idx].file);
+            const { error } = await supabase.from("ai_knowledge_base").insert({
+              title: result.title,
+              content: result.content,
+              category: batchCategory,
+            });
+            if (error) throw error;
+            return result;
+          })
+        );
+
+        // Update statuses
+        setBatchFiles(prev => {
+          const next = [...prev];
+          results.forEach((r, j) => {
+            const idx = batchIndices[j];
+            if (r.status === "fulfilled") {
+              next[idx] = { ...next[idx], status: "done" };
+              successCount++;
+            } else {
+              next[idx] = { ...next[idx], status: "error", error: (r.reason as Error).message };
+              errorCount++;
+            }
+          });
+          return next;
+        });
+      }
+    };
+
+    // Text files: batch of 5 (lightweight)
+    await processGroup(textIndices, 5);
+    // PDFs: one at a time (heavy memory usage)
+    await processGroup(pdfIndices, 1);
 
     queryClient.invalidateQueries({ queryKey: ["admin-knowledge-base"] });
     toast({
