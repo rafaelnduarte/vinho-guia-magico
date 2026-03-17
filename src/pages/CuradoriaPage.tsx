@@ -409,16 +409,3 @@ function parsePrice(price: string | null): number {
   const cleaned = price.replace(/[^\d,]/g, "").replace(",", ".");
   return parseFloat(cleaned) || 0;
 }
-
-function getPaginationRange(current: number, total: number): (number | "...")[] {
-  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
-  const range: (number | "...")[] = [];
-  range.push(1);
-  if (current > 3) range.push("...");
-  const start = Math.max(2, current - 1);
-  const end = Math.min(total - 1, current + 1);
-  for (let i = start; i <= end; i++) range.push(i);
-  if (current < total - 2) range.push("...");
-  range.push(total);
-  return range;
-}
