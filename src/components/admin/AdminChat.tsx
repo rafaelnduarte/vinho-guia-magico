@@ -537,7 +537,6 @@ function KnowledgeBase() {
     onSuccess: () => {
       toast({ title: "Documento adicionado!" });
       setNewEntry({ title: "", content: "", category: "geral" });
-      setUploadedFileName(null);
       queryClient.invalidateQueries({ queryKey: ["admin-knowledge-base"] });
     },
     onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
