@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { GraduationCap, BookOpen } from "lucide-react";
+import { GraduationCap, BookOpen, Lock } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 
 interface CursoCard {
