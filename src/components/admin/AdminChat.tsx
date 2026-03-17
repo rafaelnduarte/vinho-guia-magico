@@ -736,13 +736,94 @@ function KnowledgeBase() {
         Você pode digitar o conteúdo ou fazer upload de arquivos (.txt, .md, .csv, .pdf).
       </p>
 
-      {/* Add new entry */}
+      {/* Batch upload area */}
       <div className="rounded-lg border border-border p-3 space-y-3 bg-card">
-        <p className="text-xs font-medium text-muted-foreground">Novo documento</p>
+        <p className="text-xs font-medium text-muted-foreground">Upload em lote (múltiplos arquivos)</p>
+        <Select value={batchCategory} onValueChange={setBatchCategory}>
+          <SelectTrigger className="text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {categories.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+          </SelectContent>
+        </Select>
+
+        <label>
+          <div className="flex items-center gap-2 px-3 py-3 rounded-md border border-dashed border-border cursor-pointer hover:bg-accent/50 transition-colors">
+            <Upload className="h-4 w-4 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">
+              Clique para selecionar arquivos (.txt, .md, .csv, .pdf) — múltiplos permitidos
+            </span>
+          </div>
+          <input
+            type="file"
+            accept=".txt,.md,.csv,.tsv,.pdf"
+            className="hidden"
+            multiple
+            onChange={handleFilesSelected}
+            disabled={isBatchProcessing}
+          />
+        </label>
+
+        {batchFiles.length > 0 && (
+          <div className="space-y-1.5 max-h-[200px] overflow-y-auto">
+            {batchFiles.map((item, i) => (
+              <div key={i} className="flex items-center gap-2 text-xs px-2 py-1.5 rounded bg-muted/50">
+                {item.status === "pending" && <File className="h-3 w-3 text-muted-foreground shrink-0" />}
+                {item.status === "uploading" && <Loader2 className="h-3 w-3 animate-spin text-primary shrink-0" />}
+                {item.status === "done" && <CheckCircle2 className="h-3 w-3 text-green-600 shrink-0" />}
+                {item.status === "error" && <AlertCircle className="h-3 w-3 text-destructive shrink-0" />}
+                <span className="truncate flex-1 text-foreground">{item.file.name}</span>
+                {item.status === "error" && (
+                  <span className="text-destructive truncate max-w-[150px]" title={item.error}>{item.error}</span>
+                )}
+                {!isBatchProcessing && (
+                  <Button size="icon" variant="ghost" className="h-5 w-5 shrink-0" onClick={() => removeBatchFile(i)}>
+                    <X className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {batchFiles.length > 0 && (
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">
+              {batchFiles.filter(f => f.status === "done").length}/{batchFiles.length} processado(s)
+              {isBatchProcessing && " — processando em lotes de 5..."}
+            </span>
+            <div className="flex gap-2">
+              {!isBatchProcessing && (
+                <Button size="sm" variant="outline" onClick={() => setBatchFiles([])} className="text-xs">
+                  Limpar
+                </Button>
+              )}
+              <Button
+                size="sm"
+                onClick={handleBatchUpload}
+                disabled={isBatchProcessing || batchFiles.every(f => f.status === "done")}
+                className="gap-1 text-xs"
+              >
+                {isBatchProcessing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+                {isBatchProcessing ? "Processando..." : `Processar ${batchFiles.filter(f => f.status === "pending" || f.status === "error").length} arquivo(s)`}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {isBatchProcessing && (
+          <Progress value={(batchFiles.filter(f => f.status === "done" || f.status === "error").length / batchFiles.length) * 100} className="h-2" />
+        )}
+      </div>
+
+      {/* Add single entry manually */}
+      <div className="rounded-lg border border-border p-3 space-y-3 bg-card">
+        <p className="text-xs font-medium text-muted-foreground">Adicionar manualmente</p>
         <Input
           value={newEntry.title}
           onChange={e => setNewEntry(p => ({ ...p, title: e.target.value }))}
-          placeholder="Título do documento (ex: Guia de Harmonização)"
+          placeholder="Título do documento"
         />
         <Select value={newEntry.category} onValueChange={v => setNewEntry(p => ({ ...p, category: v }))}>
           <SelectTrigger className="text-sm">
@@ -752,42 +833,11 @@ function KnowledgeBase() {
             {categories.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
           </SelectContent>
         </Select>
-
-        {/* File upload area */}
-        <div className="flex items-center gap-2">
-          <label className="flex-1">
-            <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-dashed border-border cursor-pointer hover:bg-accent/50 transition-colors">
-              {isUploading ? (
-                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-              ) : (
-                <Upload className="h-4 w-4 text-muted-foreground" />
-              )}
-              <span className="text-xs text-muted-foreground">
-                {isUploading
-                  ? "Processando arquivo..."
-                  : uploadedFileName
-                    ? uploadedFileName
-                    : "Upload de arquivo (.txt, .md, .csv, .pdf)"}
-              </span>
-              {uploadedFileName && !isUploading && (
-                <File className="h-3 w-3 text-primary ml-auto" />
-              )}
-            </div>
-            <input
-              type="file"
-              accept=".txt,.md,.csv,.tsv,.pdf"
-              className="hidden"
-              onChange={handleFileUpload}
-              disabled={isUploading}
-            />
-          </label>
-        </div>
-
         <Textarea
           value={newEntry.content}
           onChange={e => setNewEntry(p => ({ ...p, content: e.target.value }))}
-          placeholder="Cole aqui o conteúdo ou faça upload de um arquivo acima..."
-          rows={6}
+          placeholder="Cole aqui o conteúdo..."
+          rows={4}
         />
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted-foreground">{newEntry.content.length} caracteres</span>
