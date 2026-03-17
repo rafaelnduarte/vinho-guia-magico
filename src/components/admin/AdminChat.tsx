@@ -511,8 +511,9 @@ function KnowledgeBase() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ title: "", content: "", category: "geral" });
   const [newEntry, setNewEntry] = useState({ title: "", content: "", category: "geral" });
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [batchFiles, setBatchFiles] = useState<{ file: File; status: "pending" | "uploading" | "done" | "error"; error?: string }[]>([]);
+  const [isBatchProcessing, setIsBatchProcessing] = useState(false);
+  const [batchCategory, setBatchCategory] = useState("geral");
 
   const { data: entries, isLoading } = useQuery({
     queryKey: ["admin-knowledge-base"],
