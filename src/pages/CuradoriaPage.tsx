@@ -16,7 +16,7 @@ import WineCard from "@/components/curadoria/WineCard";
 import { useFilterParams } from "@/hooks/useFilterParams";
 import { useAnalytics } from "@/hooks/useAnalytics";
 
-const PAGE_SIZE = 9;
+const PAGE_SIZE = 50;
 
 const SORT_OPTIONS = [
   { value: "newest", label: "Mais recentes" },
