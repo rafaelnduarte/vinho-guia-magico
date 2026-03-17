@@ -9,10 +9,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   BarChart3, DollarSign, Users, MessageSquare, Settings,
-  Loader2, Save, Wine, Plus, Trash2, Edit2, Check, X,
+  Loader2, Save, Plus, Trash2, Edit2, Check, X,
   BookOpen, FileText, ToggleLeft, ToggleRight, Download, Clock,
-  Upload, File
+  Upload, File, CheckCircle2, AlertCircle
 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
