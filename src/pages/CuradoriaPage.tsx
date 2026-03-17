@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useRef } from "react";
+import { useMemo, useEffect, useRef, useState, useCallback } from "react";
 import { Wine as WineIcon, Search, Loader2, ArrowUpDown, X, ThumbsUp } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
