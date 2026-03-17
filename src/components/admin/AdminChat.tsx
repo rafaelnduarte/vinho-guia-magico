@@ -584,89 +584,134 @@ function KnowledgeBase() {
     onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
   });
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const maxSize = 100 * 1024 * 1024; // 100MB
-    if (file.size > maxSize) {
-      toast({ title: "Arquivo muito grande", description: "Máximo 100MB", variant: "destructive" });
-      return;
-    }
-
+  const processSingleFile = async (file: File): Promise<{ title: string; content: string }> => {
     const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
-    const supportedExts = ["txt", "md", "csv", "tsv", "pdf"];
-    if (!supportedExts.includes(ext)) {
-      toast({ title: "Formato não suportado", description: "Use .txt, .md, .csv ou .pdf", variant: "destructive" });
-      return;
+
+    if (["txt", "md", "csv", "tsv"].includes(ext)) {
+      const text = await file.text();
+      return { title: file.name.replace(/\.[^/.]+$/, ""), content: text };
     }
 
-    setIsUploading(true);
-    setUploadedFileName(file.name);
+    // PDF: upload to storage, then call edge function
+    const filePath = `${crypto.randomUUID()}-${file.name}`;
+    const { error: uploadErr } = await supabase.storage
+      .from("knowledge-files")
+      .upload(filePath, file);
+    if (uploadErr) throw new Error(`Upload falhou: ${uploadErr.message}`);
 
-    try {
-      // For text files, read directly in browser
-      if (["txt", "md", "csv", "tsv"].includes(ext)) {
-        const text = await file.text();
-        setNewEntry(p => ({
-          ...p,
-          content: text,
-          title: p.title || file.name.replace(/\.[^/.]+$/, ""),
-        }));
-        toast({ title: "Arquivo carregado", description: `${text.length} caracteres extraídos` });
-      } else {
-        // PDF: upload to storage, then call edge function to extract text
-        const filePath = `${crypto.randomUUID()}-${file.name}`;
-        const { error: uploadErr } = await supabase.storage
-          .from("knowledge-files")
-          .upload(filePath, file);
+    const { data: session } = await supabase.auth.getSession();
+    const token = session?.session?.access_token;
 
-        if (uploadErr) throw new Error(`Upload falhou: ${uploadErr.message}`);
-
-        // Call parse function
-        const { data: session } = await supabase.auth.getSession();
-        const token = session?.session?.access_token;
-
-        // Use long timeout (5 min) for large files
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000);
-
-        const resp = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-knowledge-file`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({ file_path: filePath, file_name: file.name }),
-            signal: controller.signal,
-          }
-        );
-
-        clearTimeout(timeoutId);
-
-        if (!resp.ok) {
-          const err = await resp.json().catch(() => ({ error: "Erro desconhecido" }));
-          throw new Error(err.error || `Erro ${resp.status}`);
-        }
-
-        const { text } = await resp.json();
-        setNewEntry(p => ({
-          ...p,
-          content: text,
-          title: p.title || file.name.replace(/\.[^/.]+$/, ""),
-        }));
-        toast({ title: "PDF processado", description: `${text.length} caracteres extraídos via IA` });
+    const resp = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-knowledge-file`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ file_path: filePath, file_name: file.name }),
       }
-    } catch (err: any) {
-      toast({ title: "Erro ao processar arquivo", description: err.message, variant: "destructive" });
-      setUploadedFileName(null);
-    } finally {
-      setIsUploading(false);
-      // Reset file input
-      e.target.value = "";
+    );
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ error: "Erro desconhecido" }));
+      throw new Error(err.error || `Erro ${resp.status}`);
     }
+
+    const { text } = await resp.json();
+    return { title: file.name.replace(/\.[^/.]+$/, ""), content: text };
+  };
+
+  const handleBatchUpload = async () => {
+    if (batchFiles.length === 0) return;
+    setIsBatchProcessing(true);
+
+    const BATCH_SIZE = 5;
+    const files = [...batchFiles];
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (let i = 0; i < files.length; i += BATCH_SIZE) {
+      const batch = files.slice(i, i + BATCH_SIZE);
+      const batchIndices = batch.map((_, j) => i + j);
+
+      // Mark batch as uploading
+      setBatchFiles(prev => {
+        const next = [...prev];
+        batchIndices.forEach(idx => { if (next[idx]) next[idx] = { ...next[idx], status: "uploading" }; });
+        return next;
+      });
+
+      // Process batch concurrently
+      const results = await Promise.allSettled(
+        batch.map(async (item) => {
+          const result = await processSingleFile(item.file);
+          // Save to DB immediately
+          const { error } = await supabase.from("ai_knowledge_base").insert({
+            title: result.title,
+            content: result.content,
+            category: batchCategory,
+          });
+          if (error) throw error;
+          return result;
+        })
+      );
+
+      // Update statuses
+      setBatchFiles(prev => {
+        const next = [...prev];
+        results.forEach((r, j) => {
+          const idx = batchIndices[j];
+          if (r.status === "fulfilled") {
+            next[idx] = { ...next[idx], status: "done" };
+            successCount++;
+          } else {
+            next[idx] = { ...next[idx], status: "error", error: (r.reason as Error).message };
+            errorCount++;
+          }
+        });
+        return next;
+      });
+    }
+
+    queryClient.invalidateQueries({ queryKey: ["admin-knowledge-base"] });
+    toast({
+      title: `Upload concluído`,
+      description: `${successCount} processado(s)${errorCount > 0 ? `, ${errorCount} erro(s)` : ""}`,
+      variant: errorCount > 0 ? "destructive" : "default",
+    });
+    setIsBatchProcessing(false);
+  };
+
+  const handleFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = e.target.files;
+    if (!fileList || fileList.length === 0) return;
+
+    const supportedExts = ["txt", "md", "csv", "tsv", "pdf"];
+    const maxSize = 100 * 1024 * 1024;
+    const newFiles: typeof batchFiles = [];
+
+    for (let i = 0; i < fileList.length; i++) {
+      const file = fileList[i];
+      const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+      if (!supportedExts.includes(ext)) {
+        toast({ title: `${file.name}: formato não suportado`, variant: "destructive" });
+        continue;
+      }
+      if (file.size > maxSize) {
+        toast({ title: `${file.name}: muito grande (max 100MB)`, variant: "destructive" });
+        continue;
+      }
+      newFiles.push({ file, status: "pending" });
+    }
+
+    setBatchFiles(prev => [...prev, ...newFiles]);
+    e.target.value = "";
+  };
+
+  const removeBatchFile = (index: number) => {
+    setBatchFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const categories = [
