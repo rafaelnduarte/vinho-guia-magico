@@ -7,7 +7,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const MAX_PDF_SIZE_MB = 8; // Reduced to prevent memory limit exceeded in edge functions
+const MAX_PDF_SIZE_MB = 15;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS")
