@@ -712,6 +712,78 @@ export type Database = {
           },
         ]
       }
+      trilha_cursos: {
+        Row: {
+          created_at: string
+          curso_id: string
+          id: string
+          sort_order: number
+          trilha_id: string
+        }
+        Insert: {
+          created_at?: string
+          curso_id: string
+          id?: string
+          sort_order?: number
+          trilha_id: string
+        }
+        Update: {
+          created_at?: string
+          curso_id?: string
+          id?: string
+          sort_order?: number
+          trilha_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trilha_cursos_curso_id_fkey"
+            columns: ["curso_id"]
+            isOneToOne: false
+            referencedRelation: "cursos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trilha_cursos_trilha_id_fkey"
+            columns: ["trilha_id"]
+            isOneToOne: false
+            referencedRelation: "trilhas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trilhas: {
+        Row: {
+          capa_url: string | null
+          created_at: string
+          descricao: string | null
+          id: string
+          is_published: boolean
+          sort_order: number
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          capa_url?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          is_published?: boolean
+          sort_order?: number
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          capa_url?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          is_published?: boolean
+          sort_order?: number
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       usage_ledger: {
         Row: {
           estimated_cost_brl: number | null
