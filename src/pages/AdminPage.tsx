@@ -44,6 +44,7 @@ export default function AdminPage() {
         <TabsContent value="tutorials"><AdminTutorials /></TabsContent>
         <TabsContent value="chat"><AdminChat /></TabsContent>
         <TabsContent value="cursos"><AdminCursos /></TabsContent>
+        <TabsContent value="trilhas"><AdminTrilhas /></TabsContent>
       </Tabs>
     </div>
   );
