@@ -152,7 +152,7 @@ export default function CursosPage() {
         trilhas.map((trilha) => (
           <section key={trilha.id} className="space-y-3">
             <h2 className="font-display text-lg text-foreground border-b border-border pb-2">{trilha.titulo}</h2>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               {trilha.cursos.map((curso) => {
                 const pct = curso.totalAulas > 0 ? Math.round((curso.completedAulas / curso.totalAulas) * 100) : 0;
                 return (
@@ -162,12 +162,17 @@ export default function CursosPage() {
                     className="relative text-left rounded-xl border border-border overflow-hidden shadow-sm hover:shadow-md hover:border-accent/40 transition-all"
                     style={{
                       aspectRatio: "500 / 834",
-                      backgroundImage: curso.capa_url ? `url(${curso.capa_url})` : undefined,
-                      backgroundSize: "cover",
-                      backgroundPosition: "center",
                       backgroundColor: curso.capa_url ? undefined : "hsl(var(--muted))",
                     }}
                   >
+                    {curso.capa_url && (
+                      <img
+                        src={curso.capa_url}
+                        alt={curso.titulo}
+                        className="absolute inset-0 w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                    )}
                     {!curso.capa_url && (
                       <div className="absolute inset-0 flex items-center justify-center">
                         <GraduationCap className="h-12 w-12 text-muted-foreground/40" />
