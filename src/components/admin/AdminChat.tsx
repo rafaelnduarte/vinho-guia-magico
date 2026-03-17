@@ -37,7 +37,6 @@ export default function AdminChat() {
         <TabsContent value="config"><ChatConfig /></TabsContent>
         <TabsContent value="prompt"><SystemPromptEditor /></TabsContent>
         <TabsContent value="knowledge"><KnowledgeBase /></TabsContent>
-        <TabsContent value="thomas"><ThomasNotes /></TabsContent>
       </Tabs>
     </div>
   );
