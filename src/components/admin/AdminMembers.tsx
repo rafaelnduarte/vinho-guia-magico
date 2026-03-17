@@ -549,7 +549,7 @@ function MemberDetail({ userId, onBack }: { userId: string; onBack: () => void }
           </Badge>
         </div>
         <div className="rounded-lg border border-border bg-card p-4">
-          <p className="text-xs text-muted-foreground mb-1">GBD</p>
+          <p className="text-xs text-muted-foreground mb-1">GDB</p>
           <Badge variant={data.membership?.gdb ? "default" : "secondary"}>
             {data.membership?.gdb ? "Tem acesso" : "Sem acesso"}
           </Badge>
