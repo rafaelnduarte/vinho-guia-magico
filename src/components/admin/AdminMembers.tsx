@@ -533,7 +533,7 @@ function MemberDetail({ userId, onBack }: { userId: string; onBack: () => void }
       </div>
 
       {/* Info cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
         <div className="rounded-lg border border-border bg-card p-4">
           <p className="text-xs text-muted-foreground mb-1">Membro desde</p>
           <p className="font-medium text-foreground">
@@ -544,6 +544,12 @@ function MemberDetail({ userId, onBack }: { userId: string; onBack: () => void }
           <p className="text-xs text-muted-foreground mb-1">Status</p>
           <Badge variant={data.membership?.status === "active" ? "default" : "secondary"}>
             {data.membership?.status === "active" ? "Ativo" : "Inativo"}
+          </Badge>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-4">
+          <p className="text-xs text-muted-foreground mb-1">GBD</p>
+          <Badge variant={data.membership?.gdb ? "default" : "secondary"}>
+            {data.membership?.gdb ? "Tem acesso" : "Sem acesso"}
           </Badge>
         </div>
         <div className="rounded-lg border border-border bg-card p-4">
