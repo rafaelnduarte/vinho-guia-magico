@@ -111,6 +111,7 @@ export default function AdminMembers() {
       full_name: row.full_name,
       status: row.status?.toLowerCase() || "active",
       membership_type: row.membership_type?.toLowerCase() || "radar",
+      gdb: row.gdb ? row.gdb.toLowerCase() === "tem acesso" : false,
       role: row.role?.toLowerCase() || "member",
       source: row.source || "csv",
       external_id: row.external_id || null,
