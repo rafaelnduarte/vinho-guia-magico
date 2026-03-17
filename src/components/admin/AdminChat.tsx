@@ -623,7 +623,7 @@ function KnowledgeBase() {
     return { title: file.name.replace(/\.[^/.]+$/, ""), content: text };
   };
 
-  const handleBatchUpload = async () => {
+  const handleBatchUpload = async (retryOnly = false) => {
     if (batchFiles.length === 0) return;
     setIsBatchProcessing(true);
 
@@ -632,22 +632,25 @@ function KnowledgeBase() {
     let successCount = 0;
     let errorCount = 0;
 
-    for (let i = 0; i < files.length; i += BATCH_SIZE) {
-      const batch = files.slice(i, i + BATCH_SIZE);
-      const batchIndices = batch.map((_, j) => i + j);
+    // Determine which files to process
+    const indicesToProcess = files
+      .map((f, i) => i)
+      .filter(i => retryOnly ? files[i].status === "error" : (files[i].status === "pending" || files[i].status === "error"));
+
+    for (let batchStart = 0; batchStart < indicesToProcess.length; batchStart += BATCH_SIZE) {
+      const batchIndices = indicesToProcess.slice(batchStart, batchStart + BATCH_SIZE);
 
       // Mark batch as uploading
       setBatchFiles(prev => {
         const next = [...prev];
-        batchIndices.forEach(idx => { if (next[idx]) next[idx] = { ...next[idx], status: "uploading" }; });
+        batchIndices.forEach(idx => { if (next[idx]) next[idx] = { ...next[idx], status: "uploading", error: undefined }; });
         return next;
       });
 
       // Process batch concurrently
       const results = await Promise.allSettled(
-        batch.map(async (item) => {
-          const result = await processSingleFile(item.file);
-          // Save to DB immediately
+        batchIndices.map(async (idx) => {
+          const result = await processSingleFile(files[idx].file);
           const { error } = await supabase.from("ai_knowledge_base").insert({
             title: result.title,
             content: result.content,
