@@ -1,0 +1,1 @@
+ALTER TABLE public.memberships ADD COLUMN gdb boolean NOT NULL DEFAULT false;

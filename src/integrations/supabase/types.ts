@@ -475,6 +475,7 @@ export type Database = {
           created_at: string
           ended_at: string | null
           external_id: string | null
+          gdb: boolean
           id: string
           membership_type: string
           source: string
@@ -487,6 +488,7 @@ export type Database = {
           created_at?: string
           ended_at?: string | null
           external_id?: string | null
+          gdb?: boolean
           id?: string
           membership_type?: string
           source?: string
@@ -499,6 +501,7 @@ export type Database = {
           created_at?: string
           ended_at?: string | null
           external_id?: string | null
+          gdb?: boolean
           id?: string
           membership_type?: string
           source?: string
