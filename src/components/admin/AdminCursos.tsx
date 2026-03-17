@@ -322,13 +322,13 @@ export default function AdminCursos() {
       </div>
 
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-56 rounded-lg" />)}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-40 rounded-lg" />)}
         </div>
       ) : cursoList.length === 0 ? (
         <p className="text-muted-foreground text-center py-12">Nenhum curso encontrado. Sincronize com o Panda.</p>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
           {cursoList.map((curso) => (
             <div key={curso.id} className="rounded-lg border border-border overflow-hidden hover:shadow-md transition-shadow">
               {/* Cover image */}
