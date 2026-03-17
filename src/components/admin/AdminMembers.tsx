@@ -471,6 +471,7 @@ function MemberDetail({ userId, onBack }: { userId: string; onBack: () => void }
       full_name: data.profile?.full_name ?? "",
       status: data.membership?.status ?? "active",
       membership_type: data.membership?.membership_type ?? "comunidade",
+      gdb: data.membership?.gdb ? "true" : "false",
     });
     setEditOpen(true);
   };
