@@ -42,7 +42,7 @@ export default function AdminPage() {
         <TabsContent value="partners"><AdminPartners /></TabsContent>
         <TabsContent value="seals"><AdminSeals /></TabsContent>
         <TabsContent value="tutorials"><AdminTutorials /></TabsContent>
-        <TabsContent value="chat"><AdminChat /></TabsContent>
+        <TabsContent value="chat" forceMount className="data-[state=inactive]:hidden"><AdminChat /></TabsContent>
         <TabsContent value="cursos"><AdminCursos /></TabsContent>
         <TabsContent value="trilhas"><AdminTrilhas /></TabsContent>
       </Tabs>
