@@ -20,6 +20,7 @@ const memberColumns: CsvColumn[] = [
   { key: "full_name", label: "Nome Completo", required: true },
   { key: "status", label: "Status", validate: (v) => ["active", "inactive"].includes(v.toLowerCase()) ? null : "Use 'active' ou 'inactive'" },
   { key: "membership_type", label: "Tipo", validate: (v) => ["radar", "comunidade"].includes(v.toLowerCase()) ? null : "Use 'radar' ou 'comunidade'" },
+  { key: "gdb", label: "GDB", validate: (v) => ["tem acesso", "sem acesso"].includes(v.toLowerCase()) ? null : "Use 'Tem acesso' ou 'Sem acesso'" },
   { key: "role", label: "Role", validate: (v) => ["admin", "member"].includes(v.toLowerCase()) ? null : "Use 'admin' ou 'member'" },
   { key: "source", label: "Origem" },
   { key: "external_id", label: "ID Externo" },
