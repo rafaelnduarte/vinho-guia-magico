@@ -165,14 +165,16 @@ export default function CursosPage() {
             <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               {trilha.cursos.map((curso) => {
                 const pct = curso.totalAulas > 0 ? Math.round((curso.completedAulas / curso.totalAulas) * 100) : 0;
+                const isGdbTrilha = trilha.titulo === "Guia Definitivo Borgonha";
+                const isLocked = isGdbTrilha && !hasGdb;
                 return (
                   <button
                     key={curso.id}
                     onClick={() => {
-                      if (hasGdb) {
-                        navigate(`/cursos/${curso.id}`);
-                      } else {
+                      if (isLocked) {
                         window.open("https://pay.hub.la/6PFtjLOp0SUVmQvr9ym1?utm_source=item-bloqueado-app", "_blank");
+                      } else {
+                        navigate(`/cursos/${curso.id}`);
                       }
                     }}
                     className="relative text-left rounded-xl border border-border overflow-hidden shadow-sm hover:shadow-md hover:border-accent/40 transition-all"
@@ -194,8 +196,8 @@ export default function CursosPage() {
                         <GraduationCap className="h-12 w-12 text-muted-foreground/40" />
                       </div>
                     )}
-                    {/* Lock overlay when user has no GDB access */}
-                    {!hasGdb && (
+                    {/* Lock overlay only for GDB trilha when user has no access */}
+                    {isLocked && (
                       <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center z-10">
                         <Lock className="h-10 w-10 text-white/80 mb-2" />
                         <span className="text-xs text-white/70 font-medium">Bloqueado</span>
