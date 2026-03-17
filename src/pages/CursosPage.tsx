@@ -26,6 +26,7 @@ export default function CursosPage() {
   const navigate = useNavigate();
   const [trilhas, setTrilhas] = useState<TrilhaGroup[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasGdb, setHasGdb] = useState(true);
 
   useEffect(() => {
     if (!user?.id) return;
