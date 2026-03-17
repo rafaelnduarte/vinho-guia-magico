@@ -32,6 +32,15 @@ export default function CursosPage() {
     if (!user?.id) return;
 
     const fetchData = async () => {
+      // Fetch GDB status
+      const { data: membershipData } = await supabase
+        .from("memberships")
+        .select("gdb")
+        .eq("user_id", user.id)
+        .eq("status", "active")
+        .maybeSingle();
+      setHasGdb(membershipData?.gdb ?? false);
+
       // 1. Fetch published trilhas ordered by sort_order
       const { data: trilhasData } = await supabase
         .from("trilhas")
