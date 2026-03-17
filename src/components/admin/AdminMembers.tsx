@@ -281,6 +281,11 @@ export default function AdminMembers() {
                           </Badge>
                         </div>
                       </td>
+                      <td className="px-4 py-3 hidden md:table-cell">
+                        <Badge variant={m.gdb ? "default" : "secondary"}>
+                          {m.gdb ? "Tem acesso" : "Sem acesso"}
+                        </Badge>
+                      </td>
                       <td className="px-4 py-3 hidden lg:table-cell text-muted-foreground">
                         {m.started_at ? new Date(m.started_at).toLocaleDateString("pt-BR") : "—"}
                       </td>
