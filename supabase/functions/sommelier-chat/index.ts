@@ -79,6 +79,10 @@ serve(async (req) => {
     // Service client for writes & membership check
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Verify active membership (prevents expired members from using AI via direct API)
+    const { data: hasAccess } = await adminClient.rpc("has_active_access", { _user_id: user.id });
+    if (!hasAccess) throw new HttpError(403, "forbidden", "Assinatura inativa");
+
     const body = await req.json();
     const { message, session_id } = body;
 
