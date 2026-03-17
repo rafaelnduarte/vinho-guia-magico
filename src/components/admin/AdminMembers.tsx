@@ -254,6 +254,7 @@ export default function AdminMembers() {
                     <th className="px-4 py-3 font-medium">Membro</th>
                     <th className="px-4 py-3 font-medium hidden md:table-cell">Origem</th>
                     <th className="px-4 py-3 font-medium">Status</th>
+                    <th className="px-4 py-3 font-medium hidden md:table-cell">GBD</th>
                     <th className="px-4 py-3 font-medium hidden lg:table-cell">Desde</th>
                     <th className="px-4 py-3 font-medium text-right">Ações</th>
                   </tr>
@@ -280,6 +281,11 @@ export default function AdminMembers() {
                           </Badge>
                         </div>
                       </td>
+                      <td className="px-4 py-3 hidden md:table-cell">
+                        <Badge variant={m.gdb ? "default" : "secondary"}>
+                          {m.gdb ? "Tem acesso" : "Sem acesso"}
+                        </Badge>
+                      </td>
                       <td className="px-4 py-3 hidden lg:table-cell text-muted-foreground">
                         {m.started_at ? new Date(m.started_at).toLocaleDateString("pt-BR") : "—"}
                       </td>
@@ -291,7 +297,7 @@ export default function AdminMembers() {
                     </tr>
                   ))}
                   {members.length === 0 && (
-                    <tr><td colSpan={5} className="px-4 py-12 text-center text-muted-foreground">Nenhum membro encontrado.</td></tr>
+                    <tr><td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">Nenhum membro encontrado.</td></tr>
                   )}
                 </tbody>
               </table>
