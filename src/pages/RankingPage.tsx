@@ -24,6 +24,7 @@ interface RankingEntry {
   avatar_url: string | null;
   vote_count: number;
   comment_count: number;
+  course_count: number;
   total_points: number;
   role: string;
   membership_type: string;
