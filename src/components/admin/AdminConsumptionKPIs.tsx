@@ -499,6 +499,28 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds, period 
         </div>
       </div>
 
+      {/* Weekday volume chart */}
+      <div className="rounded-lg border border-border overflow-hidden">
+        <div className="px-4 py-3 bg-muted/50 flex items-center gap-2">
+          <BarChart3 className="h-4 w-4 text-muted-foreground" />
+          <h3 className="text-sm font-medium text-foreground">Quantidade por Semana</h3>
+        </div>
+        <div className="p-4">
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={kpis.weekdayVolume}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis dataKey="day" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+              <YAxis allowDecimals={false} tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+              <Tooltip
+                contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8 }}
+                labelStyle={{ color: "hsl(var(--foreground))" }}
+              />
+              <Bar dataKey="quantidade" name="Acessos" fill="#22c55e" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
       {/* Detailed table */}
       <div className="rounded-lg border border-border overflow-hidden">
         <div className="px-4 py-3 bg-muted/50 flex items-center gap-2">
