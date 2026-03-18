@@ -4,6 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+} from "recharts";
+import {
   BookOpen, Clock, TrendingUp, Users, AlertTriangle, Award,
   BarChart3, Activity, Smartphone, Info,
 } from "lucide-react";
@@ -206,6 +209,15 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds, period 
 
     const heatmapGrid = { totalDays, dayLabels: heatDayLabels, matrix: heatMatrix, max: heatMax };
 
+    // Hourly volume for line chart
+    const hourlyVolume = Array.from({ length: 24 }, (_, h) => {
+      let total = 0;
+      for (let d = 0; d < totalDays; d++) {
+        total += heatMatrix[`${d}-${h}`] || 0;
+      }
+      return { hour: `${String(h).padStart(2, "0")}h`, acessos: total };
+    });
+
     // KPI 11: Aulas mais assistidas (by total seconds)
     const aulaWatched: Record<string, number> = {};
     progresso.forEach((p) => {
@@ -334,6 +346,7 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds, period 
       avgDropOffSeconds,
       highestAbandonment,
       heatmapGrid,
+      hourlyVolume,
       mostWatched,
       dau: uniqueDay.size,
       wau: uniqueWeek.size,
@@ -422,56 +435,57 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds, period 
         />
       </div>
 
-      {/* Heatmap dia × hora */}
+      {/* Consumo por Horário — Line chart */}
       <div className="rounded-lg border border-border overflow-hidden">
         <div className="px-4 py-3 bg-muted/50 flex items-center gap-2">
           <Clock className="h-4 w-4 text-muted-foreground" />
-          <h3 className="text-sm font-medium text-foreground">Consumo por Dia × Horário</h3>
+          <h3 className="text-sm font-medium text-foreground">Consumo por Horário</h3>
         </div>
-        <ScrollArea className="w-full">
-          <div className="p-4 min-w-[700px]">
-            {/* Header row: days */}
-            <div className="flex">
-              <div className="w-10 shrink-0" />
-              {Array.from({ length: kpis.heatmapGrid.totalDays }, (_, i) => (
-                <div key={i} className="flex-1 text-center text-[9px] text-muted-foreground font-medium min-w-[18px]">
-                  {kpis.heatmapGrid.dayLabels[i]?.split("/")[0]}
-                </div>
-              ))}
-            </div>
-            {/* Rows: hours 0-23 */}
-            {Array.from({ length: 24 }, (_, h) => (
-              <div key={h} className="flex items-center">
-                <div className="w-10 shrink-0 text-[10px] text-muted-foreground text-right pr-2">
-                  {h.toString().padStart(2, "0")}h
-                </div>
-                {Array.from({ length: kpis.heatmapGrid.totalDays }, (_, d) => {
-                  const count = kpis.heatmapGrid.matrix[`${d}-${h}`] || 0;
-                  const opacity = kpis.heatmapGrid.max > 0 && count > 0
-                    ? Math.max(0.25, count / kpis.heatmapGrid.max)
-                    : 0;
-                  return (
-                    <div
-                      key={d}
-                      className="flex-1 min-w-[18px] aspect-square m-[1px] rounded-sm relative group cursor-default"
-                      style={{
-                        backgroundColor: count > 0
-                          ? `hsl(var(--primary) / ${opacity})`
-                          : "hsl(var(--muted) / 0.3)",
-                      }}
-                    >
-                      {count > 0 && (
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-10 bg-popover text-popover-foreground text-[10px] px-2 py-1 rounded shadow-md whitespace-nowrap border border-border">
-                          {kpis.heatmapGrid.dayLabels[d]} às {h.toString().padStart(2, "0")}h — {count} atividade{count > 1 ? "s" : ""}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
-        </ScrollArea>
+        <div className="p-4">
+          <ResponsiveContainer width="100%" height={300}>
+            <AreaChart data={kpis.hourlyVolume} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="colorAcessos" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#22c55e" stopOpacity={0.05} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis
+                dataKey="hour"
+                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                axisLine={{ stroke: "hsl(var(--border))" }}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                axisLine={false}
+                tickLine={false}
+                allowDecimals={false}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "hsl(var(--popover))",
+                  border: "1px solid hsl(var(--border))",
+                  borderRadius: "8px",
+                  fontSize: "12px",
+                  color: "hsl(var(--popover-foreground))",
+                }}
+                formatter={(value: number) => [`${value} acessos`, "Volume"]}
+                labelFormatter={(label) => `Horário: ${label}`}
+              />
+              <Area
+                type="monotone"
+                dataKey="acessos"
+                stroke="#22c55e"
+                strokeWidth={2}
+                fill="url(#colorAcessos)"
+                dot={false}
+                activeDot={{ r: 4, fill: "#22c55e", strokeWidth: 0 }}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
       </div>
 
       {/* Detailed table */}
