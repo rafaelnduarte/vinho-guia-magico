@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import {
   BookOpen, Clock, TrendingUp, Users, AlertTriangle, Award,
@@ -338,6 +338,16 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds, period 
       })
       .sort((a, b) => b.watched - a.watched);
 
+    // Weekday volume
+    const dayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+    const weekdayVolume = dayNames.map((name, idx) => {
+      let total = 0;
+      progresso.forEach((p) => {
+        if (new Date(p.updated_at).getDay() === idx) total++;
+      });
+      return { day: name, quantidade: total };
+    });
+
     return {
       avgCourseCompletion,
       leastCompleted,
@@ -347,6 +357,7 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds, period 
       highestAbandonment,
       heatmapGrid,
       hourlyVolume,
+      weekdayVolume,
       mostWatched,
       dau: uniqueDay.size,
       wau: uniqueWeek.size,
@@ -484,6 +495,28 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds, period 
                 activeDot={{ r: 4, fill: "#22c55e", strokeWidth: 0 }}
               />
             </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Weekday volume chart */}
+      <div className="rounded-lg border border-border overflow-hidden">
+        <div className="px-4 py-3 bg-muted/50 flex items-center gap-2">
+          <BarChart3 className="h-4 w-4 text-muted-foreground" />
+          <h3 className="text-sm font-medium text-foreground">Quantidade por Semana</h3>
+        </div>
+        <div className="p-4">
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={kpis.weekdayVolume}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis dataKey="day" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+              <YAxis allowDecimals={false} tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+              <Tooltip
+                contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8 }}
+                labelStyle={{ color: "hsl(var(--foreground))" }}
+              />
+              <Bar dataKey="quantidade" name="Acessos" fill="#22c55e" radius={[4, 4, 0, 0]} />
+            </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
