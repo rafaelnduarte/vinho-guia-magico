@@ -353,7 +353,8 @@ export default function SommelierPage() {
   };
 
   useEffect(() => {
-    if (!isLoading) return;
+    const hasPendingRecovery = !!latestPendingMessageRef.current;
+    if (!isLoading && !hasPendingRecovery) return;
 
     const pollInterval = setInterval(async () => {
       if (sessionId) {
@@ -371,12 +372,12 @@ export default function SommelierPage() {
           refetchUsage();
           return;
         }
-      } else {
-        const recovered = await recoverPendingConversation();
-        if (recovered) {
-          refetchSessions();
-          refetchUsage();
-        }
+      }
+
+      const recovered = await recoverPendingConversation();
+      if (recovered) {
+        refetchSessions();
+        refetchUsage();
       }
     }, 5000);
 
@@ -384,7 +385,8 @@ export default function SommelierPage() {
   }, [isLoading, sessionId, hydrateSessionMessages, recoverPendingConversation, refetchSessions, refetchUsage]);
 
   useEffect(() => {
-    if (!isLoading) return;
+    const hasPendingRecovery = !!latestPendingMessageRef.current;
+    if (!isLoading && !hasPendingRecovery) return;
 
     const handleVisibilityRecovery = async () => {
       if (document.visibilityState !== "visible") return;
