@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Trophy, ThumbsUp, MessageSquare, Medal, Users, Wine, Target } from "lucide-react";
+import { Loader2, Trophy, ThumbsUp, MessageSquare, Medal, Users, Wine, Target, GraduationCap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import MemberBadge from "@/components/MemberBadge";
 
