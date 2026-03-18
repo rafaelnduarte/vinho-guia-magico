@@ -16,7 +16,7 @@ const PERIODS = [
 ] as const;
 
 type Period = (typeof PERIODS)[number]["value"];
-type Section = "membros" | "vinhos";
+type Section = "membros" | "vinhos" | "cursos";
 
 interface RankingEntry {
   user_id: string;
