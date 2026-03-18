@@ -241,6 +241,14 @@ export default function SommelierPage() {
           return;
         }
 
+        if (errorPayload?.error === "ai_gateway_error") {
+          setMessages(prev => [
+            ...prev,
+            { role: "assistant", content: `⚠️ ${errorPayload.message || "Erro ao consultar IA. Tente novamente em instantes."}` },
+          ]);
+          return;
+        }
+
         backendMessage = errorPayload?.message ?? null;
       }
 
@@ -254,7 +262,6 @@ export default function SommelierPage() {
         if (latestMessages && latestMessages.length > 0) {
           const lastMsg = latestMessages[latestMessages.length - 1];
           if (lastMsg.role === "assistant") {
-            // Server processed successfully, just reload
             setMessages(
               latestMessages
                 .filter((m: any) => m.role !== "system")
@@ -265,8 +272,13 @@ export default function SommelierPage() {
           }
         }
       }
-      toast({ title: "Erro", description: backendMessage || e.message || "Falha ao enviar mensagem", variant: "destructive" });
-      setMessages(prev => prev.slice(0, -1)); // remove optimistic user msg
+
+      // Show error as chat message instead of toast for better UX
+      const errorMsg = backendMessage || e.message || "Falha ao enviar mensagem";
+      setMessages(prev => [
+        ...prev,
+        { role: "assistant", content: `⚠️ ${errorMsg}\n\nTente enviar sua mensagem novamente.` },
+      ]);
     } finally {
       setIsLoading(false);
     }
