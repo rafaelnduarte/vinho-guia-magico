@@ -358,38 +358,62 @@ serve(async (req) => {
       { role: "user", content: message },
     ];
 
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${lovableApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "openai/gpt-5",
-        messages: aiMessages,
-        max_tokens: maxTokens,
-        stream: false,
-      }),
+    const aiRequestBody = JSON.stringify({
+      model: "openai/gpt-5",
+      messages: aiMessages,
+      max_tokens: maxTokens,
+      stream: false,
     });
+
+    const aiHeaders = {
+      Authorization: `Bearer ${lovableApiKey}`,
+      "Content-Type": "application/json",
+    };
 
     let assistantContent = "Desculpe, não consegui gerar uma resposta.";
     let tokensIn = 0;
     let tokensOut = 0;
 
-    if (!aiResponse.ok) {
-      if (aiResponse.status === 429) {
+    // Retry up to 2 times on transient errors (500, 502, 503, 504)
+    let aiResponse: Response | null = null;
+    let lastErrText = "";
+    const MAX_RETRIES = 2;
+
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      if (attempt > 0) {
+        console.log(`AI gateway retry attempt ${attempt}...`);
+        await new Promise(r => setTimeout(r, 1500 * attempt));
+      }
+
+      aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: aiHeaders,
+        body: aiRequestBody,
+      });
+
+      if (aiResponse.ok || aiResponse.status === 429 || aiResponse.status === 402) {
+        break; // Don't retry on success or known client errors
+      }
+
+      lastErrText = await aiResponse.text();
+      console.error(`AI gateway error (attempt ${attempt + 1}):`, aiResponse.status, lastErrText);
+
+      if (attempt === MAX_RETRIES) break;
+    }
+
+    if (!aiResponse!.ok) {
+      if (aiResponse!.status === 429) {
         throw new HttpError(429, "rate_limited", "Serviço sobrecarregado. Tente novamente em instantes.");
       }
 
-      if (aiResponse.status === 402) {
+      if (aiResponse!.status === 402) {
         assistantContent = buildProviderFallbackReply(contextPack);
       } else {
-        const errText = await aiResponse.text();
-        console.error("AI gateway error:", aiResponse.status, errText);
-        throw new HttpError(502, "ai_gateway_error", "Erro ao consultar IA");
+        console.error("AI gateway final error:", aiResponse!.status, lastErrText);
+        throw new HttpError(502, "ai_gateway_error", "Erro ao consultar IA. Tente novamente em instantes.");
       }
     } else {
-      const aiData = await aiResponse.json();
+      const aiData = await aiResponse!.json();
       assistantContent = aiData.choices?.[0]?.message?.content ?? assistantContent;
       tokensIn = aiData.usage?.prompt_tokens ?? 0;
       tokensOut = aiData.usage?.completion_tokens ?? 0;
