@@ -504,7 +504,7 @@ serve(async (req) => {
             { role: "system", content: "Resuma esta conversa sobre vinhos em 2-3 frases curtas em português. Mantenha os pontos-chave." },
             { role: "user", content: summaryMessages },
           ],
-          max_tokens: 150,
+          max_completion_tokens: 150,
         }),
       }).then(async (res) => {
         if (res.ok) {
