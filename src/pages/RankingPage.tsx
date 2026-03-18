@@ -41,6 +41,16 @@ interface WineRankingEntry {
   total_points: number;
 }
 
+interface CourseRankingEntry {
+  curso_id: string;
+  titulo: string | null;
+  nivel: string | null;
+  tipo: string | null;
+  capa_url: string | null;
+  completion_count: number;
+  total_points: number;
+}
+
 function getBadgeType(role: string, membershipType: string): "admin" | "radar" | "comunidade" {
   if (role === "admin") return "admin";
   return membershipType === "radar" ? "radar" : "comunidade";
