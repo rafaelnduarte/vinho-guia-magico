@@ -133,6 +133,18 @@ export default function RankingPage() {
           <Wine className="h-4 w-4" />
           Vinhos
         </button>
+        <button
+          onClick={() => setSection("cursos")}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
+            section === "cursos"
+              ? "bg-primary text-primary-foreground"
+              : "bg-muted/50 text-muted-foreground hover:bg-muted"
+          )}
+        >
+          <GraduationCap className="h-4 w-4" />
+          Cursos
+        </button>
       </div>
 
       {/* Period tabs */}
@@ -152,8 +164,11 @@ export default function RankingPage() {
         </div>
       ) : section === "membros" ? (
         <MembersRanking rankings={rankings ?? []} userId={user?.id} currentUserRank={currentUserRank} />
-      ) : (
+      ) : section === "vinhos" ? (
         <WinesRanking rankings={wineRankings ?? []} />
+      ) : (
+        <CoursesRanking rankings={courseRankings ?? []} />
+      )}
       )}
     </div>
   );
