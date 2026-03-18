@@ -457,8 +457,8 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds, period 
             <AreaChart data={kpis.hourlyVolume} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="colorAcessos" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#22c55e" stopOpacity={0.05} />
+                  <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.05} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -488,11 +488,11 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds, period 
               <Area
                 type="monotone"
                 dataKey="acessos"
-                stroke="#22c55e"
+                stroke="hsl(var(--primary))"
                 strokeWidth={2}
                 fill="url(#colorAcessos)"
                 dot={false}
-                activeDot={{ r: 4, fill: "#22c55e", strokeWidth: 0 }}
+                activeDot={{ r: 4, fill: "hsl(var(--primary))", strokeWidth: 0 }}
               />
             </AreaChart>
           </ResponsiveContainer>
