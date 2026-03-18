@@ -361,7 +361,7 @@ serve(async (req) => {
     const aiRequestBody = JSON.stringify({
       model: "openai/gpt-5",
       messages: aiMessages,
-      max_tokens: maxTokens,
+      max_completion_tokens: maxTokens,
       stream: false,
     });
 
@@ -476,7 +476,7 @@ serve(async (req) => {
             { role: "system", content: "Crie um título MUITO curto (máximo 6 palavras) em português para esta conversa sobre vinhos. Retorne APENAS o título, sem aspas, sem pontuação final." },
             { role: "user", content: `Pergunta: ${message.slice(0, 200)}\nResposta: ${assistantContent.slice(0, 300)}` },
           ],
-          max_tokens: 30,
+          max_completion_tokens: 30,
         }),
       }).then(async (res) => {
         if (res.ok) {
@@ -504,7 +504,7 @@ serve(async (req) => {
             { role: "system", content: "Resuma esta conversa sobre vinhos em 2-3 frases curtas em português. Mantenha os pontos-chave." },
             { role: "user", content: summaryMessages },
           ],
-          max_tokens: 150,
+          max_completion_tokens: 150,
         }),
       }).then(async (res) => {
         if (res.ok) {
