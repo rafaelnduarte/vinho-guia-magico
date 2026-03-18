@@ -515,7 +515,7 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds, period 
                 contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8 }}
                 labelStyle={{ color: "hsl(var(--foreground))" }}
               />
-              <Bar dataKey="quantidade" name="Acessos" fill="#22c55e" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="quantidade" name="Acessos" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
