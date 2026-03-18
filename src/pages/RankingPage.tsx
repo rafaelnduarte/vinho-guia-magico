@@ -267,6 +267,7 @@ function MembersRanking({
                   </td>
                   <td className="px-1.5 sm:px-3 py-3 text-center text-muted-foreground">{entry.vote_count}</td>
                   <td className="px-1.5 sm:px-3 py-3 text-center text-muted-foreground hidden sm:table-cell">{entry.comment_count}</td>
+                  <td className="px-1.5 sm:px-3 py-3 text-center text-muted-foreground hidden sm:table-cell">{entry.course_count}</td>
                   <td className="px-2 sm:px-4 py-3 text-right font-display font-bold text-foreground">
                     {entry.total_points}
                   </td>
