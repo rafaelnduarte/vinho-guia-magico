@@ -476,7 +476,7 @@ serve(async (req) => {
             { role: "system", content: "Crie um título MUITO curto (máximo 6 palavras) em português para esta conversa sobre vinhos. Retorne APENAS o título, sem aspas, sem pontuação final." },
             { role: "user", content: `Pergunta: ${message.slice(0, 200)}\nResposta: ${assistantContent.slice(0, 300)}` },
           ],
-          max_tokens: 30,
+          max_completion_tokens: 30,
         }),
       }).then(async (res) => {
         if (res.ok) {
