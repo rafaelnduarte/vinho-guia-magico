@@ -85,7 +85,8 @@ export default function RankingPage() {
       </div>
 
       <p className="text-sm text-muted-foreground">
-        Cada voto e comentário vale <strong>1 ponto</strong>. Participe da curadoria e suba no ranking!
+        Cada voto, comentário e curso concluído vale <strong>1 ponto</strong>. Participe e suba no ranking!
+      </p>
       </p>
 
       {/* Section toggle */}
