@@ -71,40 +71,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    let initialised = false;
+    let isMounted = true;
+
+    const applySession = async (nextSession: Session | null) => {
+      if (!isMounted) return;
+
+      setSession(nextSession);
+      const nextUser = nextSession?.user ?? null;
+      setUser(nextUser);
+
+      if (nextUser) {
+        await fetchUserData(nextUser.id);
+      } else {
+        setRole(null);
+        setMembershipActive(false);
+        setMustChangePassword(false);
+        setOnboardingCompleted(true);
+        setMembershipLoading(false);
+      }
+
+      if (isMounted) {
+        setLoading(false);
+      }
+    };
+
+    supabase.auth.getSession()
+      .then(({ data }) => applySession(data.session))
+      .catch(() => {
+        if (!isMounted) return;
+        setMembershipLoading(false);
+        setLoading(false);
+      });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          fetchUserData(session.user.id).finally(() => {
-            initialised = true;
-            setLoading(false);
-          });
-        } else {
-          setRole(null);
-          setMembershipActive(false);
-          setMustChangePassword(false);
-          setOnboardingCompleted(true);
-          setMembershipLoading(false);
-          initialised = true;
-          setLoading(false);
-        }
+      (_event, nextSession) => {
+        void applySession(nextSession);
       }
     );
 
-    // Safety timeout: if onAuthStateChange never fires, unblock the UI
-    const timeout = setTimeout(() => {
-      if (!initialised) {
-        setMembershipLoading(false);
-        setLoading(false);
-      }
-    }, 5000);
-
     return () => {
+      isMounted = false;
       subscription.unsubscribe();
-      clearTimeout(timeout);
     };
   }, []);
 
