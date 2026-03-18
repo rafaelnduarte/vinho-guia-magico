@@ -338,6 +338,16 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds, period 
       })
       .sort((a, b) => b.watched - a.watched);
 
+    // Weekday volume
+    const dayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+    const weekdayVolume = dayNames.map((name, idx) => {
+      let total = 0;
+      progresso.forEach((p) => {
+        if (new Date(p.updated_at).getDay() === idx) total++;
+      });
+      return { day: name, quantidade: total };
+    });
+
     return {
       avgCourseCompletion,
       leastCompleted,
@@ -347,6 +357,7 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds, period 
       highestAbandonment,
       heatmapGrid,
       hourlyVolume,
+      weekdayVolume,
       mostWatched,
       dau: uniqueDay.size,
       wau: uniqueWeek.size,
