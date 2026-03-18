@@ -1127,6 +1127,18 @@ export type Database = {
       }
     }
     Functions: {
+      get_course_rankings: {
+        Args: { period?: string }
+        Returns: {
+          capa_url: string
+          completion_count: number
+          curso_id: string
+          nivel: string
+          tipo: string
+          titulo: string
+          total_points: number
+        }[]
+      }
       get_member_ai_limits: {
         Args: never
         Returns: {
