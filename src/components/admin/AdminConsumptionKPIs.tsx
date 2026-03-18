@@ -209,6 +209,15 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds, period 
 
     const heatmapGrid = { totalDays, dayLabels: heatDayLabels, matrix: heatMatrix, max: heatMax };
 
+    // Hourly volume for line chart
+    const hourlyVolume = Array.from({ length: 24 }, (_, h) => {
+      let total = 0;
+      for (let d = 0; d < totalDays; d++) {
+        total += heatMatrix[`${d}-${h}`] || 0;
+      }
+      return { hour: `${String(h).padStart(2, "0")}h`, acessos: total };
+    });
+
     // KPI 11: Aulas mais assistidas (by total seconds)
     const aulaWatched: Record<string, number> = {};
     progresso.forEach((p) => {
