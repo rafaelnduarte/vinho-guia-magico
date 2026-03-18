@@ -229,6 +229,8 @@ export default function SommelierPage() {
     setMessages(prev => [...prev, userMsg]);
     setIsLoading(true);
 
+    let keepRecoveryAlive = false;
+
     try {
       const { data, error } = await supabase.functions.invoke("sommelier-chat", {
         body: { message: msgText, session_id: sessionId },
@@ -244,6 +246,7 @@ export default function SommelierPage() {
             content: `⚠️ Seus créditos mensais acabaram!\n\nVocê pode:\n- 📖 **Ver fichas dos vinhos** na curadoria\n- 💬 Voltar no próximo mês com créditos renovados`,
           },
         ]);
+        latestPendingMessageRef.current = null;
         return;
       }
 
@@ -252,6 +255,7 @@ export default function SommelierPage() {
           ...prev,
           { role: "assistant", content: `⏳ ${data.message}` },
         ]);
+        latestPendingMessageRef.current = null;
         return;
       }
 
@@ -289,6 +293,7 @@ export default function SommelierPage() {
               content: `⚠️ ${errorPayload.message || "A IA está temporariamente indisponível por limite de crédito do provedor."}`,
             },
           ]);
+          latestPendingMessageRef.current = null;
           return;
         }
 
@@ -297,6 +302,7 @@ export default function SommelierPage() {
             ...prev,
             { role: "assistant", content: `⏳ ${errorPayload.message || "Muitas mensagens no momento."}` },
           ]);
+          latestPendingMessageRef.current = null;
           return;
         }
 
@@ -305,6 +311,7 @@ export default function SommelierPage() {
             ...prev,
             { role: "assistant", content: `⚠️ ${errorPayload.message || "Erro ao consultar IA. Tente novamente em instantes."}` },
           ]);
+          latestPendingMessageRef.current = null;
           return;
         }
 
@@ -327,13 +334,21 @@ export default function SommelierPage() {
         return;
       }
 
+      if (!(e instanceof FunctionsHttpError)) {
+        keepRecoveryAlive = true;
+        return;
+      }
+
       const errorMsg = backendMessage || e.message || "Falha ao enviar mensagem";
       setMessages(prev => [
         ...prev,
         { role: "assistant", content: `⚠️ ${errorMsg}\n\nTente enviar sua mensagem novamente.` },
       ]);
+      latestPendingMessageRef.current = null;
     } finally {
-      setIsLoading(false);
+      if (!keepRecoveryAlive) {
+        setIsLoading(false);
+      }
     }
   };
 
