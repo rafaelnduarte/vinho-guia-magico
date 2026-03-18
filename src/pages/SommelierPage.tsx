@@ -4,7 +4,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import MemberBadge from "@/components/MemberBadge";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast";
 import ReactMarkdown from "react-markdown";
 import {
   Wine, Send, Loader2, Sparkles, AlertTriangle,
@@ -39,7 +38,6 @@ const QUICK_SUGGESTIONS = [
 
 export default function SommelierPage() {
   const { user, role } = useAuth();
-  const { toast } = useToast();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -51,8 +49,73 @@ export default function SommelierPage() {
   const [sessionSearch, setSessionSearch] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const latestPendingMessageRef = useRef<string | null>(null);
+  const recoveryAttemptedRef = useRef(false);
 
   const isAdmin = role === "admin";
+
+  const hydrateSessionMessages = useCallback(async (sid: string) => {
+    const { data: allMsgs } = await supabase
+      .from("chat_messages")
+      .select("id, role, content, created_at")
+      .eq("session_id", sid)
+      .order("created_at", { ascending: true });
+
+    const normalized = (allMsgs ?? [])
+      .filter((m: any) => m.role !== "system")
+      .map((m: any) => ({ id: m.id, role: m.role, content: m.content, created_at: m.created_at }));
+
+    setMessages(normalized);
+    return normalized;
+  }, []);
+
+  const recoverPendingConversation = useCallback(async () => {
+    if (!user || !isLoading || recoveryAttemptedRef.current) return false;
+
+    recoveryAttemptedRef.current = true;
+
+    const pendingText = latestPendingMessageRef.current?.trim().toLowerCase();
+    const recentWindow = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+
+    const { data: recentSessions } = await supabase
+      .from("chat_sessions")
+      .select("id, created_at")
+      .eq("user_id", user.id)
+      .gte("created_at", recentWindow)
+      .order("created_at", { ascending: false })
+      .limit(5);
+
+    for (const session of recentSessions ?? []) {
+      const { data: sessionMessages } = await supabase
+        .from("chat_messages")
+        .select("id, role, content, created_at")
+        .eq("session_id", session.id)
+        .order("created_at", { ascending: true });
+
+      const normalized = (sessionMessages ?? [])
+        .filter((m: any) => m.role !== "system")
+        .map((m: any) => ({ id: m.id, role: m.role, content: m.content, created_at: m.created_at }));
+
+      const hasMatchingUserMessage = pendingText
+        ? normalized.some((m) => m.role === "user" && m.content.trim().toLowerCase() === pendingText)
+        : normalized.some((m) => m.role === "user");
+
+      const hasAssistantReply = normalized.some((m) => m.role === "assistant");
+
+      if (hasMatchingUserMessage) {
+        setSessionId(session.id);
+        setMessages(normalized);
+
+        if (hasAssistantReply) {
+          setIsLoading(false);
+          latestPendingMessageRef.current = null;
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }, [user, isLoading]);
 
   // Fetch sessions — admins see all (with owner name), members see only own
   const { data: sessions, refetch: refetchSessions } = useQuery({
@@ -77,7 +140,6 @@ export default function SommelierPage() {
         return sessionsRaw.map(s => ({ ...s, owner_name: undefined })) as ChatSession[];
       }
 
-      // For admins, resolve owner names for other users' sessions
       const allOtherUserIds = [...new Set(sessionsRaw.filter(s => s.user_id !== user!.id).map(s => s.user_id))];
       let profileMap: Record<string, string> = {};
       let membershipMap: Record<string, string> = {};
@@ -91,7 +153,6 @@ export default function SommelierPage() {
         profileMap = Object.fromEntries((profiles ?? []).map(p => [p.user_id, p.full_name ?? "Usuário"]));
         const roleMap = Object.fromEntries((roles ?? []).map(r => [r.user_id, r.role]));
         (memberships ?? []).forEach(m => { membershipMap[m.user_id] = m.membership_type; });
-        // Override with admin role
         Object.entries(roleMap).forEach(([uid, role]) => { if (role === "admin") membershipMap[uid] = "admin"; });
       }
 
@@ -104,7 +165,6 @@ export default function SommelierPage() {
     enabled: !!user,
   });
 
-  // Fetch current month usage
   const { data: currentUsage, refetch: refetchUsage } = useQuery({
     queryKey: ["chat-usage", user?.id],
     queryFn: async () => {
@@ -124,7 +184,6 @@ export default function SommelierPage() {
     if (currentUsage !== undefined) setUsageBrl(currentUsage);
   }, [currentUsage]);
 
-  // Fetch pricing config for cap
   useQuery({
     queryKey: ["chat-pricing"],
     queryFn: async () => {
@@ -143,22 +202,18 @@ export default function SommelierPage() {
   const loadSession = async (sid: string) => {
     setSessionId(sid);
     setShowSidebar(false);
-    const { data } = await supabase
-      .from("chat_messages")
-      .select("id, role, content, created_at")
-      .eq("session_id", sid)
-      .order("created_at", { ascending: true });
-    setMessages(
-      (data ?? [])
-        .filter((m: any) => m.role !== "system")
-        .map((m: any) => ({ id: m.id, role: m.role, content: m.content, created_at: m.created_at }))
-    );
+    recoveryAttemptedRef.current = false;
+    latestPendingMessageRef.current = null;
+    await hydrateSessionMessages(sid);
   };
 
   const startNewChat = () => {
     setSessionId(null);
     setMessages([]);
     setShowSidebar(false);
+    setWarning(null);
+    latestPendingMessageRef.current = null;
+    recoveryAttemptedRef.current = false;
     inputRef.current?.focus();
   };
 
@@ -167,6 +222,9 @@ export default function SommelierPage() {
     if (!msgText || isLoading) return;
 
     setInput("");
+    latestPendingMessageRef.current = msgText;
+    recoveryAttemptedRef.current = false;
+
     const userMsg: ChatMessage = { role: "user", content: msgText };
     setMessages(prev => [...prev, userMsg]);
     setIsLoading(true);
@@ -199,13 +257,14 @@ export default function SommelierPage() {
 
       if (data.error) throw new Error(data.message);
 
-      if (data.session_id && !sessionId) {
+      if (data.session_id) {
         setSessionId(data.session_id);
         refetchSessions();
-        // Refetch again after a delay to pick up AI-generated title
         setTimeout(() => refetchSessions(), 4000);
       }
 
+      latestPendingMessageRef.current = null;
+      recoveryAttemptedRef.current = false;
       setMessages(prev => [...prev, { role: "assistant", content: data.message }]);
 
       if (data.usage) {
@@ -252,28 +311,22 @@ export default function SommelierPage() {
         backendMessage = errorPayload?.message ?? null;
       }
 
-      // On error, check if the server already saved the response (user may have navigated away and come back)
       if (sessionId) {
-        const { data: latestMessages } = await supabase
-          .from("chat_messages")
-          .select("id, role, content, created_at")
-          .eq("session_id", sessionId)
-          .order("created_at", { ascending: true });
-        if (latestMessages && latestMessages.length > 0) {
-          const lastMsg = latestMessages[latestMessages.length - 1];
-          if (lastMsg.role === "assistant") {
-            setMessages(
-              latestMessages
-                .filter((m: any) => m.role !== "system")
-                .map((m: any) => ({ id: m.id, role: m.role, content: m.content, created_at: m.created_at }))
-            );
-            setIsLoading(false);
-            return;
-          }
+        const reloaded = await hydrateSessionMessages(sessionId);
+        if (reloaded.some((m) => m.role === "assistant")) {
+          setIsLoading(false);
+          latestPendingMessageRef.current = null;
+          return;
         }
       }
 
-      // Show error as chat message instead of toast for better UX
+      const recovered = await recoverPendingConversation();
+      if (recovered) {
+        refetchSessions();
+        refetchUsage();
+        return;
+      }
+
       const errorMsg = backendMessage || e.message || "Falha ao enviar mensagem";
       setMessages(prev => [
         ...prev,
@@ -284,40 +337,69 @@ export default function SommelierPage() {
     }
   };
 
-  // Poll for assistant response if loading takes too long (handles tab switching)
   useEffect(() => {
-    if (!isLoading || !sessionId) return;
+    if (!isLoading) return;
 
     const pollInterval = setInterval(async () => {
-      const { data: latestMessages } = await supabase
-        .from("chat_messages")
-        .select("id, role, content, created_at")
-        .eq("session_id", sessionId)
-        .order("created_at", { ascending: false })
-        .limit(1);
-
-      if (latestMessages && latestMessages.length > 0 && latestMessages[0].role === "assistant") {
-        // Server has the response, reload all messages
-        const { data: allMsgs } = await supabase
+      if (sessionId) {
+        const { data: latestMessages } = await supabase
           .from("chat_messages")
           .select("id, role, content, created_at")
           .eq("session_id", sessionId)
-          .order("created_at", { ascending: true });
-        
-        setMessages(
-          (allMsgs ?? [])
-            .filter((m: any) => m.role !== "system")
-            .map((m: any) => ({ id: m.id, role: m.role, content: m.content, created_at: m.created_at }))
-        );
-        setIsLoading(false);
-        refetchUsage();
+          .order("created_at", { ascending: false })
+          .limit(1);
+
+        if (latestMessages && latestMessages.length > 0 && latestMessages[0].role === "assistant") {
+          await hydrateSessionMessages(sessionId);
+          setIsLoading(false);
+          latestPendingMessageRef.current = null;
+          refetchUsage();
+          return;
+        }
+      } else {
+        const recovered = await recoverPendingConversation();
+        if (recovered) {
+          refetchSessions();
+          refetchUsage();
+        }
       }
-    }, 5000); // Poll every 5 seconds
+    }, 5000);
 
     return () => clearInterval(pollInterval);
-  }, [isLoading, sessionId, refetchUsage]);
+  }, [isLoading, sessionId, hydrateSessionMessages, recoverPendingConversation, refetchSessions, refetchUsage]);
 
-  // Convert BRL to credits (1 credit = R$0.10)
+  useEffect(() => {
+    if (!isLoading) return;
+
+    const handleVisibilityRecovery = async () => {
+      if (document.visibilityState !== "visible") return;
+
+      if (sessionId) {
+        const reloaded = await hydrateSessionMessages(sessionId);
+        if (reloaded.some((m) => m.role === "assistant")) {
+          setIsLoading(false);
+          latestPendingMessageRef.current = null;
+          refetchUsage();
+          return;
+        }
+      }
+
+      const recovered = await recoverPendingConversation();
+      if (recovered) {
+        refetchSessions();
+        refetchUsage();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityRecovery);
+    window.addEventListener("focus", handleVisibilityRecovery);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityRecovery);
+      window.removeEventListener("focus", handleVisibilityRecovery);
+    };
+  }, [isLoading, sessionId, hydrateSessionMessages, recoverPendingConversation, refetchSessions, refetchUsage]);
+
   const usageCredits = Math.round(usageBrl * 10);
   const capCredits = Math.round(capBrl * 10);
   const usagePercent = capCredits > 0 ? Math.min((usageCredits / capCredits) * 100, 100) : 0;
