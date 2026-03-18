@@ -4,6 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+} from "recharts";
+import {
   BookOpen, Clock, TrendingUp, Users, AlertTriangle, Award,
   BarChart3, Activity, Smartphone, Info,
 } from "lucide-react";
