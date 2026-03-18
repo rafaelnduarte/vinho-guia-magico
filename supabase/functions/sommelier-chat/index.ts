@@ -361,7 +361,7 @@ serve(async (req) => {
     const aiRequestBody = JSON.stringify({
       model: "openai/gpt-5",
       messages: aiMessages,
-      max_tokens: maxTokens,
+      max_completion_tokens: maxTokens,
       stream: false,
     });
 
