@@ -221,6 +221,9 @@ function MembersRanking({
               <th className="px-1.5 sm:px-3 py-3 font-medium text-center hidden sm:table-cell" title="Comentários">
                 <MessageSquare className="h-3.5 w-3.5 mx-auto" />
               </th>
+              <th className="px-1.5 sm:px-3 py-3 font-medium text-center hidden sm:table-cell" title="Cursos concluídos">
+                <GraduationCap className="h-3.5 w-3.5 mx-auto" />
+              </th>
               <th className="px-2 sm:px-4 py-3 font-medium text-right w-12">Pts</th>
             </tr>
           </thead>
