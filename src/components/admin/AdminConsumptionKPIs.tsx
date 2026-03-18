@@ -488,11 +488,11 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds, period 
               <Area
                 type="monotone"
                 dataKey="acessos"
-                stroke="#22c55e"
+                stroke="hsl(var(--primary))"
                 strokeWidth={2}
                 fill="url(#colorAcessos)"
                 dot={false}
-                activeDot={{ r: 4, fill: "#22c55e", strokeWidth: 0 }}
+                activeDot={{ r: 4, fill: "hsl(var(--primary))", strokeWidth: 0 }}
               />
             </AreaChart>
           </ResponsiveContainer>
