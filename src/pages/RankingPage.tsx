@@ -87,7 +87,6 @@ export default function RankingPage() {
       <p className="text-sm text-muted-foreground">
         Cada voto, comentário e curso concluído vale <strong>1 ponto</strong>. Participe e suba no ranking!
       </p>
-      </p>
 
       {/* Section toggle */}
       <div className="flex gap-2">
