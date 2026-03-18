@@ -1140,6 +1140,7 @@ export type Database = {
         Returns: {
           avatar_url: string
           comment_count: number
+          course_count: number
           full_name: string
           membership_type: string
           role: string
