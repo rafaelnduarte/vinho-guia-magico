@@ -84,8 +84,17 @@ export default function RankingPage() {
     },
   });
 
+  const { data: courseRankings, isLoading: loadingCourses } = useQuery({
+    queryKey: ["course-rankings", period],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_course_rankings", { period });
+      if (error) throw error;
+      return (data ?? []) as CourseRankingEntry[];
+    },
+  });
+
   const currentUserRank = rankings?.findIndex((r) => r.user_id === user?.id);
-  const isLoading = section === "membros" ? loadingMembers : loadingWines;
+  const isLoading = section === "membros" ? loadingMembers : section === "vinhos" ? loadingWines : loadingCourses;
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 sm:py-8 space-y-4 sm:space-y-6">
