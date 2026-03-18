@@ -346,6 +346,7 @@ export default function AdminConsumptionKPIs({ profileMap, adminUserIds, period 
       avgDropOffSeconds,
       highestAbandonment,
       heatmapGrid,
+      hourlyVolume,
       mostWatched,
       dau: uniqueDay.size,
       wau: uniqueWeek.size,
