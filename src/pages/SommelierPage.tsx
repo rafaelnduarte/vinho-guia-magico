@@ -29,6 +29,21 @@ interface ChatSession {
   owner_name?: string;
   owner_membership?: "radar" | "comunidade" | "admin";
 }
+
+const normalizeChatMessages = (allMsgs: Array<any>): ChatMessage[] =>
+  (allMsgs ?? [])
+    .filter((m: any) => m.role !== "system")
+    .map((m: any) => ({
+      id: m.id,
+      role: m.role,
+      content: typeof m.content === "string" ? m.content : "",
+      created_at: m.created_at,
+    }))
+    .filter((m: ChatMessage) => m.role !== "assistant" || m.content.trim().length > 0);
+
+const hasRenderableAssistantReply = (allMsgs: ChatMessage[]) =>
+  allMsgs.some((m) => m.role === "assistant" && m.content.trim().length > 0);
+
 const QUICK_SUGGESTIONS = [
   { label: "🍷 Harmonização", prompt: "Me ajuda com harmonização! Qual vinho do portal combina com um jantar de massas?" },
   { label: "✈️ Flight de 4", prompt: "Monte um flight de 4 vinhos do portal por um tema interessante." },
@@ -61,10 +76,7 @@ export default function SommelierPage() {
       .eq("session_id", sid)
       .order("created_at", { ascending: true });
 
-    const normalized = (allMsgs ?? [])
-      .filter((m: any) => m.role !== "system")
-      .map((m: any) => ({ id: m.id, role: m.role, content: m.content, created_at: m.created_at }));
-
+    const normalized = normalizeChatMessages(allMsgs ?? []);
     setMessages(normalized);
     return normalized;
   }, []);
@@ -92,15 +104,13 @@ export default function SommelierPage() {
         .eq("session_id", session.id)
         .order("created_at", { ascending: true });
 
-      const normalized = (sessionMessages ?? [])
-        .filter((m: any) => m.role !== "system")
-        .map((m: any) => ({ id: m.id, role: m.role, content: m.content, created_at: m.created_at }));
+      const normalized = normalizeChatMessages(sessionMessages ?? []);
 
       const hasMatchingUserMessage = pendingText
         ? normalized.some((m) => m.role === "user" && m.content.trim().toLowerCase() === pendingText)
         : normalized.some((m) => m.role === "user");
 
-      const hasAssistantReply = normalized.some((m) => m.role === "assistant");
+      const hasAssistantReply = hasRenderableAssistantReply(normalized);
 
       if (hasMatchingUserMessage) {
         setSessionId(session.id);
@@ -117,7 +127,6 @@ export default function SommelierPage() {
     return false;
   }, [user, isLoading]);
 
-  // Fetch sessions — admins see all (with owner name), members see only own
   const { data: sessions, refetch: refetchSessions } = useQuery({
     queryKey: ["chat-sessions", user?.id, isAdmin],
     queryFn: async () => {
@@ -267,9 +276,34 @@ export default function SommelierPage() {
         setTimeout(() => refetchSessions(), 4000);
       }
 
+      const assistantText = typeof data?.message === "string" ? data.message : "";
+
+      if (!assistantText.trim()) {
+        const hydrated = data?.session_id ? await hydrateSessionMessages(data.session_id) : [];
+
+        if (hasRenderableAssistantReply(hydrated)) {
+          latestPendingMessageRef.current = null;
+          recoveryAttemptedRef.current = false;
+          if (data.usage) {
+            setUsageBrl(data.usage.cost_brl);
+            setCapBrl(data.usage.cap_brl);
+          }
+          if (data.warning) setWarning(data.warning);
+          refetchUsage();
+          return;
+        }
+
+        setMessages(prev => [
+          ...prev,
+          { role: "assistant", content: "⚠️ A IA retornou uma resposta vazia. Tente novamente." },
+        ]);
+        latestPendingMessageRef.current = null;
+        return;
+      }
+
       latestPendingMessageRef.current = null;
       recoveryAttemptedRef.current = false;
-      setMessages(prev => [...prev, { role: "assistant", content: data.message }]);
+      setMessages(prev => [...prev, { role: "assistant", content: assistantText }]);
 
       if (data.usage) {
         setUsageBrl(data.usage.cost_brl);
@@ -320,7 +354,7 @@ export default function SommelierPage() {
 
       if (sessionId) {
         const reloaded = await hydrateSessionMessages(sessionId);
-        if (reloaded.some((m) => m.role === "assistant")) {
+        if (hasRenderableAssistantReply(reloaded)) {
           setIsLoading(false);
           latestPendingMessageRef.current = null;
           return;
@@ -363,9 +397,10 @@ export default function SommelierPage() {
           .select("id, role, content, created_at")
           .eq("session_id", sessionId)
           .order("created_at", { ascending: false })
-          .limit(1);
+          .limit(3);
 
-        if (latestMessages && latestMessages.length > 0 && latestMessages[0].role === "assistant") {
+        const normalizedLatest = normalizeChatMessages(latestMessages ?? []);
+        if (hasRenderableAssistantReply(normalizedLatest)) {
           await hydrateSessionMessages(sessionId);
           setIsLoading(false);
           latestPendingMessageRef.current = null;
@@ -393,7 +428,7 @@ export default function SommelierPage() {
 
       if (sessionId) {
         const reloaded = await hydrateSessionMessages(sessionId);
-        if (reloaded.some((m) => m.role === "assistant")) {
+        if (hasRenderableAssistantReply(reloaded)) {
           setIsLoading(false);
           latestPendingMessageRef.current = null;
           refetchUsage();

@@ -55,6 +55,60 @@ const buildProviderFallbackReply = (contextPack: Array<{ nome: string; pais: str
   return `⚠️ O provedor de IA está temporariamente indisponível, mas já te deixo sugestões rápidas do portal:\n\n${quickSuggestions}\n\nSe quiser, me mande novamente sua pergunta em alguns segundos que tento uma resposta completa.`;
 };
 
+const extractTextFromPart = (part: unknown): string => {
+  if (typeof part === "string") return part;
+
+  if (Array.isArray(part)) {
+    return part.map(extractTextFromPart).join("");
+  }
+
+  if (part && typeof part === "object") {
+    const record = part as Record<string, unknown>;
+
+    if (typeof record.text === "string") return record.text;
+    if (typeof record.output_text === "string") return record.output_text;
+    if (typeof record.content === "string") return record.content;
+    if (typeof record.value === "string") return record.value;
+
+    if (Array.isArray(record.content)) return extractTextFromPart(record.content);
+    if (Array.isArray(record.text)) return extractTextFromPart(record.text);
+  }
+
+  return "";
+};
+
+const extractAssistantContent = (payload: any): string => {
+  const directCandidates = [
+    payload?.choices?.[0]?.message?.content,
+    payload?.choices?.[0]?.content,
+    payload?.message?.content,
+    payload?.output_text,
+    payload?.content,
+  ];
+
+  for (const candidate of directCandidates) {
+    const text = extractTextFromPart(candidate).trim();
+    if (text) return text;
+  }
+
+  if (Array.isArray(payload?.output)) {
+    for (const item of payload.output) {
+      const text = extractTextFromPart(item?.content).trim();
+      if (text) return text;
+    }
+  }
+
+  return "";
+};
+
+const extractUsageMetric = (usage: any, keys: string[]) => {
+  for (const key of keys) {
+    const value = usage?.[key];
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+  }
+  return 0;
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -69,17 +123,17 @@ serve(async (req) => {
     const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
     if (!lovableApiKey) throw new Error("LOVABLE_API_KEY not configured");
 
-    // Auth user client
     const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
       global: { headers: { Authorization: authHeader } },
     });
-    const { data: { user }, error: authErr } = await userClient.auth.getUser();
+    const {
+      data: { user },
+      error: authErr,
+    } = await userClient.auth.getUser();
     if (authErr || !user) throw new HttpError(401, "unauthorized", "Não autorizado");
 
-    // Service client for writes & membership check
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Verify active membership (prevents expired members from using AI via direct API)
     const { data: hasAccess } = await adminClient.rpc("has_active_access", { _user_id: user.id });
     if (!hasAccess) throw new HttpError(403, "forbidden", "Assinatura inativa");
 
@@ -93,7 +147,6 @@ serve(async (req) => {
       throw new HttpError(400, "validation_error", "Mensagem muito longa (max 2000 chars)");
     }
 
-    // 1. Get pricing config (includes system_prompt)
     const { data: pricingArr } = await adminClient
       .from("ai_pricing_config")
       .select("*")
@@ -103,8 +156,10 @@ serve(async (req) => {
 
     const systemPrompt = pricing.system_prompt || FALLBACK_SYSTEM_PROMPT;
     const maxTokens = pricing.max_tokens_detalhado;
+    const selectedModel = typeof pricing.model_name === "string" && pricing.model_name.trim().length > 0
+      ? pricing.model_name.trim()
+      : "google/gemini-3-flash-preview";
 
-    // 1b. Get active knowledge base entries (capped to avoid oversized prompts)
     const { data: knowledgeEntries } = await adminClient
       .from("ai_knowledge_base")
       .select("title, content, category")
@@ -133,7 +188,6 @@ serve(async (req) => {
       }
     }
 
-    // 2. Check monthly budget
     const currentMonth = new Date().toISOString().slice(0, 7);
     const { data: usageArr } = await adminClient
       .from("usage_ledger")
@@ -155,18 +209,17 @@ serve(async (req) => {
       );
     }
 
-    // 3. Rate limiting (sliding window)
     const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
     const todayStart = new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
+    const { data: userSessions } = await adminClient.from("chat_sessions").select("id").eq("user_id", user.id);
+    const userSessionIds = userSessions?.map((session) => session.id) ?? [];
 
     const { count: recentCount } = await adminClient
       .from("chat_messages")
       .select("id", { count: "exact", head: true })
       .eq("role", "user")
       .gte("created_at", fiveMinAgo)
-      .in("session_id", 
-        (await adminClient.from("chat_sessions").select("id").eq("user_id", user.id)).data?.map(s => s.id) ?? []
-      );
+      .in("session_id", userSessionIds.length > 0 ? userSessionIds : ["00000000-0000-0000-0000-000000000000"]);
 
     if ((recentCount ?? 0) >= pricing.rate_limit_per_5min) {
       return new Response(
@@ -180,9 +233,7 @@ serve(async (req) => {
       .select("id", { count: "exact", head: true })
       .eq("role", "user")
       .gte("created_at", todayStart)
-      .in("session_id",
-        (await adminClient.from("chat_sessions").select("id").eq("user_id", user.id)).data?.map(s => s.id) ?? []
-      );
+      .in("session_id", userSessionIds.length > 0 ? userSessionIds : ["00000000-0000-0000-0000-000000000000"]);
 
     if ((dailyCount ?? 0) >= pricing.rate_limit_per_day) {
       return new Response(
@@ -191,7 +242,6 @@ serve(async (req) => {
       );
     }
 
-    // 4. Create or get session (with ownership verification)
     let sessionId = session_id;
     if (sessionId) {
       const { data: sessionCheck } = await adminClient
@@ -212,7 +262,6 @@ serve(async (req) => {
       sessionId = newSession.id;
     }
 
-    // 5. Get conversation history
     const { data: history } = await adminClient
       .from("chat_messages")
       .select("role, content")
@@ -220,7 +269,6 @@ serve(async (req) => {
       .order("created_at", { ascending: true })
       .limit(20);
 
-    // Compact history: if > 12 msgs, use summary + last 6
     let conversationMessages: Array<{ role: string; content: string }> = [];
     const allHistory = history ?? [];
 
@@ -239,7 +287,6 @@ serve(async (req) => {
       conversationMessages = allHistory;
     }
 
-    // 6. RAG enxuto: busca direcionada para evitar payload gigante e erro 402
     const { data: allWines } = await adminClient
       .from("wines")
       .select("id, name, producer, country, region, vintage, type, grape, importer, price_range, description, tasting_notes, rating, status")
@@ -341,7 +388,6 @@ serve(async (req) => {
       ? `\n\nCATÁLOGO DO PORTAL: ${allWinesList.length} vinhos cadastrados.\nVinhos em foco para esta pergunta (${contextPack.length}):\n${JSON.stringify(contextPack)}\n\nNomes do catálogo (referência rápida): ${allWineNames}`
       : "\n\nNenhum vinho cadastrado no portal no momento.";
 
-    // 7. Save user message
     await adminClient.from("chat_messages").insert({
       session_id: sessionId,
       role: "user",
@@ -349,17 +395,16 @@ serve(async (req) => {
       mode: "detalhado",
     });
 
-    // 8. Call Lovable AI
     const fullSystemPrompt = systemPrompt + knowledgeContext + contextMessage +
       "\n\nIMPORTANTE: Seja sucinto e direto. Nunca entregue respostas incompletas. Complete sempre seu raciocínio.";
     const aiMessages = [
       { role: "system", content: fullSystemPrompt },
-      ...conversationMessages.map(m => ({ role: m.role === "system" ? "user" : m.role, content: m.content })),
+      ...conversationMessages.map((m) => ({ role: m.role === "system" ? "user" : m.role, content: m.content })),
       { role: "user", content: message },
     ];
 
     const aiRequestBody = JSON.stringify({
-      model: "openai/gpt-5",
+      model: selectedModel,
       messages: aiMessages,
       max_completion_tokens: maxTokens,
       stream: false,
@@ -374,7 +419,6 @@ serve(async (req) => {
     let tokensIn = 0;
     let tokensOut = 0;
 
-    // Retry up to 2 times on transient errors (500, 502, 503, 504)
     let aiResponse: Response | null = null;
     let lastErrText = "";
     const MAX_RETRIES = 2;
@@ -382,7 +426,7 @@ serve(async (req) => {
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       if (attempt > 0) {
         console.log(`AI gateway retry attempt ${attempt}...`);
-        await new Promise(r => setTimeout(r, 1500 * attempt));
+        await new Promise((resolve) => setTimeout(resolve, 1500 * attempt));
       }
 
       aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -392,7 +436,7 @@ serve(async (req) => {
       });
 
       if (aiResponse.ok || aiResponse.status === 429 || aiResponse.status === 402) {
-        break; // Don't retry on success or known client errors
+        break;
       }
 
       lastErrText = await aiResponse.text();
@@ -413,18 +457,31 @@ serve(async (req) => {
         throw new HttpError(502, "ai_gateway_error", "Erro ao consultar IA. Tente novamente em instantes.");
       }
     } else {
-      const aiData = await aiResponse!.json();
-      assistantContent = aiData.choices?.[0]?.message?.content ?? assistantContent;
-      tokensIn = aiData.usage?.prompt_tokens ?? 0;
-      tokensOut = aiData.usage?.completion_tokens ?? 0;
+      let aiData: any = null;
+
+      try {
+        aiData = await aiResponse!.json();
+      } catch (parseError) {
+        console.error("Failed to parse AI gateway response:", parseError);
+      }
+
+      tokensIn = extractUsageMetric(aiData?.usage, ["prompt_tokens", "input_tokens"]);
+      tokensOut = extractUsageMetric(aiData?.usage, ["completion_tokens", "output_tokens"]);
+      assistantContent = extractAssistantContent(aiData);
+
+      if (!assistantContent.trim()) {
+        console.error("AI gateway returned empty assistant content", {
+          model: selectedModel,
+          preview: JSON.stringify(aiData)?.slice(0, 1200) ?? "no-payload",
+        });
+        assistantContent = buildProviderFallbackReply(contextPack);
+      }
     }
 
-    // 9. Calculate cost
     const costUsd = (tokensIn / 1000) * Number(pricing.price_in_per_1k) +
       (tokensOut / 1000) * Number(pricing.price_out_per_1k);
     const costBrl = costUsd * Number(pricing.usd_brl_rate);
 
-    // 10. Save assistant message
     await adminClient.from("chat_messages").insert({
       session_id: sessionId,
       role: "assistant",
@@ -436,7 +493,6 @@ serve(async (req) => {
       mode: "detalhado",
     });
 
-    // 11. Update usage ledger (upsert)
     if (usage) {
       await adminClient
         .from("usage_ledger")
@@ -462,7 +518,6 @@ serve(async (req) => {
       });
     }
 
-    // 12a. Auto-generate session title after first exchange
     if (allHistory.length === 0) {
       fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
@@ -481,7 +536,7 @@ serve(async (req) => {
       }).then(async (res) => {
         if (res.ok) {
           const data = await res.json();
-          const title = data.choices?.[0]?.message?.content?.trim();
+          const title = extractAssistantContent(data).trim();
           if (title) {
             await adminClient.from("chat_sessions").update({ title: title.slice(0, 80) }).eq("id", sessionId);
           }
@@ -489,9 +544,8 @@ serve(async (req) => {
       }).catch(console.error);
     }
 
-    // 12b. Update summary if conversation is long
     if (allHistory.length >= 12 && allHistory.length % 6 === 0) {
-      const summaryMessages = allHistory.map(m => `${m.role}: ${m.content.slice(0, 100)}`).join("\n");
+      const summaryMessages = allHistory.map((m) => `${m.role}: ${m.content.slice(0, 100)}`).join("\n");
       fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -509,7 +563,7 @@ serve(async (req) => {
       }).then(async (res) => {
         if (res.ok) {
           const data = await res.json();
-          const summary = data.choices?.[0]?.message?.content;
+          const summary = extractAssistantContent(data).trim();
           if (summary) {
             await adminClient.from("chat_sessions").update({ summary }).eq("id", sessionId);
           }
@@ -517,7 +571,6 @@ serve(async (req) => {
       }).catch(console.error);
     }
 
-    // Get updated usage
     const { data: updatedUsage } = await adminClient
       .from("usage_ledger")
       .select("estimated_cost_brl")
@@ -539,7 +592,7 @@ serve(async (req) => {
           tokens_in: tokensIn,
           tokens_out: tokensOut,
         },
-        wine_ids: wineContext.map(w => w.id),
+        wine_ids: wineContext.map((w) => w.id),
         warning: usagePercent >= 80 ? "Seus créditos estão acabando." : null,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
