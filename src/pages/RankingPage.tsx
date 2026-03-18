@@ -169,7 +169,6 @@ export default function RankingPage() {
       ) : (
         <CoursesRanking rankings={courseRankings ?? []} />
       )}
-      )}
     </div>
   );
 }
