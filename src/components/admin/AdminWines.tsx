@@ -332,12 +332,14 @@ export default function AdminWines() {
         if (error) throw error;
       }
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["admin-wines"] });
       setOpen(false);
       setEditing(null);
       setForm(emptyForm);
-      toast({ title: editing ? "Vinho atualizado" : "Vinho criado" });
+      if (result !== "updated_existing") {
+        toast({ title: editing ? "Vinho atualizado" : "Vinho criado" });
+      }
     },
     onError: (e) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
   });
