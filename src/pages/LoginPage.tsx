@@ -118,7 +118,10 @@ export default function LoginPage() {
               <div>
                 <h2 className="text-2xl font-display text-foreground">Entrar</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Acesse sua área de membro
+                  Acesse sua área de membro.
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Primeiro acesso? Sua senha é o seu email de cadastro
                 </p>
               </div>
               <form onSubmit={handleLogin} className="space-y-5">
@@ -155,6 +158,14 @@ export default function LoginPage() {
                 >
                   Esqueci minha senha
                 </button>
+                <a
+                  href="https://pay.hub.la/EXHctuig5BkAD5oPYQUs?utm_source=login-plataforma"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block w-full text-center text-sm text-primary hover:text-primary/80 font-medium transition-colors"
+                >
+                  Ainda não é membro? Inscreva-se aqui
+                </a>
               </form>
             </>
           )}
