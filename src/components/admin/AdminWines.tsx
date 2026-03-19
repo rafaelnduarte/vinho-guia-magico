@@ -313,6 +313,21 @@ export default function AdminWines() {
         const { error } = await supabase.from("wines").update(payload).eq("id", editing);
         if (error) throw error;
       } else {
+        // Check if a wine with the same website_url already exists — upsert if so
+        const urlToCheck = payload.website_url;
+        if (urlToCheck) {
+          const { data: existing } = await supabase
+            .from("wines")
+            .select("id")
+            .eq("website_url", urlToCheck)
+            .maybeSingle();
+          if (existing) {
+            const { error } = await supabase.from("wines").update(payload).eq("id", existing.id);
+            if (error) throw error;
+            toast({ title: "Vinho existente atualizado", description: "Já existia um vinho com esse link. Os dados foram atualizados." });
+            return "updated_existing";
+          }
+        }
         const { error } = await supabase.from("wines").insert(payload);
         if (error) throw error;
       }
