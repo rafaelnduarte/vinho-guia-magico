@@ -118,9 +118,6 @@ export default function LoginPage() {
               <div>
                 <h2 className="text-2xl font-display text-foreground">Entrar</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Acesse sua área de membro.
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">
                   Primeiro acesso? Sua senha é o seu email de cadastro
                 </p>
               </div>
