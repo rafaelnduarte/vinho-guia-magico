@@ -120,9 +120,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, nextSession) => {
-        // TOKEN_REFRESHED is the main event that fires on tab switch — skip heavy work
-        const isTokenRefresh = event === "TOKEN_REFRESHED";
-        void applySession(nextSession, isTokenRefresh);
+        void applySession(nextSession, event);
       }
     );
 
