@@ -14,14 +14,13 @@ import { toast } from "@/hooks/use-toast";
 import {
   Camera,
   Loader2,
-  Smartphone,
   Wine,
   Archive,
   ArrowRight,
-  Share,
-  MoreVertical,
-  Plus,
   ChevronRight,
+  GraduationCap,
+  Trophy,
+  Star,
 } from "lucide-react";
 
 interface OnboardingDialogProps {
@@ -31,6 +30,8 @@ interface OnboardingDialogProps {
   initialBio: string;
   initialAvatar: string | null;
 }
+
+const TOTAL_STEPS = 4;
 
 export default function OnboardingDialog({
   open,
@@ -44,7 +45,7 @@ export default function OnboardingDialog({
   const [step, setStep] = useState(1);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Step 2 state
+  // Step 1 state (Profile)
   const [fullName, setFullName] = useState(initialName);
   const [bio, setBio] = useState(initialBio);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
@@ -93,7 +94,7 @@ export default function OnboardingDialog({
     setSavingProfile(true);
     await supabase.from("profiles").update({ full_name: fullName, bio }).eq("user_id", user.id);
     setSavingProfile(false);
-    setStep(3);
+    setStep(2);
   };
 
   const fireConfetti = useCallback(() => {
@@ -148,7 +149,7 @@ export default function OnboardingDialog({
       >
         {/* Progress dots */}
         <div className="flex items-center justify-center gap-2 pt-6 pb-2">
-          {[1, 2, 3].map((s) => (
+          {Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map((s) => (
             <div
               key={s}
               className={`h-2 rounded-full transition-all ${
@@ -159,65 +160,12 @@ export default function OnboardingDialog({
         </div>
 
         <div className="px-6 pb-6">
-          {/* STEP 1 — Welcome + PWA */}
+          {/* STEP 1 — Profile */}
           {step === 1 && (
             <div className="space-y-5 animate-fade-in">
               <div className="text-center space-y-2 pt-2">
-                <Smartphone className="h-10 w-10 mx-auto text-primary" />
                 <h2 className="text-xl font-display font-semibold text-foreground">
                   Bem-vindo ao Radar! 🍷
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  Para a melhor experiência, adicione o Radar à tela inicial do seu celular.
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                {/* iOS */}
-                <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-2">
-                  <p className="text-sm font-medium text-foreground flex items-center gap-2">
-                    <span className="text-base">🍎</span> iPhone (Safari)
-                  </p>
-                  <ol className="text-xs text-muted-foreground space-y-1 pl-5 list-decimal">
-                    <li className="flex items-center gap-1">
-                      Toque em <Share className="h-3 w-3 inline" /> <span className="font-medium">Compartilhar</span>
-                    </li>
-                    <li className="flex items-center gap-1">
-                      Role e toque em <Plus className="h-3 w-3 inline" /> <span className="font-medium">Adicionar à Tela de Início</span>
-                    </li>
-                    <li>Confirme tocando em <span className="font-medium">Adicionar</span></li>
-                  </ol>
-                </div>
-
-                {/* Android */}
-                <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-2">
-                  <p className="text-sm font-medium text-foreground flex items-center gap-2">
-                    <span className="text-base">🤖</span> Android (Chrome)
-                  </p>
-                  <ol className="text-xs text-muted-foreground space-y-1 pl-5 list-decimal">
-                    <li className="flex items-center gap-1">
-                      Toque em <MoreVertical className="h-3 w-3 inline" /> <span className="font-medium">Menu</span> (3 pontos)
-                    </li>
-                    <li className="flex items-center gap-1">
-                      Toque em <Smartphone className="h-3 w-3 inline" /> <span className="font-medium">Adicionar à tela inicial</span>
-                    </li>
-                    <li>Confirme tocando em <span className="font-medium">Adicionar</span></li>
-                  </ol>
-                </div>
-              </div>
-
-              <Button onClick={() => setStep(2)} className="w-full">
-                Próximo <ArrowRight className="h-4 w-4 ml-2" />
-              </Button>
-            </div>
-          )}
-
-          {/* STEP 2 — Profile */}
-          {step === 2 && (
-            <div className="space-y-5 animate-fade-in">
-              <div className="text-center space-y-2 pt-2">
-                <h2 className="text-xl font-display font-semibold text-foreground">
-                  Monte seu perfil
                 </h2>
                 <p className="text-sm text-muted-foreground">
                   Adicione uma foto e conte um pouco sobre você.
@@ -286,20 +234,15 @@ export default function OnboardingDialog({
                 <p className="text-xs text-muted-foreground text-right">{bio.length}/140</p>
               </div>
 
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setStep(1)} className="flex-1">
-                  Voltar
-                </Button>
-                <Button onClick={handleSaveProfile} disabled={savingProfile} className="flex-1">
-                  {savingProfile ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                  Próximo <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
-              </div>
+              <Button onClick={handleSaveProfile} disabled={savingProfile} className="w-full">
+                {savingProfile ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Próximo <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
             </div>
           )}
 
-          {/* STEP 3 — Curadoria vs Acervo */}
-          {step === 3 && (
+          {/* STEP 2 — Curadoria & Acervo */}
+          {step === 2 && (
             <div className="space-y-5 animate-fade-in">
               <div className="text-center space-y-2 pt-2">
                 <h2 className="text-xl font-display font-semibold text-foreground">
@@ -311,7 +254,6 @@ export default function OnboardingDialog({
               </div>
 
               <div className="space-y-4">
-                {/* Curadoria */}
                 <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-2">
                   <div className="flex items-center gap-2">
                     <Wine className="h-5 w-5 text-primary" />
@@ -324,7 +266,6 @@ export default function OnboardingDialog({
                   </p>
                 </div>
 
-                {/* Acervo */}
                 <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-2">
                   <div className="flex items-center gap-2">
                     <Archive className="h-5 w-5 text-muted-foreground" />
@@ -342,6 +283,110 @@ export default function OnboardingDialog({
                 <p className="text-xs text-muted-foreground mb-4">
                   Você pode acessar ambas as seções pelo menu <strong>Curadoria</strong>.
                 </p>
+              </div>
+
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setStep(1)} className="flex-1">
+                  Voltar
+                </Button>
+                <Button onClick={() => setStep(3)} className="flex-1">
+                  Próximo <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 3 — Cursos */}
+          {step === 3 && (
+            <div className="space-y-5 animate-fade-in">
+              <div className="text-center space-y-2 pt-2">
+                <GraduationCap className="h-10 w-10 mx-auto text-primary" />
+                <h2 className="text-xl font-display font-semibold text-foreground">
+                  Cursos
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Aprenda sobre o mundo do vinho com nossos cursos exclusivos.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <GraduationCap className="h-5 w-5 text-primary" />
+                    <h3 className="font-medium text-foreground">Aulas em vídeo</h3>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Assista às aulas no seu ritmo. Os cursos cobrem desde os fundamentos 
+                    até temas avançados como regiões produtoras, uvas e técnicas de degustação.
+                  </p>
+                </div>
+
+                <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Star className="h-5 w-5 text-accent" />
+                    <h3 className="font-medium text-foreground">Progresso e certificação</h3>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Acompanhe seu progresso em cada curso. Ao concluir 100% de um curso, 
+                    você ganha pontos no <strong>Ranking</strong>!
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setStep(2)} className="flex-1">
+                  Voltar
+                </Button>
+                <Button onClick={() => setStep(4)} className="flex-1">
+                  Próximo <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 4 — Ranking */}
+          {step === 4 && (
+            <div className="space-y-5 animate-fade-in">
+              <div className="text-center space-y-2 pt-2">
+                <Trophy className="h-10 w-10 mx-auto text-accent" />
+                <h2 className="text-xl font-display font-semibold text-foreground">
+                  Ranking & Prêmios
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Suas atividades no app rendem pontos e prêmios!
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <div className="rounded-lg border border-accent/30 bg-accent/5 p-4 space-y-2">
+                  <h3 className="font-medium text-foreground text-sm">Como ganhar pontos:</h3>
+                  <ul className="text-xs text-muted-foreground space-y-1.5 pl-1">
+                    <li className="flex items-center gap-2">
+                      <Wine className="h-3.5 w-3.5 text-primary shrink-0" />
+                      <span><strong>Votar</strong> nos vinhos da curadoria</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Wine className="h-3.5 w-3.5 text-primary shrink-0" />
+                      <span><strong>Comentar</strong> nos vinhos</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <GraduationCap className="h-3.5 w-3.5 text-primary shrink-0" />
+                      <span><strong>Concluir cursos</strong> (100%)</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Trophy className="h-5 w-5 text-accent" />
+                    <h3 className="font-medium text-foreground">Prêmios</h3>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Os membros mais ativos no Ranking são reconhecidos e podem ganhar 
+                    prêmios exclusivos, como garrafas especiais, acesso VIP a degustações 
+                    e muito mais. Quanto mais você participa, mais chances tem!
+                  </p>
+                </div>
               </div>
 
               <Button onClick={handleFinish} className="w-full">
