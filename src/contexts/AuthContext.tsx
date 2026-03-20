@@ -44,7 +44,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const initialLoadDone = useRef(false);
 
   const fetchUserData = async (userId: string) => {
-    setMembershipLoading(true);
+    // Only show loading spinner on very first load — never after that
+    if (!initialLoadDone.current) {
+      setMembershipLoading(true);
+    }
     const [roleRes, membershipRes, profileRes] = await Promise.all([
       supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
       supabase.from("memberships").select("status").eq("user_id", userId).eq("status", "active").maybeSingle(),
@@ -56,6 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setMustChangePassword((profileRes.data as any)?.must_change_password ?? false);
     setOnboardingCompleted((profileRes.data as any)?.onboarding_completed ?? true);
     setMembershipLoading(false);
+    initialLoadDone.current = true;
   };
 
   const refreshProfile = async () => {
