@@ -113,7 +113,7 @@ Deno.serve(async (req) => {
 
       // Build the request body as a string to control memory
       const bodyStr = JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-2.5-flash-lite",
         messages: [
           {
             role: "system",
@@ -136,7 +136,7 @@ Deno.serve(async (req) => {
             ],
           },
         ],
-        max_tokens: 32000,
+        max_completion_tokens: 32000,
       });
 
       const MAX_RETRIES = 3;
