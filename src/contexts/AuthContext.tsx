@@ -41,6 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [membershipActive, setMembershipActive] = useState(false);
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const [onboardingCompleted, setOnboardingCompleted] = useState(true);
+  const initialLoadDone = useRef(false);
 
   const fetchUserData = async (userId: string) => {
     setMembershipLoading(true);
