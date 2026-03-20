@@ -1,12 +1,20 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useRef } from "react";
 import { Loader2, ShieldX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading, membershipLoading, membershipActive, mustChangePassword, signOut } = useAuth();
 
-  if (loading || membershipLoading) {
+  // Once we've rendered children successfully, never go back to a spinner.
+  // This prevents the app tree from being unmounted during silent token refreshes
+  // or background revalidation.
+  const wasAuthenticated = useRef(false);
+
+  const isBootstrapping = loading || membershipLoading;
+
+  if (isBootstrapping && !wasAuthenticated.current) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -14,7 +22,15 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
+  // If we're still loading but were previously authenticated, show children
+  // to avoid unmounting the app tree. The auth context will redirect to login
+  // if the session is actually invalid.
+  if (isBootstrapping && wasAuthenticated.current) {
+    return <>{children}</>;
+  }
+
   if (!user) {
+    wasAuthenticated.current = false;
     return <Navigate to="/login" replace />;
   }
 
@@ -36,6 +52,9 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (mustChangePassword) {
     return <Navigate to="/trocar-senha" replace />;
   }
+
+  // Mark as authenticated — from now on, never show spinner again
+  wasAuthenticated.current = true;
 
   return <>{children}</>;
 }
