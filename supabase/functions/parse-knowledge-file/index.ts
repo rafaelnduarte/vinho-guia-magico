@@ -150,7 +150,7 @@ Deno.serve(async (req) => {
         }
 
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 5 * 60 * 1000);
+        const timeout = setTimeout(() => controller.abort(), 90 * 1000); // 90s per attempt
 
         try {
           const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
