@@ -1,4 +1,4 @@
-import { useEffect, useState, createContext, useContext } from "react";
+import { useEffect, useState, useRef, createContext, useContext } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
 
@@ -41,9 +41,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [membershipActive, setMembershipActive] = useState(false);
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const [onboardingCompleted, setOnboardingCompleted] = useState(true);
+  const initialLoadDone = useRef(false);
 
   const fetchUserData = async (userId: string) => {
-    setMembershipLoading(true);
+    // Only show loading spinner on very first load — never after that
+    if (!initialLoadDone.current) {
+      setMembershipLoading(true);
+    }
     const [roleRes, membershipRes, profileRes] = await Promise.all([
       supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
       supabase.from("memberships").select("status").eq("user_id", userId).eq("status", "active").maybeSingle(),
@@ -55,6 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setMustChangePassword((profileRes.data as any)?.must_change_password ?? false);
     setOnboardingCompleted((profileRes.data as any)?.onboarding_completed ?? true);
     setMembershipLoading(false);
+    initialLoadDone.current = true;
   };
 
   const refreshProfile = async () => {
@@ -74,13 +79,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let isMounted = true;
     let currentUserId: string | null = null;
 
-    const applySession = async (nextSession: Session | null, isTokenRefresh = false) => {
+    const applySession = async (nextSession: Session | null, event?: string) => {
       if (!isMounted) return;
 
       const nextUser = nextSession?.user ?? null;
 
-      // If this is just a token refresh for the same user, skip re-fetching everything
-      if (isTokenRefresh && nextUser?.id && nextUser.id === currentUserId) {
+      // Token refresh or initial_session after we already loaded — just update session ref
+      if (nextUser?.id && nextUser.id === currentUserId && initialLoadDone.current) {
         setSession(nextSession);
         return;
       }
@@ -97,6 +102,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setMustChangePassword(false);
         setOnboardingCompleted(true);
         setMembershipLoading(false);
+        initialLoadDone.current = true;
       }
 
       if (isMounted) {
@@ -105,7 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     supabase.auth.getSession()
-      .then(({ data }) => applySession(data.session, false))
+      .then(({ data }) => applySession(data.session, "initial"))
       .catch(() => {
         if (!isMounted) return;
         setMembershipLoading(false);
@@ -114,9 +120,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, nextSession) => {
-        // TOKEN_REFRESHED is the main event that fires on tab switch — skip heavy work
-        const isTokenRefresh = event === "TOKEN_REFRESHED";
-        void applySession(nextSession, isTokenRefresh);
+        void applySession(nextSession, event);
       }
     );
 

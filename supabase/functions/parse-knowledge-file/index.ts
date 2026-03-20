@@ -139,33 +139,69 @@ Deno.serve(async (req) => {
         max_tokens: 32000,
       });
 
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 5 * 60 * 1000);
+      const MAX_RETRIES = 3;
+      let lastError = "";
 
-      try {
-        const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${lovableApiKey}`,
-            "Content-Type": "application/json",
-          },
-          signal: controller.signal,
-          body: bodyStr,
-        });
-
-        if (!aiResponse.ok) {
-          const errText = await aiResponse.text();
-          console.error("AI extraction error:", aiResponse.status, errText);
-          return new Response(
-            JSON.stringify({ error: `Falha ao extrair texto do PDF via IA: ${aiResponse.status}` }),
-            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
+      for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+        if (attempt > 0) {
+          const delay = Math.min(2000 * Math.pow(2, attempt - 1), 10000);
+          console.log(`Retry ${attempt}/${MAX_RETRIES} after ${delay}ms...`);
+          await new Promise((r) => setTimeout(r, delay));
         }
 
-        const aiData = await aiResponse.json();
-        extractedText = aiData.choices?.[0]?.message?.content ?? "";
-      } finally {
-        clearTimeout(timeout);
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5 * 60 * 1000);
+
+        try {
+          const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${lovableApiKey}`,
+              "Content-Type": "application/json",
+            },
+            signal: controller.signal,
+            body: bodyStr,
+          });
+
+          clearTimeout(timeout);
+
+          if (aiResponse.status >= 500) {
+            lastError = `${aiResponse.status} ${await aiResponse.text()}`;
+            console.error(`AI extraction error (attempt ${attempt + 1}):`, lastError);
+            continue; // retry on 5xx
+          }
+
+          if (!aiResponse.ok) {
+            const errText = await aiResponse.text();
+            console.error("AI extraction error:", aiResponse.status, errText);
+            return new Response(
+              JSON.stringify({ error: `Falha ao extrair texto do PDF via IA: ${aiResponse.status}` }),
+              { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
+          const aiData = await aiResponse.json();
+          extractedText = aiData.choices?.[0]?.message?.content ?? "";
+          break; // success
+        } catch (e) {
+          clearTimeout(timeout);
+          lastError = e instanceof Error ? e.message : String(e);
+          console.error(`AI fetch error (attempt ${attempt + 1}):`, lastError);
+          if (attempt === MAX_RETRIES - 1) {
+            const isTimeout = lastError.includes("abort");
+            return new Response(
+              JSON.stringify({ error: isTimeout ? "Timeout: o arquivo é muito grande para processar" : `Falha após ${MAX_RETRIES} tentativas: ${lastError}` }),
+              { status: isTimeout ? 504 : 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+        }
+      }
+
+      if (!extractedText && lastError) {
+        return new Response(
+          JSON.stringify({ error: `Falha após ${MAX_RETRIES} tentativas: ${lastError}` }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
     } else {
       return new Response(
