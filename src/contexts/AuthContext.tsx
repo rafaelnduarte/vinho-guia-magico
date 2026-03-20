@@ -72,13 +72,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let isMounted = true;
+    let currentUserId: string | null = null;
 
-    const applySession = async (nextSession: Session | null) => {
+    const applySession = async (nextSession: Session | null, isTokenRefresh = false) => {
       if (!isMounted) return;
 
-      setSession(nextSession);
       const nextUser = nextSession?.user ?? null;
+
+      // If this is just a token refresh for the same user, skip re-fetching everything
+      if (isTokenRefresh && nextUser?.id && nextUser.id === currentUserId) {
+        setSession(nextSession);
+        return;
+      }
+
+      setSession(nextSession);
       setUser(nextUser);
+      currentUserId = nextUser?.id ?? null;
 
       if (nextUser) {
         await fetchUserData(nextUser.id);
@@ -96,7 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     supabase.auth.getSession()
-      .then(({ data }) => applySession(data.session))
+      .then(({ data }) => applySession(data.session, false))
       .catch(() => {
         if (!isMounted) return;
         setMembershipLoading(false);
@@ -104,8 +113,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, nextSession) => {
-        void applySession(nextSession);
+      (event, nextSession) => {
+        // TOKEN_REFRESHED is the main event that fires on tab switch — skip heavy work
+        const isTokenRefresh = event === "TOKEN_REFRESHED";
+        void applySession(nextSession, isTokenRefresh);
       }
     );
 
