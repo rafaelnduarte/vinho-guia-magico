@@ -111,7 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     supabase.auth.getSession()
-      .then(({ data }) => applySession(data.session, false))
+      .then(({ data }) => applySession(data.session, "initial"))
       .catch(() => {
         if (!isMounted) return;
         setMembershipLoading(false);
