@@ -79,13 +79,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let isMounted = true;
     let currentUserId: string | null = null;
 
-    const applySession = async (nextSession: Session | null, isTokenRefresh = false) => {
+    const applySession = async (nextSession: Session | null, event?: string) => {
       if (!isMounted) return;
 
       const nextUser = nextSession?.user ?? null;
 
-      // If this is just a token refresh for the same user, skip re-fetching everything
-      if (isTokenRefresh && nextUser?.id && nextUser.id === currentUserId) {
+      // Token refresh or initial_session after we already loaded — just update session ref
+      if (nextUser?.id && nextUser.id === currentUserId && initialLoadDone.current) {
         setSession(nextSession);
         return;
       }
@@ -102,6 +102,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setMustChangePassword(false);
         setOnboardingCompleted(true);
         setMembershipLoading(false);
+        initialLoadDone.current = true;
       }
 
       if (isMounted) {
