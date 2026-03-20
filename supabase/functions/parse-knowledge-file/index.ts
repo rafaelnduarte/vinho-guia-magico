@@ -113,7 +113,7 @@ Deno.serve(async (req) => {
 
       // Build the request body as a string to control memory
       const bodyStr = JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-2.5-flash-lite",
         messages: [
           {
             role: "system",
@@ -136,7 +136,7 @@ Deno.serve(async (req) => {
             ],
           },
         ],
-        max_tokens: 32000,
+        max_completion_tokens: 32000,
       });
 
       const MAX_RETRIES = 3;
@@ -150,7 +150,7 @@ Deno.serve(async (req) => {
         }
 
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 5 * 60 * 1000);
+        const timeout = setTimeout(() => controller.abort(), 90 * 1000); // 90s per attempt
 
         try {
           const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
