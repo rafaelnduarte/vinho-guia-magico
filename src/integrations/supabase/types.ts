@@ -677,6 +677,42 @@ export type Database = {
         }
         Relationships: []
       }
+      sync_orphans: {
+        Row: {
+          action_taken_at: string | null
+          action_type: string | null
+          aula_id: string
+          curso_id: string | null
+          detected_at: string | null
+          id: string
+          panda_video_id: string
+          status: string | null
+          titulo: string
+        }
+        Insert: {
+          action_taken_at?: string | null
+          action_type?: string | null
+          aula_id: string
+          curso_id?: string | null
+          detected_at?: string | null
+          id?: string
+          panda_video_id: string
+          status?: string | null
+          titulo: string
+        }
+        Update: {
+          action_taken_at?: string | null
+          action_type?: string | null
+          aula_id?: string
+          curso_id?: string | null
+          detected_at?: string | null
+          id?: string
+          panda_video_id?: string
+          status?: string | null
+          titulo?: string
+        }
+        Relationships: []
+      }
       thomas_notes: {
         Row: {
           created_at: string
