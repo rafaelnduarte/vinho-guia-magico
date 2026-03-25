@@ -78,6 +78,8 @@ Deno.serve(async (req) => {
     const results = {
       folders_synced: 0,
       videos_synced: 0,
+      orphans_detected: 0,
+      orphans_unpublished: 0,
       errors: [] as string[],
     };
 
@@ -146,9 +148,14 @@ Deno.serve(async (req) => {
       const videosData = await videosRes.json();
       const videos = videosData.videos ?? [];
 
+      // Track Panda video IDs for orphan detection
+      const pandaVideoIdsInFolder = new Set<string>();
+
       for (const [index, video] of videos.entries()) {
-        // Fetch individual video details to discover available fields
+        pandaVideoIdsInFolder.add(video.id);
+
         let embedUrl: string | null = null;
+        let detailDescription: string | null = null;
 
         try {
           const detailRes = await fetch(`${PANDA_BASE}/videos/${video.id}`, {
@@ -157,10 +164,8 @@ Deno.serve(async (req) => {
           if (detailRes.ok) {
             const detail = await detailRes.json();
 
-            // Log the full response keys ONCE for diagnosis
             if (!loggedSampleResponse) {
               console.log(`[panda-sync] SAMPLE video detail keys: ${JSON.stringify(Object.keys(detail))}`);
-              // Log player-related fields specifically
               const playerFields = Object.entries(detail)
                 .filter(([k]) => /player|embed|url|link|iframe/i.test(k))
                 .reduce((acc, [k, v]) => ({ ...acc, [k]: v }), {});
@@ -168,8 +173,8 @@ Deno.serve(async (req) => {
               loggedSampleResponse = true;
             }
 
-            // Try all known possible field names from Panda API
             embedUrl = detail.embed_url || detail.player_url || detail.video_player || null;
+            detailDescription = detail.description || null;
           } else {
             console.warn(`[panda-sync] Detail fetch failed for ${video.id}: ${detailRes.status}`);
           }
@@ -177,17 +182,20 @@ Deno.serve(async (req) => {
           console.warn(`[panda-sync] Detail fetch exception for ${video.id}: ${(detailErr as Error).message}`);
         }
 
-        // Construct embed URL from video ID (this is the standard Panda format)
+        // Construct embed URL from video ID (standard Panda format)
         if (!embedUrl && video.id) {
           embedUrl = `https://player-vz-7b95acb0-d42.tv.pandavideo.com.br/embed/?v=${video.id}`;
         }
+
+        // Resolve description: prefer detail, fallback to list-level
+        const resolvedDescription = detailDescription || video.description || "";
 
         const { error: aulaError } = await supabase.from("aulas").upsert(
           {
             panda_video_id: video.id,
             curso_id: cursoId,
             titulo: video.title || "Sem título",
-            descricao: "",
+            descricao: resolvedDescription,
             duracao_segundos: Math.floor(video.length || 0),
             sort_order: index + 1,
             is_published: video.status === "CONVERTED",
@@ -205,9 +213,54 @@ Deno.serve(async (req) => {
 
         results.videos_synced++;
       }
+
+      // --- Orphan detection for this curso ---
+      const { data: dbAulas } = await supabase
+        .from("aulas")
+        .select("id, panda_video_id, titulo")
+        .eq("curso_id", cursoId)
+        .not("panda_video_id", "is", null);
+
+      if (dbAulas && dbAulas.length > 0) {
+        const orphans = dbAulas.filter(
+          (a) => a.panda_video_id && !pandaVideoIdsInFolder.has(a.panda_video_id)
+        );
+
+        if (orphans.length > 0) {
+          console.log(`[panda-sync] ⚠️ ${orphans.length} órfãs em "${folder.name}": ${orphans.map(o => o.titulo).join(", ")}`);
+          results.orphans_detected += orphans.length;
+
+          const orphanIds = orphans.map((o) => o.id);
+
+          // Auto-unpublish orphans
+          const { error: unpubErr } = await supabase
+            .from("aulas")
+            .update({ is_published: false, status: "orphaned" })
+            .in("id", orphanIds);
+
+          if (unpubErr) {
+            results.errors.push(`Orphan unpublish error (${folder.name}): ${unpubErr.message}`);
+          } else {
+            results.orphans_unpublished += orphanIds.length;
+          }
+
+          // Log to sync_orphans
+          await supabase.from("sync_orphans").insert(
+            orphans.map((o) => ({
+              aula_id: o.id,
+              panda_video_id: o.panda_video_id!,
+              titulo: o.titulo,
+              curso_id: cursoId,
+              status: "auto_despublished",
+              action_taken_at: new Date().toISOString(),
+              action_type: "auto_despublish",
+            }))
+          );
+        }
+      }
     }
 
-    console.log(`[panda-sync] Done: ${results.folders_synced} folders, ${results.videos_synced} videos, ${results.errors.length} errors`);
+    console.log(`[panda-sync] Done: ${results.folders_synced} folders, ${results.videos_synced} videos, ${results.orphans_detected} orphans detected, ${results.orphans_unpublished} orphans unpublished, ${results.errors.length} errors`);
 
     return new Response(
       JSON.stringify({
