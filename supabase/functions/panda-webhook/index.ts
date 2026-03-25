@@ -60,6 +60,7 @@ Deno.serve(async (req) => {
         await supabase.from("aulas").insert({
           curso_id: curso.id,
           titulo: video.title || video.name || "Sem título",
+          descricao: video.description || "",
           panda_video_id: video.id,
           duracao_segundos: Math.round(video.duration || 0),
           is_published: false,
@@ -132,10 +133,31 @@ Deno.serve(async (req) => {
     } else if (eventType === "video.deleted" && payload.video) {
       const video = payload.video;
       if (video.id) {
+        // Get aula info before updating
+        const { data: aulaData } = await supabase
+          .from("aulas")
+          .select("id, titulo, curso_id")
+          .eq("panda_video_id", video.id)
+          .maybeSingle();
+
+        // Unpublish and mark as orphaned
         await supabase
           .from("aulas")
-          .update({ is_published: false })
+          .update({ is_published: false, status: "orphaned" })
           .eq("panda_video_id", video.id);
+
+        // Log to sync_orphans
+        if (aulaData) {
+          await supabase.from("sync_orphans").insert({
+            aula_id: aulaData.id,
+            panda_video_id: video.id,
+            titulo: aulaData.titulo,
+            curso_id: aulaData.curso_id,
+            status: "auto_despublished",
+            action_taken_at: new Date().toISOString(),
+            action_type: "webhook_delete",
+          });
+        }
       }
     } else if (eventType === "folder.deleted" && payload.folder) {
       const folder = payload.folder;
