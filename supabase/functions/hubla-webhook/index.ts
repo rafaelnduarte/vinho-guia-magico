@@ -272,18 +272,32 @@ async function handleActivation(
     await logWebhook(supabase, eventId, "user_created", "success", { userId, email });
   }
 
-  const { data: existingMembership } = await supabase
+  // Check for ANY existing membership (hubla or manual) to handle Radar→Comunidade upgrades
+  const { data: allMemberships } = await supabase
     .from("memberships")
-    .select("id, status")
+    .select("id, status, source, membership_type")
     .eq("user_id", userId)
-    .eq("source", "hubla")
-    .maybeSingle();
+    .order("created_at", { ascending: false });
 
-  if (existingMembership) {
+  const existingHubla = allMemberships?.find((m: any) => m.source === "hubla");
+  const existingManual = allMemberships?.find((m: any) => m.source === "manual");
+
+  if (existingHubla) {
+    // Update existing hubla membership — always prioritize Comunidade
+    const finalType = membershipType === "comunidade" || existingHubla.membership_type === "comunidade"
+      ? "comunidade" : membershipType;
     await supabase
       .from("memberships")
-      .update({ status: "active", ended_at: null, external_id: externalId, membership_type: membershipType })
-      .eq("id", existingMembership.id);
+      .update({ status: "active", ended_at: null, external_id: externalId, membership_type: finalType })
+      .eq("id", existingHubla.id);
+  } else if (existingManual) {
+    // Upgrade manual membership — prioritize Comunidade
+    const finalType = membershipType === "comunidade" || existingManual.membership_type === "comunidade"
+      ? "comunidade" : membershipType;
+    await supabase
+      .from("memberships")
+      .update({ status: "active", ended_at: null, external_id: externalId, source: "hubla", membership_type: finalType })
+      .eq("id", existingManual.id);
   } else {
     await supabase.from("memberships").insert({
       user_id: userId,
