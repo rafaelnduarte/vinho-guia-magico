@@ -39,11 +39,21 @@ async function getCroppedImg(imageSrc: string, pixelCrop: Area): Promise<Blob> {
     size,
   );
 
+  // Try progressively lower quality to get smallest file without visible loss
+  for (const quality of [0.75, 0.6, 0.5]) {
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob((b) => resolve(b), "image/jpeg", quality);
+    });
+    if (blob && blob.size <= 150 * 1024) return blob; // under 150KB is great
+    if (quality === 0.5 && blob) return blob; // last attempt, return whatever we got
+  }
+
+  // Fallback
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {
       if (blob) resolve(blob);
       else reject(new Error("Canvas toBlob failed"));
-    }, "image/jpeg", 0.9);
+    }, "image/jpeg", 0.5);
   });
 }
 
