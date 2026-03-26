@@ -473,7 +473,7 @@ function WinesRanking({ rankings }: { rankings: WineRankingEntry[] }) {
           </thead>
           <tbody className="divide-y divide-border">
             {rankings.map((entry, i) => (
-              <tr key={entry.wine_id} className="hover:bg-muted/30 transition-colors">
+              <tr key={entry.wine_id} onClick={() => navigate(`/curadoria/${entry.wine_id}`)} className="hover:bg-muted/30 transition-colors cursor-pointer">
                 <td className="px-2 sm:px-4 py-3">
                   {i < 3 ? (
                     <Medal className={cn(
