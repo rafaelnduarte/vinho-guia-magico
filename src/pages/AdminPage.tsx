@@ -10,6 +10,7 @@ import AdminChat from "@/components/admin/AdminChat";
 import AdminBanners from "@/components/admin/AdminBanners";
 import AdminCursos from "@/components/admin/AdminCursos";
 import AdminTrilhas from "@/components/admin/AdminTrilhas";
+import AdminComments from "@/components/admin/AdminComments";
 
 export default function AdminPage() {
   return (
@@ -25,6 +26,7 @@ export default function AdminPage() {
             <TabsTrigger value="analytics" className="text-xs sm:text-sm px-3 py-2">Analytics</TabsTrigger>
             <TabsTrigger value="banners" className="text-xs sm:text-sm px-3 py-2">Banners</TabsTrigger>
             <TabsTrigger value="wines" className="text-xs sm:text-sm px-3 py-2">Vinhos</TabsTrigger>
+            <TabsTrigger value="comments" className="text-xs sm:text-sm px-3 py-2">Comentários</TabsTrigger>
             <TabsTrigger value="members" className="text-xs sm:text-sm px-3 py-2">Membros</TabsTrigger>
             <TabsTrigger value="partners" className="text-xs sm:text-sm px-3 py-2">Parceiros</TabsTrigger>
             <TabsTrigger value="seals" className="text-xs sm:text-sm px-3 py-2">Selos</TabsTrigger>
@@ -38,6 +40,7 @@ export default function AdminPage() {
         <TabsContent value="analytics"><AdminAnalytics /></TabsContent>
         <TabsContent value="banners"><AdminBanners /></TabsContent>
         <TabsContent value="wines"><AdminWines /></TabsContent>
+        <TabsContent value="comments"><AdminComments /></TabsContent>
         <TabsContent value="members"><AdminMembers /></TabsContent>
         <TabsContent value="partners"><AdminPartners /></TabsContent>
         <TabsContent value="seals"><AdminSeals /></TabsContent>
