@@ -408,8 +408,9 @@ function WinesRanking({ rankings }: { rankings: WineRankingEntry[] }) {
             return (
               <div
                 key={entry.wine_id}
+                onClick={() => navigate(`/curadoria/${entry.wine_id}`)}
                 className={cn(
-                  "flex flex-col items-center rounded-xl border border-border bg-card p-4 transition-all",
+                  "flex flex-col items-center rounded-xl border border-border bg-card p-4 transition-all cursor-pointer hover:ring-1 hover:ring-accent/50",
                   isFirst && "ring-2 ring-accent -mt-2 pb-6"
                 )}
               >
