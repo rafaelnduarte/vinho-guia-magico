@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Trophy, ThumbsUp, MessageSquare, Medal, Users, Wine, Target, GraduationCap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import MemberBadge from "@/components/MemberBadge";
@@ -68,6 +69,13 @@ export default function RankingPage() {
   const [section, setSection] = useState<Section>("membros");
   const { user } = useAuth();
 
+  // Member filter
+  const [memberTypeFilter, setMemberTypeFilter] = useState<string>("all");
+
+  // Wine filters
+  const [wineTypeFilter, setWineTypeFilter] = useState<string>("all");
+  const [wineCountryFilter, setWineCountryFilter] = useState<string>("all");
+
   const { data: rankings, isLoading: loadingMembers } = useQuery({
     queryKey: ["rankings", period],
     queryFn: async () => {
@@ -95,7 +103,34 @@ export default function RankingPage() {
     },
   });
 
-  const currentUserRank = rankings?.findIndex((r) => r.user_id === user?.id);
+  // Filtered members
+  const filteredRankings = useMemo(() => {
+    if (!rankings) return [];
+    if (memberTypeFilter === "all") return rankings;
+    return rankings.filter((r) => r.membership_type === memberTypeFilter);
+  }, [rankings, memberTypeFilter]);
+
+  // Wine filter options
+  const wineTypes = useMemo(
+    () => [...new Set((wineRankings ?? []).map((w) => w.wine_type).filter(Boolean))].sort() as string[],
+    [wineRankings]
+  );
+  const wineCountries = useMemo(
+    () => [...new Set((wineRankings ?? []).map((w) => w.wine_country).filter(Boolean))].sort() as string[],
+    [wineRankings]
+  );
+
+  // Filtered wines
+  const filteredWineRankings = useMemo(() => {
+    if (!wineRankings) return [];
+    return wineRankings.filter((w) => {
+      if (wineTypeFilter !== "all" && w.wine_type !== wineTypeFilter) return false;
+      if (wineCountryFilter !== "all" && w.wine_country !== wineCountryFilter) return false;
+      return true;
+    });
+  }, [wineRankings, wineTypeFilter, wineCountryFilter]);
+
+  const currentUserRank = filteredRankings?.findIndex((r) => r.user_id === user?.id);
   const isLoading = section === "membros" ? loadingMembers : section === "vinhos" ? loadingWines : loadingCourses;
 
   return (
@@ -160,14 +195,57 @@ export default function RankingPage() {
         </TabsList>
       </Tabs>
 
+      {/* Section-specific filters */}
+      {section === "membros" && (
+        <div className="flex gap-2">
+          <Select value={memberTypeFilter} onValueChange={setMemberTypeFilter}>
+            <SelectTrigger className="w-[160px]">
+              <SelectValue placeholder="Tipo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="comunidade">Comunidade</SelectItem>
+              <SelectItem value="radar">Radar</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {section === "vinhos" && (
+        <div className="flex flex-wrap gap-2">
+          <Select value={wineTypeFilter} onValueChange={setWineTypeFilter}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Tipo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os tipos</SelectItem>
+              {wineTypes.map((t) => (
+                <SelectItem key={t} value={t}>{t}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={wineCountryFilter} onValueChange={setWineCountryFilter}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="País" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os países</SelectItem>
+              {wineCountries.map((c) => (
+                <SelectItem key={c} value={c}>{c}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       {isLoading ? (
         <div className="flex justify-center py-16">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : section === "membros" ? (
-        <MembersRanking rankings={rankings ?? []} userId={user?.id} currentUserRank={currentUserRank} />
+        <MembersRanking rankings={filteredRankings} userId={user?.id} currentUserRank={currentUserRank} />
       ) : section === "vinhos" ? (
-        <WinesRanking rankings={wineRankings ?? []} />
+        <WinesRanking rankings={filteredWineRankings} />
       ) : (
         <CoursesRanking rankings={courseRankings ?? []} />
       )}
