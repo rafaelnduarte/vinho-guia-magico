@@ -175,10 +175,24 @@ export default function CuradoriaPage() {
           return a.name.localeCompare(b.name);
         case "name_desc":
           return b.name.localeCompare(a.name);
-        case "price_asc":
-          return parsePrice(a.price_range) - parsePrice(b.price_range);
-        case "price_desc":
-          return parsePrice(b.price_range) - parsePrice(a.price_range);
+        case "price_asc": {
+          const pa = parsePrice(a.price_range);
+          const pb = parsePrice(b.price_range);
+          // No price → end of list (highest)
+          if (pa === null && pb === null) return 0;
+          if (pa === null) return 1;
+          if (pb === null) return -1;
+          return pa - pb;
+        }
+        case "price_desc": {
+          const pa = parsePrice(a.price_range);
+          const pb = parsePrice(b.price_range);
+          // No price → beginning of list (shown first)
+          if (pa === null && pb === null) return 0;
+          if (pa === null) return -1;
+          if (pb === null) return 1;
+          return pb - pa;
+        }
         default: // newest
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       }
@@ -404,8 +418,18 @@ export default function CuradoriaPage() {
   );
 }
 
-function parsePrice(price: string | null): number {
-  if (!price) return 0;
-  const cleaned = price.replace(/[^\d,]/g, "").replace(",", ".");
-  return parseFloat(cleaned) || 0;
+function parsePrice(price: string | null): number | null {
+  if (!price || !price.trim()) return null;
+  // Normalize: if has comma as decimal separator, replace it
+  // First remove thousands separators, then handle decimal
+  let cleaned = price.replace(/[^\d.,]/g, "");
+  // If format uses comma as decimal (e.g. "1376,89" or "187,56")
+  if (cleaned.includes(",") && !cleaned.includes(".")) {
+    cleaned = cleaned.replace(",", ".");
+  } else if (cleaned.includes(",") && cleaned.includes(".")) {
+    // e.g. "1.376,89" → remove dot (thousands), replace comma (decimal)
+    cleaned = cleaned.replace(/\./g, "").replace(",", ".");
+  }
+  const val = parseFloat(cleaned);
+  return isNaN(val) || val === 0 ? null : val;
 }
