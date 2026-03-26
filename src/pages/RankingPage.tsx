@@ -185,6 +185,23 @@ function MembersRanking({
   userId?: string;
   currentUserRank?: number;
 }) {
+  const [selectedMember, setSelectedMember] = useState<(RankingEntry & { rank: number }) | null>(null);
+
+  // Fetch bio for selected member
+  const { data: memberProfile } = useQuery({
+    queryKey: ["member-profile", selectedMember?.user_id],
+    queryFn: async () => {
+      if (!selectedMember) return null;
+      const { data } = await supabase
+        .from("profiles")
+        .select("bio")
+        .eq("user_id", selectedMember.user_id)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!selectedMember,
+  });
+
   if (!rankings.length) {
     return (
       <div className="text-center py-16 text-muted-foreground">
@@ -194,19 +211,59 @@ function MembersRanking({
     );
   }
 
+  const openMember = (entry: RankingEntry, index: number) => {
+    setSelectedMember({ ...entry, rank: index + 1 });
+  };
+
   return (
     <div className="space-y-2">
+      {/* Member profile dialog */}
+      <Dialog open={!!selectedMember} onOpenChange={(open) => !open && setSelectedMember(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-center">Perfil do Membro</DialogTitle>
+          </DialogHeader>
+          {selectedMember && (
+            <div className="flex flex-col items-center gap-3 py-2">
+              <Avatar className="h-20 w-20">
+                <AvatarImage src={selectedMember.avatar_url || undefined} />
+                <AvatarFallback className="bg-accent/20 border border-accent/40 text-lg">
+                  <StatusFallbackIcon membershipType={selectedMember.membership_type} />
+                </AvatarFallback>
+              </Avatar>
+              <div className="text-center space-y-1">
+                <p className="text-lg font-semibold text-foreground">{selectedMember.full_name || "Anônimo"}</p>
+                <MemberBadge type={getBadgeType(selectedMember.role, selectedMember.membership_type)} />
+              </div>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Medal className="h-4 w-4 text-accent" />
+                <span>#{selectedMember.rank} no ranking</span>
+                <span>·</span>
+                <span className="font-display font-bold text-foreground">{selectedMember.total_points} pts</span>
+              </div>
+              {memberProfile?.bio ? (
+                <p className="text-sm text-muted-foreground text-center mt-2 px-2">{memberProfile.bio}</p>
+              ) : (
+                <p className="text-xs text-muted-foreground/60 italic mt-2">Sem bio cadastrada</p>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Top 3 podium */}
       {rankings.length >= 3 && (
         <div className="grid grid-cols-3 gap-3 mb-6">
           {[rankings[1], rankings[0], rankings[2]].map((entry, i) => {
             const position = [2, 1, 3][i];
+            const originalIndex = [1, 0, 2][i];
             const isFirst = position === 1;
             return (
               <div
                 key={entry.user_id}
+                onClick={() => openMember(entry, originalIndex)}
                 className={cn(
-                  "flex flex-col items-center rounded-xl border border-border bg-card p-4 transition-all",
+                  "flex flex-col items-center rounded-xl border border-border bg-card p-4 transition-all cursor-pointer hover:ring-1 hover:ring-accent/50",
                   isFirst && "ring-2 ring-accent -mt-2 pb-6",
                   entry.user_id === userId && "bg-primary/5"
                 )}
@@ -267,8 +324,9 @@ function MembersRanking({
               return (
                 <tr
                   key={entry.user_id}
+                  onClick={() => openMember(entry, i)}
                   className={cn(
-                    "hover:bg-muted/30 transition-colors",
+                    "hover:bg-muted/30 transition-colors cursor-pointer",
                     isMe && "bg-primary/5 font-semibold"
                   )}
                 >
