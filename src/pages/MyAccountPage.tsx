@@ -60,8 +60,8 @@ export default function MyAccountPage() {
   const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      toast({ title: "Arquivo muito grande", description: "Máximo de 5MB.", variant: "destructive" });
+    if (file.size > 25 * 1024 * 1024) {
+      toast({ title: "Arquivo muito grande", description: "Máximo de 25MB.", variant: "destructive" });
       return;
     }
     const reader = new FileReader();
@@ -187,7 +187,7 @@ export default function MyAccountPage() {
               />
             </div>
             <div className="text-sm text-muted-foreground">
-              Clique para trocar a foto.<br />Máx. 5MB.
+              Clique para trocar a foto.<br />Máx. 25MB.
             </div>
 
             <AvatarCropDialog
