@@ -387,6 +387,7 @@ function MembersRanking({
 
 // ─── Wines Ranking ───
 function WinesRanking({ rankings }: { rankings: WineRankingEntry[] }) {
+  const navigate = useNavigate();
   if (!rankings.length) {
     return (
       <div className="text-center py-16 text-muted-foreground">
