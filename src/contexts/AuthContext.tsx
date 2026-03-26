@@ -107,8 +107,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchUserData = useCallback(
     async (userId: string, silent: boolean) => {
-      // Only show loading spinner on very first load when there's no cache
-      if (!silent && !initialLoadDone.current) {
+      // Show loading spinner on non-silent fetches (e.g. fresh login)
+      if (!silent) {
         setMembershipLoading(true);
       }
 
