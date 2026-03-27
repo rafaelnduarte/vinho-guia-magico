@@ -65,15 +65,28 @@ Deno.serve(async (req) => {
         const parsed = typeof result === "string" ? JSON.parse(result) : result;
         const rows = parsed?.data ?? [];
         if (rows.length > 0) {
-          const userIds = rows.map((r: any) => r.user_id).filter(Boolean);
-          // Fetch emails in batches via admin API
+          const userIdSet = new Set(rows.map((r: any) => r.user_id).filter(Boolean));
           const emailMap = new Map<string, string>();
-          for (const uid of userIds) {
-            try {
-              const { data: { user: authU } } = await adminClient.auth.admin.getUserById(uid);
-              if (authU?.email) emailMap.set(uid, authU.email);
-            } catch (_) { /* skip */ }
+          
+          // Batch-fetch users via listUsers (1000 per page)
+          let fetchPage = 1;
+          const perPage = 1000;
+          while (emailMap.size < userIdSet.size) {
+            const { data: { users: batch }, error: listErr } = await adminClient.auth.admin.listUsers({
+              page: fetchPage,
+              perPage,
+            });
+            if (listErr || !batch || batch.length === 0) break;
+            for (const u of batch) {
+              if (userIdSet.has(u.id) && u.email) {
+                emailMap.set(u.id, u.email);
+              }
+            }
+            if (batch.length < perPage) break;
+            fetchPage++;
+            if (fetchPage > 20) break; // safety cap
           }
+
           for (const row of rows) {
             row.email = emailMap.get(row.user_id) || "";
           }
