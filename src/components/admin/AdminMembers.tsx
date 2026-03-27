@@ -153,16 +153,40 @@ export default function AdminMembers() {
   };
 
   const handleExport = async () => {
-    // Export all matching members (not just current page)
+    // Export all matching members (not just current page) — longer timeout for large datasets
     try {
-      const allData = await callAdminMembers("list_members", {
-        page: 1,
-        pageSize: 10000,
-        search: searchQuery,
-        status: statusFilter === "all" ? "" : statusFilter,
-        membership_type: typeFilter === "all" ? "" : typeFilter,
-        role: roleFilter === "all" ? "" : roleFilter,
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120_000); // 120s timeout
+
+      const resp = await fetch(`${supabaseUrl}/functions/v1/admin-members`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+          "apikey": anonKey,
+        },
+        body: JSON.stringify({
+          action: "list_members",
+          page: 1,
+          pageSize: 10000,
+          search: searchQuery,
+          status: statusFilter === "all" ? "" : statusFilter,
+          membership_type: typeFilter === "all" ? "" : typeFilter,
+          role: roleFilter === "all" ? "" : roleFilter,
+        }),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
+
+      if (!resp.ok) throw new Error(`Erro ${resp.status}`);
+      const allData = await resp.json();
+      if (allData?.error) throw new Error(allData.error);
+
       const rows = (allData?.data ?? []).map((m: any) => [
         m.full_name || "",
         m.email || "",
@@ -175,7 +199,7 @@ export default function AdminMembers() {
       ]);
       exportToCsv(`membros-${new Date().toISOString().slice(0, 10)}.csv`, ["Nome", "Email", "Status", "Tipo", "GDB", "Role", "Origem", "Membro desde"], rows);
     } catch (e: any) {
-      toast({ title: "Erro ao exportar", description: e.message, variant: "destructive" });
+      toast({ title: "Erro ao exportar", description: e.name === "AbortError" ? "Timeout — tente com menos filtros" : e.message, variant: "destructive" });
     }
   };
 
