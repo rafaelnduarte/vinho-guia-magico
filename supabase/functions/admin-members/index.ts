@@ -61,7 +61,25 @@ Deno.serve(async (req) => {
         });
         if (rpcErr) throw rpcErr;
 
-        return new Response(JSON.stringify(result), {
+        // Enrich with emails from auth.users for export
+        const parsed = typeof result === "string" ? JSON.parse(result) : result;
+        const rows = parsed?.data ?? [];
+        if (rows.length > 0) {
+          const userIds = rows.map((r: any) => r.user_id).filter(Boolean);
+          // Fetch emails in batches via admin API
+          const emailMap = new Map<string, string>();
+          for (const uid of userIds) {
+            try {
+              const { data: { user: authU } } = await adminClient.auth.admin.getUserById(uid);
+              if (authU?.email) emailMap.set(uid, authU.email);
+            } catch (_) { /* skip */ }
+          }
+          for (const row of rows) {
+            row.email = emailMap.get(row.user_id) || "";
+          }
+        }
+
+        return new Response(JSON.stringify(parsed), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -157,10 +175,10 @@ Deno.serve(async (req) => {
             let userId: string | undefined;
 
             // Try to create user first — fastest path for new users
-            const userPassword = row.password || email;
+            // New users ALWAYS get email as password
             const { data: newUser, error: createErr } = await adminClient.auth.admin.createUser({
               email,
-              password: userPassword,
+              password: email,
               email_confirm: true,
               user_metadata: { full_name: row.full_name },
             });
@@ -169,11 +187,11 @@ Deno.serve(async (req) => {
               userId = newUser.user.id;
               console.log(`[bulk_create] Created new user: ${email}`);
             } else if (createErr?.message?.includes("already been registered")) {
-              // Look up existing user via DB function (fast, indexed)
+              // Existing user — do NOT change their password
               const { data: existingId } = await adminClient.rpc("get_user_id_by_email", { _email: email });
               if (existingId) {
                 userId = existingId;
-                console.log(`[bulk_create] Existing user found: ${email}`);
+                console.log(`[bulk_create] Existing user found (password unchanged): ${email}`);
               } else {
                 throw new Error("User exists but could not resolve ID");
               }
@@ -311,8 +329,8 @@ async function createSingleMember(adminClient: any, params: any) {
 
   let userId: string;
 
-  // Try to create the user first (fastest path for new users)
-  const userPassword = password || email.toLowerCase();
+  // New users ALWAYS get email as password
+  const userPassword = email.toLowerCase();
   const { data: newUser, error: createErr } = await adminClient.auth.admin.createUser({
     email,
     password: userPassword,
@@ -324,11 +342,11 @@ async function createSingleMember(adminClient: any, params: any) {
     userId = newUser.user.id;
     console.log(`[create_member] Created new user: ${email}`);
   } else if (createErr?.message?.includes("already been registered")) {
-    // Look up existing user via DB function (fast, indexed)
+    // Existing user — do NOT change their password
     const { data: existingId } = await adminClient.rpc("get_user_id_by_email", { _email: email });
     if (existingId) {
       userId = existingId;
-      console.log(`[create_member] Existing user found: ${email}`);
+      console.log(`[create_member] Existing user found (password unchanged): ${email}`);
     } else {
       throw new Error("Usuário já existe mas não foi possível resolver o ID");
     }
