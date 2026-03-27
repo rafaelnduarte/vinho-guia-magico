@@ -165,7 +165,7 @@ export default function AdminMembers() {
       });
       const rows = (allData?.data ?? []).map((m: any) => [
         m.full_name || "",
-        "", // email not available from DB function
+        m.email || "",
         m.status === "active" ? "Ativo" : "Inativo",
         m.membership_type || "comunidade",
         m.gdb ? "Tem acesso" : "Sem acesso",
