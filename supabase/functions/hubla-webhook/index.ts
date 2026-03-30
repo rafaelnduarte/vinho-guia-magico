@@ -283,20 +283,17 @@ async function handleActivation(
   const existingManual = allMemberships?.find((m: any) => m.source === "manual");
 
   if (existingHubla) {
-    // Update existing hubla membership — always prioritize Comunidade
-    const finalType = membershipType === "comunidade" || existingHubla.membership_type === "comunidade"
-      ? "comunidade" : membershipType;
+    // Update existing hubla membership — use the product type from the webhook
+    // The membership_type must reflect the actual product purchased
     await supabase
       .from("memberships")
-      .update({ status: "active", ended_at: null, external_id: externalId, membership_type: finalType })
+      .update({ status: "active", ended_at: null, external_id: externalId, membership_type: membershipType })
       .eq("id", existingHubla.id);
   } else if (existingManual) {
-    // Upgrade manual membership — prioritize Comunidade
-    const finalType = membershipType === "comunidade" || existingManual.membership_type === "comunidade"
-      ? "comunidade" : membershipType;
+    // Upgrade manual membership — use the product type from the webhook
     await supabase
       .from("memberships")
-      .update({ status: "active", ended_at: null, external_id: externalId, source: "hubla", membership_type: finalType })
+      .update({ status: "active", ended_at: null, external_id: externalId, source: "hubla", membership_type: membershipType })
       .eq("id", existingManual.id);
   } else {
     await supabase.from("memberships").insert({
