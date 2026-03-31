@@ -10,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Loader2, Upload, X, Image } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, Upload, X, Image, Download } from "lucide-react";
+import { exportToCsv } from "@/lib/exportCsv";
 import type { Tables } from "@/integrations/supabase/types";
 
 type PartnerRow = Tables<"partners">;
