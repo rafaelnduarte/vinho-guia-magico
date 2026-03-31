@@ -435,11 +435,15 @@ export default function AdminWines() {
   });
 
   const handleExportWines = () => {
-    const headers = ["Nome", "Produtor", "Safra", "Uva", "Tipo", "País", "Região", "Importadora", "Preço", "Status"];
+    const headers = ["Nome", "Produtor", "Safra", "Uva", "Tipo", "País", "Região", "Importadora", "Preço", "Status", "Likes", "Dislikes", "Comentários", "Selos"];
     const rows = filteredWines.map((w) => [
       w.name, w.producer || "", w.vintage?.toString() || "", w.grape || "",
       w.type || "", w.country || "", w.region || "", w.importer || "",
       w.price_range || "", (w as any).status || "",
+      String(likesMap.get(w.id) || 0),
+      String(dislikesMap.get(w.id) || 0),
+      String(commentsMap.get(w.id) || 0),
+      sealNamesForWine(w.id),
     ]);
     exportToCsv(`vinhos-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
   };
