@@ -6,7 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Plus, Trash2, ArrowUp, ArrowDown, ExternalLink } from "lucide-react";
+import { Plus, Trash2, ArrowUp, ArrowDown, ExternalLink, Download } from "lucide-react";
+import { exportToCsv } from "@/lib/exportCsv";
 
 interface Banner {
   id: string;
