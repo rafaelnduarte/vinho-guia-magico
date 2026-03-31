@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Loader2, MessageSquare, Trash2, ChevronLeft, ChevronRight, Wine, User } from "lucide-react";
+import { Search, Loader2, MessageSquare, Trash2, ChevronLeft, ChevronRight, Wine, User, Download } from "lucide-react";
+import { exportToCsv } from "@/lib/exportCsv";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
