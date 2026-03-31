@@ -535,6 +535,17 @@ export default function AdminWines() {
                     <td className="px-4 py-3 hidden md:table-cell text-muted-foreground">{w.type}</td>
                     <td className="px-4 py-3 hidden md:table-cell text-muted-foreground">{w.country}</td>
                     <td className="px-4 py-3 hidden lg:table-cell text-muted-foreground">{w.price_range}</td>
+                    <td className="px-4 py-3 hidden lg:table-cell text-center text-muted-foreground">{likesMap.get(w.id) || 0}</td>
+                    <td className="px-4 py-3 hidden lg:table-cell text-center text-muted-foreground">{dislikesMap.get(w.id) || 0}</td>
+                    <td className="px-4 py-3 hidden lg:table-cell text-center text-muted-foreground">{commentsMap.get(w.id) || 0}</td>
+                    <td className="px-4 py-3 hidden xl:table-cell">
+                      <div className="flex flex-wrap gap-1">
+                        {sealsForWine(w.id).map((sid) => {
+                          const seal = seals?.find((s) => s.id === sid);
+                          return seal ? <Badge key={sid} variant="outline" className="text-xs">{seal.name}</Badge> : null;
+                        })}
+                      </div>
+                    </td>
                     <td className="px-4 py-3">
                       <Badge variant={
                         (w as any).status === "curadoria" ? "default" :
