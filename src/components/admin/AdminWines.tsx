@@ -500,12 +500,16 @@ export default function AdminWines() {
         <div className="rounded-lg border border-border overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-muted/50 text-left">
+                <thead className="bg-muted/50 text-left">
                 <tr>
                   <th className="px-4 py-3 font-medium">Vinho</th>
                   <th className="px-4 py-3 font-medium hidden md:table-cell">Tipo</th>
                   <th className="px-4 py-3 font-medium hidden md:table-cell">País</th>
                   <th className="px-4 py-3 font-medium hidden lg:table-cell">Preço</th>
+                  <th className="px-4 py-3 font-medium hidden lg:table-cell text-center">👍</th>
+                  <th className="px-4 py-3 font-medium hidden lg:table-cell text-center">👎</th>
+                  <th className="px-4 py-3 font-medium hidden lg:table-cell text-center">💬</th>
+                  <th className="px-4 py-3 font-medium hidden xl:table-cell">Selos</th>
                   <th className="px-4 py-3 font-medium">Status</th>
                   <th className="px-4 py-3 font-medium text-right">Ações</th>
                 </tr>
