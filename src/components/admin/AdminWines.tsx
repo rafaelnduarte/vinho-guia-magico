@@ -571,7 +571,7 @@ export default function AdminWines() {
                   </tr>
                 ))}
                 {filteredWines.length === 0 && (
-                  <tr><td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">Nenhum vinho encontrado.</td></tr>
+                  <tr><td colSpan={10} className="px-4 py-12 text-center text-muted-foreground">Nenhum vinho encontrado.</td></tr>
                 )}
               </tbody>
             </table>
