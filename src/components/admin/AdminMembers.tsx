@@ -135,7 +135,7 @@ export default function AdminMembers() {
       external_id: row.external_id || null,
     }));
 
-    const BATCH_SIZE = 10;
+    const BATCH_SIZE = 5;
     let totalSuccess = 0;
     let totalSkipped = 0;
     const allErrors: CsvImportResult["errors"] = [];
