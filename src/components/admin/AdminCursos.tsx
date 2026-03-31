@@ -1,7 +1,8 @@
 import { useState, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { FolderOpen, Video, CheckCircle2, Clock, Download, ArrowLeft, RefreshCw, XCircle, Loader2, Trash2, Camera } from "lucide-react";
+import { FolderOpen, Video, CheckCircle2, Clock, Download, ArrowLeft, RefreshCw, XCircle, Loader2, Trash2, Camera, FileDown } from "lucide-react";
+import { exportToCsv } from "@/lib/exportCsv";
 import { toast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -315,10 +316,21 @@ export default function AdminCursos() {
         <h2 className="text-xl font-bold text-foreground">
           CURSOS {cursoList.length > 0 && `(${cursoList.length})`}
         </h2>
-        <Button variant="outline" size="sm" onClick={() => handlePandaSync()} disabled={syncing}>
-          <Download className="h-4 w-4 mr-1" />
-          {syncing ? "Sincronizando..." : "Sincronizar Panda"}
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={() => {
+            if (!cursoList.length) return;
+            exportToCsv(`cursos-${new Date().toISOString().slice(0, 10)}.csv`,
+              ["Título", "Descrição", "Publicado", "Nº Aulas", "Panda Folder ID"],
+              cursoList.map(c => [c.titulo, c.descricao || "", c.is_published ? "Sim" : "Não", String(c.aulas_count || 0), c.panda_folder_id || ""])
+            );
+          }}>
+            <FileDown className="h-3 w-3" /> Exportar CSV
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => handlePandaSync()} disabled={syncing}>
+            <Download className="h-4 w-4 mr-1" />
+            {syncing ? "Sincronizando..." : "Sincronizar Panda"}
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (

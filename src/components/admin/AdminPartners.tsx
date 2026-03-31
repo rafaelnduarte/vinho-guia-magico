@@ -10,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Loader2, Upload, X, Image } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, Upload, X, Image, Download } from "lucide-react";
+import { exportToCsv } from "@/lib/exportCsv";
 import type { Tables } from "@/integrations/supabase/types";
 
 type PartnerRow = Tables<"partners">;
@@ -171,11 +172,22 @@ export default function AdminPartners() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-lg font-semibold text-foreground">Parceiros ({partners?.length ?? 0})</h2>
-        <Button onClick={openNew} className="gap-2">
-          <Plus className="h-4 w-4" /> Novo Parceiro
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={() => {
+            if (!partners?.length) return;
+            exportToCsv(`parceiros-${new Date().toISOString().slice(0, 10)}.csv`,
+              ["Nome", "Categoria", "Cupom", "Desconto", "Condições", "Website", "Ativo"],
+              partners.map(p => [p.name, CATEGORY_OPTIONS.find(c => c.value === p.category)?.label ?? p.category, p.coupon_code || "", p.discount || "", p.conditions || "", p.website_url || "", p.is_active ? "Sim" : "Não"])
+            );
+          }}>
+            <Download className="h-3 w-3" /> Exportar CSV
+          </Button>
+          <Button onClick={openNew} className="gap-2">
+            <Plus className="h-4 w-4" /> Novo Parceiro
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (

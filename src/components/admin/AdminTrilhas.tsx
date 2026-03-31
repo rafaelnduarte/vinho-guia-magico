@@ -11,7 +11,9 @@ import {
   ChevronRight,
   ArrowLeft,
   Loader2,
+  Download,
 } from "lucide-react";
+import { exportToCsv } from "@/lib/exportCsv";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -260,13 +262,24 @@ export default function AdminTrilhas() {
   /* ─── render ─── */
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-xl font-bold text-foreground">
           TRILHAS {trilhas && trilhas.length > 0 && `(${trilhas.length})`}
         </h2>
-        <Button size="sm" onClick={() => setCreating(true)}>
-          <Plus className="h-4 w-4 mr-1" /> Nova Trilha
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={() => {
+            if (!trilhas?.length) return;
+            exportToCsv(`trilhas-${new Date().toISOString().slice(0, 10)}.csv`,
+              ["Título", "Descrição", "Publicada", "Ordem"],
+              trilhas.map(t => [t.titulo, t.descricao || "", t.is_published ? "Sim" : "Não", String(t.sort_order)])
+            );
+          }}>
+            <Download className="h-3 w-3" /> Exportar CSV
+          </Button>
+          <Button size="sm" onClick={() => setCreating(true)}>
+            <Plus className="h-4 w-4 mr-1" /> Nova Trilha
+          </Button>
+        </div>
       </div>
 
       {/* list */}

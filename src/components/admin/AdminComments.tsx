@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Loader2, MessageSquare, Trash2, ChevronLeft, ChevronRight, Wine, User } from "lucide-react";
+import { Search, Loader2, MessageSquare, Trash2, ChevronLeft, ChevronRight, Wine, User, Download } from "lucide-react";
+import { exportToCsv } from "@/lib/exportCsv";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -113,9 +114,20 @@ export default function AdminComments() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <MessageSquare className="h-5 w-5 text-primary" />
-        <h2 className="text-lg font-semibold text-foreground">Comentários ({total})</h2>
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-3">
+          <MessageSquare className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-semibold text-foreground">Comentários ({total})</h2>
+        </div>
+        <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={() => {
+          if (!comments.length) return;
+          exportToCsv(`comentarios-${new Date().toISOString().slice(0, 10)}.csv`,
+            ["Membro", "Vinho", "Comentário", "Data"],
+            comments.map(c => [c.user_name || "Anônimo", c.wine_name || "", c.content, format(new Date(c.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })])
+          );
+        }}>
+          <Download className="h-3 w-3" /> Exportar CSV
+        </Button>
       </div>
 
       {/* Filters */}
