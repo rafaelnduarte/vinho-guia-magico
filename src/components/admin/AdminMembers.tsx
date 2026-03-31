@@ -27,12 +27,30 @@ const memberColumns: CsvColumn[] = [
 ];
 
 async function callAdminMembers(action: string, params: Record<string, any> = {}) {
-  const resp = await supabase.functions.invoke("admin-members", {
-    body: { action, ...params },
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 120_000);
+
+  const resp = await fetch(`${supabaseUrl}/functions/v1/admin-members`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`,
+      "apikey": anonKey,
+    },
+    body: JSON.stringify({ action, ...params }),
+    signal: controller.signal,
   });
-  if (resp.error) throw new Error(resp.error.message);
-  if (resp.data?.error) throw new Error(resp.data.error);
-  return resp.data;
+  clearTimeout(timeoutId);
+
+  const data = await resp.json();
+  if (!resp.ok) throw new Error(data?.error || `Erro ${resp.status}`);
+  if (data?.error) throw new Error(data.error);
+  return data;
 }
 
 export default function AdminMembers() {
@@ -117,7 +135,7 @@ export default function AdminMembers() {
       external_id: row.external_id || null,
     }));
 
-    const BATCH_SIZE = 10;
+    const BATCH_SIZE = 5;
     let totalSuccess = 0;
     let totalSkipped = 0;
     const allErrors: CsvImportResult["errors"] = [];
