@@ -286,6 +286,39 @@ export default function AdminWines() {
     },
   });
 
+  const { data: wineVotes } = useQuery({
+    queryKey: ["admin-wine-votes"],
+    queryFn: async () => {
+      const { data } = await supabase.from("wine_votes").select("wine_id, vote");
+      return data ?? [];
+    },
+  });
+
+  const { data: wineCommentCounts } = useQuery({
+    queryKey: ["admin-wine-comment-counts"],
+    queryFn: async () => {
+      const { data } = await supabase.from("wine_comments").select("wine_id");
+      return data ?? [];
+    },
+  });
+
+  const likesMap = new Map<string, number>();
+  const dislikesMap = new Map<string, number>();
+  (wineVotes ?? []).forEach((v) => {
+    if (v.vote === "recommend") likesMap.set(v.wine_id, (likesMap.get(v.wine_id) || 0) + 1);
+    else if (v.vote === "not_recommend") dislikesMap.set(v.wine_id, (dislikesMap.get(v.wine_id) || 0) + 1);
+  });
+
+  const commentsMap = new Map<string, number>();
+  (wineCommentCounts ?? []).forEach((c) => {
+    commentsMap.set(c.wine_id, (commentsMap.get(c.wine_id) || 0) + 1);
+  });
+
+  const sealNamesForWine = (wineId: string) => {
+    const sealIds = sealsForWine(wineId);
+    return sealIds.map((sid) => seals?.find((s) => s.id === sid)?.name).filter(Boolean).join(", ");
+  };
+
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!form.name.trim()) throw new Error("Nome é obrigatório");
