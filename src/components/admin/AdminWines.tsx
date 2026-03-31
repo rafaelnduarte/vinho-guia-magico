@@ -286,6 +286,39 @@ export default function AdminWines() {
     },
   });
 
+  const { data: wineVotes } = useQuery({
+    queryKey: ["admin-wine-votes"],
+    queryFn: async () => {
+      const { data } = await supabase.from("wine_votes").select("wine_id, vote");
+      return data ?? [];
+    },
+  });
+
+  const { data: wineCommentCounts } = useQuery({
+    queryKey: ["admin-wine-comment-counts"],
+    queryFn: async () => {
+      const { data } = await supabase.from("wine_comments").select("wine_id");
+      return data ?? [];
+    },
+  });
+
+  const likesMap = new Map<string, number>();
+  const dislikesMap = new Map<string, number>();
+  (wineVotes ?? []).forEach((v) => {
+    if (v.vote === "recommend") likesMap.set(v.wine_id, (likesMap.get(v.wine_id) || 0) + 1);
+    else if (v.vote === "not_recommend") dislikesMap.set(v.wine_id, (dislikesMap.get(v.wine_id) || 0) + 1);
+  });
+
+  const commentsMap = new Map<string, number>();
+  (wineCommentCounts ?? []).forEach((c) => {
+    commentsMap.set(c.wine_id, (commentsMap.get(c.wine_id) || 0) + 1);
+  });
+
+  const sealNamesForWine = (wineId: string) => {
+    const sealIds = sealsForWine(wineId);
+    return sealIds.map((sid) => seals?.find((s) => s.id === sid)?.name).filter(Boolean).join(", ");
+  };
+
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!form.name.trim()) throw new Error("Nome é obrigatório");
@@ -402,11 +435,15 @@ export default function AdminWines() {
   });
 
   const handleExportWines = () => {
-    const headers = ["Nome", "Produtor", "Safra", "Uva", "Tipo", "País", "Região", "Importadora", "Preço", "Status"];
+    const headers = ["Nome", "Produtor", "Safra", "Uva", "Tipo", "País", "Região", "Importadora", "Preço", "Status", "Likes", "Dislikes", "Comentários", "Selos"];
     const rows = filteredWines.map((w) => [
       w.name, w.producer || "", w.vintage?.toString() || "", w.grape || "",
       w.type || "", w.country || "", w.region || "", w.importer || "",
       w.price_range || "", (w as any).status || "",
+      String(likesMap.get(w.id) || 0),
+      String(dislikesMap.get(w.id) || 0),
+      String(commentsMap.get(w.id) || 0),
+      sealNamesForWine(w.id),
     ]);
     exportToCsv(`vinhos-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
   };
@@ -463,12 +500,16 @@ export default function AdminWines() {
         <div className="rounded-lg border border-border overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-muted/50 text-left">
+                <thead className="bg-muted/50 text-left">
                 <tr>
                   <th className="px-4 py-3 font-medium">Vinho</th>
                   <th className="px-4 py-3 font-medium hidden md:table-cell">Tipo</th>
                   <th className="px-4 py-3 font-medium hidden md:table-cell">País</th>
                   <th className="px-4 py-3 font-medium hidden lg:table-cell">Preço</th>
+                  <th className="px-4 py-3 font-medium hidden lg:table-cell text-center">👍</th>
+                  <th className="px-4 py-3 font-medium hidden lg:table-cell text-center">👎</th>
+                  <th className="px-4 py-3 font-medium hidden lg:table-cell text-center">💬</th>
+                  <th className="px-4 py-3 font-medium hidden xl:table-cell">Selos</th>
                   <th className="px-4 py-3 font-medium">Status</th>
                   <th className="px-4 py-3 font-medium text-right">Ações</th>
                 </tr>
@@ -494,6 +535,17 @@ export default function AdminWines() {
                     <td className="px-4 py-3 hidden md:table-cell text-muted-foreground">{w.type}</td>
                     <td className="px-4 py-3 hidden md:table-cell text-muted-foreground">{w.country}</td>
                     <td className="px-4 py-3 hidden lg:table-cell text-muted-foreground">{w.price_range}</td>
+                    <td className="px-4 py-3 hidden lg:table-cell text-center text-muted-foreground">{likesMap.get(w.id) || 0}</td>
+                    <td className="px-4 py-3 hidden lg:table-cell text-center text-muted-foreground">{dislikesMap.get(w.id) || 0}</td>
+                    <td className="px-4 py-3 hidden lg:table-cell text-center text-muted-foreground">{commentsMap.get(w.id) || 0}</td>
+                    <td className="px-4 py-3 hidden xl:table-cell">
+                      <div className="flex flex-wrap gap-1">
+                        {sealsForWine(w.id).map((sid) => {
+                          const seal = seals?.find((s) => s.id === sid);
+                          return seal ? <Badge key={sid} variant="outline" className="text-xs">{seal.name}</Badge> : null;
+                        })}
+                      </div>
+                    </td>
                     <td className="px-4 py-3">
                       <Badge variant={
                         (w as any).status === "curadoria" ? "default" :
@@ -519,7 +571,7 @@ export default function AdminWines() {
                   </tr>
                 ))}
                 {filteredWines.length === 0 && (
-                  <tr><td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">Nenhum vinho encontrado.</td></tr>
+                  <tr><td colSpan={10} className="px-4 py-12 text-center text-muted-foreground">Nenhum vinho encontrado.</td></tr>
                 )}
               </tbody>
             </table>
