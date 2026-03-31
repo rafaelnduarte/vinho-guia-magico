@@ -95,11 +95,22 @@ export default function AdminSeals() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-lg font-semibold text-foreground">Selos ({seals?.length ?? 0})</h2>
-        <Button onClick={() => { setForm(emptyForm); setEditing(null); setOpen(true); }} className="gap-2">
-          <Plus className="h-4 w-4" /> Novo Selo
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={() => {
+            if (!seals?.length) return;
+            exportToCsv(`selos-${new Date().toISOString().slice(0, 10)}.csv`,
+              ["Nome", "Categoria", "Ícone", "Descrição"],
+              seals.map(s => [s.name, s.category, s.icon || "", s.description || ""])
+            );
+          }}>
+            <Download className="h-3 w-3" /> Exportar CSV
+          </Button>
+          <Button onClick={() => { setForm(emptyForm); setEditing(null); setOpen(true); }} className="gap-2">
+            <Plus className="h-4 w-4" /> Novo Selo
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (

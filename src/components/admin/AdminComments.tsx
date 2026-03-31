@@ -114,9 +114,20 @@ export default function AdminComments() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <MessageSquare className="h-5 w-5 text-primary" />
-        <h2 className="text-lg font-semibold text-foreground">Comentários ({total})</h2>
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-3">
+          <MessageSquare className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-semibold text-foreground">Comentários ({total})</h2>
+        </div>
+        <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={() => {
+          if (!comments.length) return;
+          exportToCsv(`comentarios-${new Date().toISOString().slice(0, 10)}.csv`,
+            ["Membro", "Vinho", "Comentário", "Data"],
+            comments.map(c => [c.user_name || "Anônimo", c.wine_name || "", c.content, format(new Date(c.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })])
+          );
+        }}>
+          <Download className="h-3 w-3" /> Exportar CSV
+        </Button>
       </div>
 
       {/* Filters */}

@@ -116,6 +116,19 @@ export default function AdminBanners() {
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-foreground">Banners ({banners.length})</h2>
+        <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={() => {
+          if (!banners.length) return;
+          exportToCsv(`banners-${new Date().toISOString().slice(0, 10)}.csv`,
+            ["ID", "URL Imagem", "URL Link", "Ordem", "Ativo", "Criado em"],
+            banners.map(b => [b.id, b.image_url, b.link_url || "", String(b.sort_order), b.is_active ? "Sim" : "Não", new Date(b.created_at).toLocaleString("pt-BR")])
+          );
+        }}>
+          <Download className="h-3 w-3" /> Exportar CSV
+        </Button>
+      </div>
+
       {/* Add new banner */}
       <Card className="p-4 sm:p-6 space-y-4">
         <h3 className="font-semibold text-foreground">Adicionar Banner</h3>
