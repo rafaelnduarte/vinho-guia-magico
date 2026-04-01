@@ -163,6 +163,14 @@ export default function LoginPage() {
                 >
                   Ainda não é membro? Inscreva-se aqui
                 </a>
+                <a
+                  href="https://radar.dojovem.com.br/assine?utm_source=plataforma&utm_medium=social&utm_campaign=plataforma&utm_term=o-que-e-o-radar&utm_content=plataforma-o-que-e-o-radar"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block w-full text-center text-sm text-primary hover:text-primary/80 font-medium transition-colors"
+                >
+                  O que é o Radar do Jovem?
+                </a>
               </form>
             </>
           )}
