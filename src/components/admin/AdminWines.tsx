@@ -146,12 +146,21 @@ export default function AdminWines() {
     }
   };
 
-  // Lookup seal by name (case-insensitive)
+  // Lookup seal by name (case-insensitive, accent-insensitive)
+  const normalizeSealName = (s: string) =>
+    s.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
   const findSealId = (name: string | null): string | null => {
     if (!name || !seals) return null;
-    const trimmed = name.trim().toLowerCase();
-    const found = seals.find((s) => s.name.toLowerCase() === trimmed);
+    const normalized = normalizeSealName(name);
+    const found = seals.find((s) => normalizeSealName(s.name) === normalized);
     return found?.id ?? null;
+  };
+
+  // Parse a CSV cell that may contain multiple seal names (comma, /, or ; separated)
+  const parseSealNames = (value: string | null): string[] => {
+    if (!value) return [];
+    return value.split(/[,;/]/).map((s) => s.trim()).filter(Boolean);
   };
 
   const handleCsvImport = async (rows: Record<string, any>[]): Promise<CsvImportResult> => {
@@ -239,16 +248,24 @@ export default function AdminWines() {
         }
 
         // Associate seals (para_quem → Perfil Cliente, categoria_vinho → Perfil Vinho)
-        const sealNames = [row.para_quem, row.categoria_vinho].filter(Boolean);
-        if (sealNames.length > 0) {
+        // Each field may contain multiple seal names separated by comma, semicolon or slash
+        const allSealNames = [
+          ...parseSealNames(row.para_quem),
+          ...parseSealNames(row.categoria_vinho),
+        ];
+        if (allSealNames.length > 0) {
           // Remove existing seals for this wine first to avoid duplicates
           await supabase.from("wine_seals").delete().eq("wine_id", wineId);
-          const sealInserts = sealNames
+          const sealInserts = allSealNames
             .map((name: string) => findSealId(name))
             .filter(Boolean)
             .map((sealId) => ({ wine_id: wineId, seal_id: sealId! }));
-          if (sealInserts.length > 0) {
-            await supabase.from("wine_seals").insert(sealInserts);
+          // Deduplicate by seal_id
+          const uniqueInserts = sealInserts.filter(
+            (item, idx, arr) => arr.findIndex((x) => x.seal_id === item.seal_id) === idx
+          );
+          if (uniqueInserts.length > 0) {
+            await supabase.from("wine_seals").insert(uniqueInserts);
           }
         }
       } catch (err: any) {
