@@ -146,12 +146,21 @@ export default function AdminWines() {
     }
   };
 
-  // Lookup seal by name (case-insensitive)
+  // Lookup seal by name (case-insensitive, accent-insensitive)
+  const normalizeSealName = (s: string) =>
+    s.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
   const findSealId = (name: string | null): string | null => {
     if (!name || !seals) return null;
-    const trimmed = name.trim().toLowerCase();
-    const found = seals.find((s) => s.name.toLowerCase() === trimmed);
+    const normalized = normalizeSealName(name);
+    const found = seals.find((s) => normalizeSealName(s.name) === normalized);
     return found?.id ?? null;
+  };
+
+  // Parse a CSV cell that may contain multiple seal names (comma, /, or ; separated)
+  const parseSealNames = (value: string | null): string[] => {
+    if (!value) return [];
+    return value.split(/[,;/]/).map((s) => s.trim()).filter(Boolean);
   };
 
   const handleCsvImport = async (rows: Record<string, any>[]): Promise<CsvImportResult> => {
