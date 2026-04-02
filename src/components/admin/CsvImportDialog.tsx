@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
+import { normalizeCsvHeader, parseCSV } from "@/lib/parseCsv";
 import { Upload, FileText, CheckCircle2, XCircle, AlertTriangle, Loader2, Download } from "lucide-react";
 
 export interface CsvColumn {
@@ -36,55 +37,6 @@ interface ParsedRow {
   data: Record<string, string>;
   errors: Array<{ field: string; message: string }>;
   rowIndex: number;
-}
-
-function parseCSV(text: string): { headers: string[]; rows: string[][] } {
-  const lines = text.split(/\r?\n/).filter((l) => l.trim());
-  if (lines.length === 0) return { headers: [], rows: [] };
-
-  const parseLine = (line: string): string[] => {
-    const result: string[] = [];
-    let current = "";
-    let inQuotes = false;
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i];
-      if (inQuotes) {
-        if (char === '"' && line[i + 1] === '"') {
-          current += '"';
-          i++;
-        } else if (char === '"') {
-          inQuotes = false;
-        } else {
-          current += char;
-        }
-      } else {
-        if (char === '"') {
-          inQuotes = true;
-        } else if (char === "," || char === ";") {
-          result.push(current.trim());
-          current = "";
-        } else {
-          current += char;
-        }
-      }
-    }
-    result.push(current.trim());
-    return result;
-  };
-
-  const headers = parseLine(lines[0]);
-  const rows = lines.slice(1).map(parseLine);
-  return { headers, rows };
-}
-
-function normalizeHeader(h: string): string {
-  return h
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]/g, "_")
-    .replace(/_+/g, "_")
-    .replace(/^_|_$/g, "");
 }
 
 export default function CsvImportDialog({
@@ -138,11 +90,11 @@ export default function CsvImportDialog({
       // Map CSV headers to column keys
       const map: Record<string, string> = {};
       headers.forEach((h, i) => {
-        const normalized = normalizeHeader(h);
+        const normalized = normalizeCsvHeader(h);
         const match = columns.find(
           (c) =>
-            normalizeHeader(c.key) === normalized ||
-            normalizeHeader(c.label) === normalized
+            normalizeCsvHeader(c.key) === normalized ||
+            normalizeCsvHeader(c.label) === normalized
         );
         if (match) map[String(i)] = match.key;
       });
