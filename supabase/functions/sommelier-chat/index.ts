@@ -289,7 +289,7 @@ serve(async (req) => {
 
     const { data: allWines } = await adminClient
       .from("wines")
-      .select("id, name, producer, country, region, vintage, type, grape, importer, price_range, description, tasting_notes, rating, status")
+      .select("id, name, producer, country, region, vintage, type, grape, importer, price_range, price, description, tasting_notes, rating, status")
       .in("status", ["curadoria", "acervo"])
       .order("created_at", { ascending: false });
 
@@ -374,6 +374,7 @@ serve(async (req) => {
       uva: wine.grape,
       importadora: wine.importer,
       preco: wine.price_range,
+      preco_numerico: wine.price,
       descricao: wine.description?.slice(0, 140),
       notas_degustacao: wine.tasting_notes?.slice(0, 120),
       nota: wine.rating,
