@@ -683,35 +683,28 @@ export default function SommelierTestPage() {
                     <div className="flex justify-start mt-2 ml-1">
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <span>Gostou das recomendações?</span>
-                        {msg.recommended_wine_ids.map((wineId) => {
-                          const sent = feedbackSent[wineId];
-                          return (
-                            <div key={wineId} className="flex gap-1">
-                              <button
-                                onClick={() => sendFeedback(wineId, "liked")}
-                                disabled={!!sent}
-                                className={cn(
-                                  "p-1 rounded transition-colors",
-                                  sent === "liked" ? "text-emerald-500" : "hover:text-emerald-500 text-muted-foreground",
-                                  sent && "opacity-70"
-                                )}
-                              >
-                                <ThumbsUp className="h-3.5 w-3.5" />
-                              </button>
-                              <button
-                                onClick={() => sendFeedback(wineId, "disliked")}
-                                disabled={!!sent}
-                                className={cn(
-                                  "p-1 rounded transition-colors",
-                                  sent === "disliked" ? "text-destructive" : "hover:text-destructive text-muted-foreground",
-                                  sent && "opacity-70"
-                                )}
-                              >
-                                <ThumbsDown className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          );
-                        })}
+                        <button
+                          onClick={() => sendFeedback(msg.recommended_wine_ids!, "liked", i)}
+                          disabled={feedbackSent[i] !== undefined}
+                          className={cn(
+                            "p-1 rounded transition-colors",
+                            feedbackSent[i] === "liked" ? "text-emerald-500" : "hover:text-emerald-500 text-muted-foreground",
+                            feedbackSent[i] !== undefined && "opacity-70"
+                          )}
+                        >
+                          <ThumbsUp className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => sendFeedback(msg.recommended_wine_ids!, "disliked", i)}
+                          disabled={feedbackSent[i] !== undefined}
+                          className={cn(
+                            "p-1 rounded transition-colors",
+                            feedbackSent[i] === "disliked" ? "text-destructive" : "hover:text-destructive text-muted-foreground",
+                            feedbackSent[i] !== undefined && "opacity-70"
+                          )}
+                        >
+                          <ThumbsDown className="h-3.5 w-3.5" />
+                        </button>
                       </div>
                     </div>
                   )}
