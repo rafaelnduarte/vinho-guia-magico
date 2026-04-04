@@ -407,14 +407,86 @@ serve(async (req) => {
       new Set(querySource.split(/[^a-z0-9]+/g).filter((token) => token.length >= 3))
     ).slice(0, 25);
 
-    // ── Extract price limit from user message ──
-    const priceMatch = message.match(/(?:até|abaixo de|menos de|no máximo|max|budget)\s*(?:R\$\s*)?([\d.,]+)/i);
-    let maxPrice: number | null = null;
-    if (priceMatch) {
-      maxPrice = parseFloat(priceMatch[1].replace(/\./g, '').replace(',', '.'));
+    // ── Smart pre-filter: detect country, type, and price from user message ──
+    const msgLower = message.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+    const countryMap: Record<string, string[]> = {
+      "franca": ["França"], "frances": ["França"], "francesa": ["França"], "franceses": ["França"], "borgonha": ["França"], "bordeaux": ["França"], "champagne": ["França"], "beaujolais": ["França"],
+      "italia": ["Itália"], "italiano": ["Itália"], "italiana": ["Itália"], "italianos": ["Itália"], "toscana": ["Itália"], "piemonte": ["Itália"],
+      "espanha": ["Espanha"], "espanhol": ["Espanha"], "espanhola": ["Espanha"], "espanhois": ["Espanha"],
+      "portugal": ["Portugal"], "portugues": ["Portugal"], "portuguesa": ["Portugal"],
+      "brasil": ["Brasil"], "brasileiro": ["Brasil"], "brasileira": ["Brasil"], "brasileiros": ["Brasil"],
+      "alemanha": ["Alemanha"], "alemao": ["Alemanha"], "alema": ["Alemanha"],
+      "austria": ["Áustria"], "austriaco": ["Áustria"],
+      "argentina": ["Argentina"], "argentino": ["Argentina"],
+      "chile": ["Chile"], "chileno": ["Chile"],
+      "africa do sul": ["África do Sul"], "sul-africano": ["África do Sul"],
+    };
+
+    const typeMap: Record<string, string> = {
+      "tinto": "tinto", "tintos": "tinto",
+      "branco": "branco", "brancos": "branco",
+      "rose": "rosé", "roses": "rosé",
+      "espumante": "espumante", "espumantes": "espumante",
+      "fortificado": "fortificado",
+    };
+
+    let detectedCountries: string[] = [];
+    for (const [keyword, countries] of Object.entries(countryMap)) {
+      if (msgLower.includes(keyword)) {
+        detectedCountries.push(...countries);
+      }
+    }
+    detectedCountries = [...new Set(detectedCountries)];
+
+    let detectedType: string | null = null;
+    for (const [keyword, type] of Object.entries(typeMap)) {
+      if (msgLower.includes(keyword)) {
+        detectedType = type;
+        break;
+      }
     }
 
-    const scoredWines = allWinesList
+    const priceMatch = msgLower.match(/(?:ate|abaixo de|menos de|no maximo|max|budget)\s*(?:r\$\s*)?([\d.,]+)/);
+    let maxPrice: number | null = null;
+    if (priceMatch) {
+      maxPrice = parseFloat(priceMatch[1].replace(/\./g, "").replace(",", "."));
+    }
+
+    // Pre-filter: ensure matching wines get into context
+    let priorityWines: typeof allWinesList = [];
+    let remainingWines: typeof allWinesList = [];
+
+    if (detectedCountries.length > 0 || detectedType || maxPrice !== null) {
+      for (const wine of allWinesList) {
+        let matches = true;
+        if (detectedCountries.length > 0 && !detectedCountries.includes(wine.country ?? "")) {
+          matches = false;
+        }
+        if (detectedType && wine.type !== detectedType) {
+          matches = false;
+        }
+        if (maxPrice !== null && wine.price) {
+          if (Number(wine.price) > maxPrice) {
+            matches = false;
+          }
+        }
+        if (matches) {
+          priorityWines.push(wine);
+        } else {
+          remainingWines.push(wine);
+        }
+      }
+    } else {
+      remainingWines = allWinesList;
+    }
+
+    // Use priority wines first, fill remaining slots with other wines
+    const maxPriority = Math.min(priorityWines.length, MAX_WINES_IN_CONTEXT);
+    const maxRemaining = MAX_WINES_IN_CONTEXT - maxPriority;
+
+    const winesForScoring = [...priorityWines, ...remainingWines.slice(0, maxRemaining)];
+    const scoredWines = winesForScoring
       .map((wine) => {
         const searchable = normalizeText(
           [wine.name, wine.producer, wine.country, wine.region, wine.type, wine.grape, wine.importer]
@@ -434,8 +506,13 @@ serve(async (req) => {
         if (maxPrice !== null) {
           const winePrice = parseFloat((wine.price_range ?? '0').replace(/[^\d.,]/g, '').replace(/\./g, '').replace(',', '.'));
           if (!isNaN(winePrice) && winePrice > maxPrice) {
-            score = -100; // Exclude wines over budget
+            score = -100;
           }
+        }
+
+        // Boost priority wines that match user filters
+        if (priorityWines.some(pw => pw.id === wine.id)) {
+          score += 20;
         }
 
         // Penalize already-recommended wines so new ones are prioritized
