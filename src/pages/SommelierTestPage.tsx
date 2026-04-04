@@ -484,8 +484,6 @@ export default function SommelierTestPage() {
   const usagePercent = capCredits > 0 ? Math.min((usageCredits / capCredits) * 100, 100) : 0;
   const budgetExceeded = usageCredits >= capCredits;
 
-  const currentStage = PALATE_STAGES[palateStage] || PALATE_STAGES.descoberta;
-
   return (
     <div className="flex flex-col h-[calc(100dvh-56px)] md:h-[100dvh] animate-fade-in">
       {/* Header */}
