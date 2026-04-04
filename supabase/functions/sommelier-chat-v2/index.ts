@@ -407,6 +407,13 @@ serve(async (req) => {
       new Set(querySource.split(/[^a-z0-9]+/g).filter((token) => token.length >= 3))
     ).slice(0, 25);
 
+    // ── Extract price limit from user message ──
+    const priceMatch = message.match(/(?:até|abaixo de|menos de|no máximo|max|budget)\s*(?:R\$\s*)?([\d.,]+)/i);
+    let maxPrice: number | null = null;
+    if (priceMatch) {
+      maxPrice = parseFloat(priceMatch[1].replace(/\./g, '').replace(',', '.'));
+    }
+
     const scoredWines = allWinesList
       .map((wine) => {
         const searchable = normalizeText(
@@ -421,6 +428,14 @@ serve(async (req) => {
           if (normalizeText(wine.name ?? "").includes(token)) score += 5;
           else if (normalizeText(wine.grape ?? "").includes(token) || normalizeText(wine.type ?? "").includes(token)) score += 3;
           else score += 1;
+        }
+
+        // Filter by price when user specified a budget
+        if (maxPrice !== null) {
+          const winePrice = parseFloat((wine.price_range ?? '0').replace(/[^\d.,]/g, '').replace(/\./g, '').replace(',', '.'));
+          if (!isNaN(winePrice) && winePrice > maxPrice) {
+            score = -100; // Exclude wines over budget
+          }
         }
 
         // Penalize already-recommended wines so new ones are prioritized
