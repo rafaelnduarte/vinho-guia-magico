@@ -35,12 +35,6 @@ interface ChatSession {
   owner_membership?: "radar" | "comunidade" | "admin";
 }
 
-const PALATE_STAGES: Record<string, { label: string; color: string; icon: string; progress: number }> = {
-  descoberta: { label: "Descoberta", color: "text-emerald-500", icon: "🌱", progress: 25 },
-  exploracao: { label: "Exploração", color: "text-blue-500", icon: "🧭", progress: 50 },
-  aprofundamento: { label: "Aprofundamento", color: "text-purple-500", icon: "🔬", progress: 75 },
-  conhecedor: { label: "Conhecedor", color: "text-amber-500", icon: "🏆", progress: 100 },
-};
 
 const normalizeChatMessages = (allMsgs: Array<any>): ChatMessage[] =>
   (allMsgs ?? [])
