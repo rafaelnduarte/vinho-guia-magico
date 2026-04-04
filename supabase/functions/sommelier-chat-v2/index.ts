@@ -636,7 +636,10 @@ serve(async (req) => {
     }
 
     // ── Track recommended wines & update palate journey ──
-    const recommendedWineIds = extractRecommendedWineIds(assistantContent, contextPack);
+    // Include ranking wines in extraction so recommendations from ranking context are also detected
+    const rankingWineEntries = (wineRankings ?? []).map((r: any) => ({ id: r.wine_id, nome: r.wine_name }));
+    const allKnownWines = [...contextPack, ...rankingWineEntries];
+    const recommendedWineIds = extractRecommendedWineIds(assistantContent, allKnownWines);
     if (recommendedWineIds.length > 0) {
       const newRecs = recommendedWineIds
         .filter((wid) => !alreadyRecommendedIds.has(wid))
