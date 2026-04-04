@@ -385,6 +385,9 @@ serve(async (req) => {
     };
     const alreadyRecommendedIds = new Set<string>(userContext.all_recommended_wine_ids ?? []);
 
+    // ── Fetch wine rankings ──
+    const { data: wineRankings } = await adminClient.rpc("get_wine_rankings", { period: "all" });
+
     const { data: allWines } = await adminClient
       .from("wines")
       .select("id, name, producer, country, region, vintage, type, grape, importer, price_range, description, tasting_notes, rating, status")
