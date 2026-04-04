@@ -68,8 +68,7 @@ export default function SommelierTestPage() {
   const [warning, setWarning] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(false);
   const [sessionSearch, setSessionSearch] = useState("");
-  const [palateStage, setPalateStage] = useState("descoberta");
-  const [feedbackSent, setFeedbackSent] = useState<Record<string, string>>({});
+  const [feedbackSent, setFeedbackSent] = useState<Record<number, string>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const latestPendingMessageRef = useRef<string | null>(null);
