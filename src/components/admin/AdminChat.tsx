@@ -29,6 +29,7 @@ export default function AdminChat() {
             <TabsTrigger value="logs" className="text-xs px-3 py-2">Logs</TabsTrigger>
             <TabsTrigger value="config" className="text-xs px-3 py-2">Configuração</TabsTrigger>
             <TabsTrigger value="prompt" className="text-xs px-3 py-2">System Prompt</TabsTrigger>
+            <TabsTrigger value="prompt-v2" className="text-xs px-3 py-2">System Prompt v2</TabsTrigger>
             <TabsTrigger value="knowledge" className="text-xs px-3 py-2">Base de Conhecimento</TabsTrigger>
           </TabsList>
         </div>
@@ -36,6 +37,7 @@ export default function AdminChat() {
         <TabsContent value="logs"><ChatLogs /></TabsContent>
         <TabsContent value="config"><ChatConfig /></TabsContent>
         <TabsContent value="prompt"><SystemPromptEditor /></TabsContent>
+        <TabsContent value="prompt-v2"><SystemPromptV2Editor /></TabsContent>
         <TabsContent value="knowledge" forceMount className="data-[state=inactive]:hidden"><KnowledgeBase /></TabsContent>
       </Tabs>
     </div>
@@ -498,6 +500,73 @@ function SystemPromptEditor() {
         <span className="text-xs text-muted-foreground">{prompt.length} caracteres</span>
         <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="gap-2">
           <Save className="h-4 w-4" /> Salvar Prompt
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ---- SYSTEM PROMPT V2 EDITOR ----
+function SystemPromptV2Editor() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: config, isLoading } = useQuery({
+    queryKey: ["admin-chat-config"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("ai_pricing_config").select("*").limit(1);
+      if (error) throw error;
+      return data?.[0] ?? null;
+    },
+  });
+
+  const [prompt, setPrompt] = useState("");
+  const [initialized, setInitialized] = useState(false);
+
+  useEffect(() => {
+    if (config && !initialized) {
+      setPrompt(config.system_prompt_v2 ?? "");
+      setInitialized(true);
+    }
+  }, [config, initialized]);
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!config) return;
+      const { error } = await supabase
+        .from("ai_pricing_config")
+        .update({ system_prompt_v2: prompt })
+        .eq("id", config.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: "System prompt v2 salvo!" });
+      queryClient.invalidateQueries({ queryKey: ["admin-chat-config"] });
+    },
+    onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+
+  if (isLoading) return <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>;
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
+        <FileText className="h-4 w-4" /> System Prompt v2
+      </h3>
+      <p className="text-xs text-muted-foreground">
+        Prompt de teste usado apenas no /sommelier-test. Não afeta a produção.
+      </p>
+      <Textarea
+        value={prompt}
+        onChange={e => setPrompt(e.target.value)}
+        rows={16}
+        className="font-mono text-xs"
+        placeholder="Insira o system prompt v2..."
+      />
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-muted-foreground">{prompt.length} caracteres</span>
+        <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="gap-2">
+          <Save className="h-4 w-4" /> Salvar Prompt v2
         </Button>
       </div>
     </div>
