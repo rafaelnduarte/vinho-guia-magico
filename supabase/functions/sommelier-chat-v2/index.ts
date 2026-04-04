@@ -502,14 +502,6 @@ serve(async (req) => {
             matches = false;
           }
         }
-      for (const wine of allWinesList) {
-        let matches = true;
-        if (detectedCountries.length > 0 && !detectedCountries.includes(wine.country ?? "")) {
-          matches = false;
-        }
-        if (detectedType && wine.type !== detectedType) {
-          matches = false;
-        }
         if (maxPrice !== null && wine.price) {
           if (Number(wine.price) > maxPrice) {
             matches = false;
