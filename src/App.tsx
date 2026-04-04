@@ -22,6 +22,7 @@ import CursosPage from "@/pages/CursosPage";
 import CursoDetailPage from "@/pages/CursoDetailPage";
 import AulaPage from "@/pages/AulaPage";
 import NotFound from "@/pages/NotFound";
+import SommelierTestPage from "@/pages/SommelierTestPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
