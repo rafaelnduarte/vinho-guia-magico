@@ -95,7 +95,23 @@ export default function SommelierTestPage() {
       .order("created_at", { ascending: true });
 
     const normalized = normalizeChatMessages(allMsgs ?? []);
-    setMessages(normalized);
+    // Preserve recommended_wine_ids from current messages so feedback buttons don't disappear
+    setMessages(prev => {
+      const wineIdsByContent = new Map<string, string[]>();
+      prev.forEach(m => {
+        if (m.recommended_wine_ids && m.recommended_wine_ids.length > 0) {
+          wineIdsByContent.set(m.content.slice(0, 200), m.recommended_wine_ids);
+        }
+      });
+      return normalized.map(m => {
+        const key = m.content.slice(0, 200);
+        const existingWineIds = wineIdsByContent.get(key);
+        if (m.role === "assistant" && existingWineIds) {
+          return { ...m, recommended_wine_ids: existingWineIds };
+        }
+        return m;
+      });
+    });
     return normalized;
   }, []);
 
