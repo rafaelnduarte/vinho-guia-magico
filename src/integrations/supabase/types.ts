@@ -53,7 +53,9 @@ export type Database = {
           max_tokens_detalhado: number
           max_tokens_economico: number
           max_tokens_ultra_economico: number
+          max_tokens_v2: number | null
           model_name: string
+          model_name_v2: string | null
           monthly_cap_brl: number
           price_in_per_1k: number
           price_out_per_1k: number
@@ -69,7 +71,9 @@ export type Database = {
           max_tokens_detalhado?: number
           max_tokens_economico?: number
           max_tokens_ultra_economico?: number
+          max_tokens_v2?: number | null
           model_name?: string
+          model_name_v2?: string | null
           monthly_cap_brl?: number
           price_in_per_1k?: number
           price_out_per_1k?: number
@@ -85,7 +89,9 @@ export type Database = {
           max_tokens_detalhado?: number
           max_tokens_economico?: number
           max_tokens_ultra_economico?: number
+          max_tokens_v2?: number | null
           model_name?: string
+          model_name_v2?: string | null
           monthly_cap_brl?: number
           price_in_per_1k?: number
           price_out_per_1k?: number
