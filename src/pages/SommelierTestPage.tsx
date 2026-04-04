@@ -8,7 +8,7 @@ import ReactMarkdown from "react-markdown";
 import {
   Wine, Send, Loader2, Sparkles, AlertTriangle,
   MessageSquare, Plus, ChevronLeft, Search, X,
-  ThumbsUp, ThumbsDown, TrendingUp, FlaskConical
+  ThumbsUp, ThumbsDown, FlaskConical
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -35,12 +35,6 @@ interface ChatSession {
   owner_membership?: "radar" | "comunidade" | "admin";
 }
 
-const PALATE_STAGES: Record<string, { label: string; color: string; icon: string; progress: number }> = {
-  descoberta: { label: "Descoberta", color: "text-emerald-500", icon: "🌱", progress: 25 },
-  exploracao: { label: "Exploração", color: "text-blue-500", icon: "🧭", progress: 50 },
-  aprofundamento: { label: "Aprofundamento", color: "text-purple-500", icon: "🔬", progress: 75 },
-  conhecedor: { label: "Conhecedor", color: "text-amber-500", icon: "🏆", progress: 100 },
-};
 
 const normalizeChatMessages = (allMsgs: Array<any>): ChatMessage[] =>
   (allMsgs ?? [])
@@ -74,8 +68,7 @@ export default function SommelierTestPage() {
   const [warning, setWarning] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(false);
   const [sessionSearch, setSessionSearch] = useState("");
-  const [palateStage, setPalateStage] = useState("descoberta");
-  const [feedbackSent, setFeedbackSent] = useState<Record<string, string>>({});
+  const [feedbackSent, setFeedbackSent] = useState<Record<number, string>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const latestPendingMessageRef = useRef<string | null>(null);
@@ -83,28 +76,15 @@ export default function SommelierTestPage() {
 
   const isAdmin = role === "admin";
 
-  // Fetch palate stage on load
-  useQuery({
-    queryKey: ["palate-stage-test", user?.id],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("user_wine_profile")
-        .select("palate_stage")
-        .eq("user_id", user!.id)
-        .maybeSingle();
-      if (data?.palate_stage) setPalateStage(data.palate_stage);
-      return data;
-    },
-    enabled: !!user,
-  });
-
-  const sendFeedback = async (wineId: string, feedback: "liked" | "disliked") => {
-    if (!user) return;
-    setFeedbackSent((prev) => ({ ...prev, [wineId]: feedback }));
-    await supabase.from("user_preference_log").upsert(
-      { user_id: user.id, wine_id: wineId, feedback },
-      { onConflict: "user_id,wine_id" }
-    );
+  const sendFeedback = async (wineIds: string[], feedback: "liked" | "disliked", msgIndex: number) => {
+    if (!user || feedbackSent[msgIndex] !== undefined) return;
+    setFeedbackSent(prev => ({ ...prev, [msgIndex]: feedback }));
+    for (const wineId of wineIds) {
+      await supabase.from("user_preference_log").upsert(
+        { user_id: user.id, wine_id: wineId, feedback },
+        { onConflict: "user_id,wine_id" }
+      );
+    }
   };
 
   const hydrateSessionMessages = useCallback(async (sid: string) => {
@@ -314,10 +294,6 @@ export default function SommelierTestPage() {
         setTimeout(() => refetchSessions(), 4000);
       }
 
-      // Update palate stage from response
-      if (data.palate_stage) {
-        setPalateStage(data.palate_stage);
-      }
 
       const assistantText = typeof data?.message === "string" ? data.message : "";
 
@@ -504,8 +480,6 @@ export default function SommelierTestPage() {
   const usagePercent = capCredits > 0 ? Math.min((usageCredits / capCredits) * 100, 100) : 0;
   const budgetExceeded = usageCredits >= capCredits;
 
-  const currentStage = PALATE_STAGES[palateStage] || PALATE_STAGES.descoberta;
-
   return (
     <div className="flex flex-col h-[calc(100dvh-56px)] md:h-[100dvh] animate-fade-in">
       {/* Header */}
@@ -522,13 +496,6 @@ export default function SommelierTestPage() {
           TESTE v2
         </Badge>
 
-        {/* Palate stage indicator */}
-        <div className="hidden sm:flex items-center gap-1.5 text-xs">
-          <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className={cn("font-medium", currentStage.color)}>
-            {currentStage.icon} {currentStage.label}
-          </span>
-        </div>
 
         <Button variant="outline" size="sm" onClick={startNewChat} className="text-xs gap-1">
           <Plus className="h-3 w-3" /> Nova
@@ -705,35 +672,28 @@ export default function SommelierTestPage() {
                     <div className="flex justify-start mt-2 ml-1">
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <span>Gostou das recomendações?</span>
-                        {msg.recommended_wine_ids.map((wineId) => {
-                          const sent = feedbackSent[wineId];
-                          return (
-                            <div key={wineId} className="flex gap-1">
-                              <button
-                                onClick={() => sendFeedback(wineId, "liked")}
-                                disabled={!!sent}
-                                className={cn(
-                                  "p-1 rounded transition-colors",
-                                  sent === "liked" ? "text-emerald-500" : "hover:text-emerald-500 text-muted-foreground",
-                                  sent && "opacity-70"
-                                )}
-                              >
-                                <ThumbsUp className="h-3.5 w-3.5" />
-                              </button>
-                              <button
-                                onClick={() => sendFeedback(wineId, "disliked")}
-                                disabled={!!sent}
-                                className={cn(
-                                  "p-1 rounded transition-colors",
-                                  sent === "disliked" ? "text-destructive" : "hover:text-destructive text-muted-foreground",
-                                  sent && "opacity-70"
-                                )}
-                              >
-                                <ThumbsDown className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          );
-                        })}
+                        <button
+                          onClick={() => sendFeedback(msg.recommended_wine_ids!, "liked", i)}
+                          disabled={feedbackSent[i] !== undefined}
+                          className={cn(
+                            "p-1 rounded transition-colors",
+                            feedbackSent[i] === "liked" ? "text-emerald-500" : "hover:text-emerald-500 text-muted-foreground",
+                            feedbackSent[i] !== undefined && "opacity-70"
+                          )}
+                        >
+                          <ThumbsUp className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => sendFeedback(msg.recommended_wine_ids!, "disliked", i)}
+                          disabled={feedbackSent[i] !== undefined}
+                          className={cn(
+                            "p-1 rounded transition-colors",
+                            feedbackSent[i] === "disliked" ? "text-destructive" : "hover:text-destructive text-muted-foreground",
+                            feedbackSent[i] !== undefined && "opacity-70"
+                          )}
+                        >
+                          <ThumbsDown className="h-3.5 w-3.5" />
+                        </button>
                       </div>
                     </div>
                   )}
