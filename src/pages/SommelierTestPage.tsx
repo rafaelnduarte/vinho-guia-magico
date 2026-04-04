@@ -76,28 +76,15 @@ export default function SommelierTestPage() {
 
   const isAdmin = role === "admin";
 
-  // Fetch palate stage on load
-  useQuery({
-    queryKey: ["palate-stage-test", user?.id],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("user_wine_profile")
-        .select("palate_stage")
-        .eq("user_id", user!.id)
-        .maybeSingle();
-      if (data?.palate_stage) setPalateStage(data.palate_stage);
-      return data;
-    },
-    enabled: !!user,
-  });
-
-  const sendFeedback = async (wineId: string, feedback: "liked" | "disliked") => {
-    if (!user) return;
-    setFeedbackSent((prev) => ({ ...prev, [wineId]: feedback }));
-    await supabase.from("user_preference_log").upsert(
-      { user_id: user.id, wine_id: wineId, feedback },
-      { onConflict: "user_id,wine_id" }
-    );
+  const sendFeedback = async (wineIds: string[], feedback: "liked" | "disliked", msgIndex: number) => {
+    if (!user || feedbackSent[msgIndex] !== undefined) return;
+    setFeedbackSent(prev => ({ ...prev, [msgIndex]: feedback }));
+    for (const wineId of wineIds) {
+      await supabase.from("user_preference_log").upsert(
+        { user_id: user.id, wine_id: wineId, feedback },
+        { onConflict: "user_id,wine_id" }
+      );
+    }
   };
 
   const hydrateSessionMessages = useCallback(async (sid: string) => {
