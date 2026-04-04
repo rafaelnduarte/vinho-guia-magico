@@ -294,10 +294,6 @@ export default function SommelierTestPage() {
         setTimeout(() => refetchSessions(), 4000);
       }
 
-      // Update palate stage from response
-      if (data.palate_stage) {
-        setPalateStage(data.palate_stage);
-      }
 
       const assistantText = typeof data?.message === "string" ? data.message : "";
 
