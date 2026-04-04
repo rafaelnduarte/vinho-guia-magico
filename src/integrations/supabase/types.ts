@@ -60,6 +60,7 @@ export type Database = {
           rate_limit_per_5min: number
           rate_limit_per_day: number
           system_prompt: string
+          system_prompt_v2: string | null
           updated_at: string
           usd_brl_rate: number
         }
@@ -75,6 +76,7 @@ export type Database = {
           rate_limit_per_5min?: number
           rate_limit_per_day?: number
           system_prompt?: string
+          system_prompt_v2?: string | null
           updated_at?: string
           usd_brl_rate?: number
         }
@@ -90,6 +92,7 @@ export type Database = {
           rate_limit_per_5min?: number
           rate_limit_per_day?: number
           system_prompt?: string
+          system_prompt_v2?: string | null
           updated_at?: string
           usd_brl_rate?: number
         }

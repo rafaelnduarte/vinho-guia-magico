@@ -242,7 +242,7 @@ serve(async (req) => {
     const pricing = pricingArr?.[0];
     if (!pricing) throw new HttpError(500, "server_config", "Configuração de preços não encontrada");
 
-    const systemPrompt = pricing.system_prompt || FALLBACK_SYSTEM_PROMPT;
+    const systemPrompt = (pricing.system_prompt_v2 && pricing.system_prompt_v2.trim().length > 0) ? pricing.system_prompt_v2 : (pricing.system_prompt || FALLBACK_SYSTEM_PROMPT);
     const maxTokens = pricing.max_tokens_detalhado;
     const selectedModel = typeof pricing.model_name === "string" && pricing.model_name.trim().length > 0
       ? pricing.model_name.trim()
