@@ -639,10 +639,7 @@ serve(async (req) => {
     // Include ranking wines in extraction so recommendations from ranking context are also detected
     const rankingWineEntries = (wineRankings ?? []).map((r: any) => ({ id: r.wine_id, nome: r.wine_name }));
     const allKnownWines = [...contextPack, ...rankingWineEntries];
-    console.log("[DEBUG] allKnownWines sample:", allKnownWines.slice(0, 3).map(w => w.nome));
-    console.log("[DEBUG] assistantContent sample:", assistantContent.slice(0, 300));
     const recommendedWineIds = extractRecommendedWineIds(assistantContent, allKnownWines);
-    console.log("[DEBUG] recommendedWineIds:", recommendedWineIds);
     if (recommendedWineIds.length > 0) {
       const newRecs = recommendedWineIds
         .filter((wid) => !alreadyRecommendedIds.has(wid))
