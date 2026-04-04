@@ -289,7 +289,7 @@ serve(async (req) => {
 
     const { data: allWines } = await adminClient
       .from("wines")
-      .select("id, name, producer, country, region, vintage, type, grape, importer, price_range, description, tasting_notes, rating, status")
+      .select("id, name, producer, country, region, vintage, type, grape, importer, price_range, price, description, tasting_notes, rating, status")
       .in("status", ["curadoria", "acervo"])
       .order("created_at", { ascending: false });
 
