@@ -1,4 +1,4 @@
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRef } from "react";
 import { Loader2, ShieldX } from "lucide-react";
@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading, membershipLoading, membershipActive, mustChangePassword, signOut } = useAuth();
+  const location = useLocation();
 
   // Once we've rendered children successfully, never go back to a spinner.
   // This prevents the app tree from being unmounted during silent token refreshes
@@ -31,7 +32,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (!user) {
     wasAuthenticated.current = false;
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
   if (!membershipActive) {
