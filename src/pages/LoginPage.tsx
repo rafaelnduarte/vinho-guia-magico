@@ -1,12 +1,27 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 import logoJovem from "@/assets/logo-jovem-do-vinho.png";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+
+type LoginLocationState = {
+  from?: {
+    pathname?: string;
+    search?: string;
+    hash?: string;
+  };
+};
+
+function buildRedirectPath(state: LoginLocationState | null) {
+  const from = state?.from;
+  if (!from?.pathname) return "/home";
+  return `${from.pathname}${from.search ?? ""}${from.hash ?? ""}`;
+}
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -16,7 +31,15 @@ export default function LoginPage() {
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotLoading, setForgotLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
+  const { user, loading: authLoading } = useAuth();
+  const redirectTo = buildRedirectPath(location.state as LoginLocationState | null);
+
+  useEffect(() => {
+    if (authLoading || !user) return;
+    navigate(redirectTo, { replace: true });
+  }, [authLoading, user, navigate, redirectTo]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +56,7 @@ export default function LoginPage() {
         variant: "destructive",
       });
     } else {
-      navigate("/home");
+      navigate(redirectTo, { replace: true });
     }
     setLoading(false);
   };
