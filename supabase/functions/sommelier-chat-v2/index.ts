@@ -471,6 +471,9 @@ serve(async (req) => {
             matches = false;
           }
         }
+        if (wine.status !== "curadoria") {
+          matches = false;
+        }
         if (matches) {
           priorityWines.push(wine);
         } else {
