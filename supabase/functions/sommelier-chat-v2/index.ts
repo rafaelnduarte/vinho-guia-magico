@@ -385,6 +385,9 @@ serve(async (req) => {
     };
     const alreadyRecommendedIds = new Set<string>(userContext.all_recommended_wine_ids ?? []);
 
+    // ── Fetch wine rankings ──
+    const { data: wineRankings } = await adminClient.rpc("get_wine_rankings", { period: "all" });
+
     const { data: allWines } = await adminClient
       .from("wines")
       .select("id, name, producer, country, region, vintage, type, grape, importer, price_range, description, tasting_notes, rating, status")
@@ -499,7 +502,17 @@ serve(async (req) => {
     });
 
     const userContextBlock = buildUserContextBlock(userContext);
-    const fullSystemPrompt = systemPrompt + knowledgeContext + contextMessage + userContextBlock +
+
+    let rankingContext = "";
+    if (wineRankings && wineRankings.length > 0) {
+      const top20 = wineRankings.slice(0, 20);
+      const rankingLines = top20.map((r: any, i: number) =>
+        `${i + 1}. ${r.wine_name} (${r.wine_type ?? ""}, ${r.wine_country ?? ""}) — ${r.total_points} pontos (${r.vote_count} votos, ${r.comment_count} comentários)`
+      );
+      rankingContext = `\n\nRANKING DO PORTAL (top 20 por votos e comentários dos membros, all-time):\n${rankingLines.join("\n")}`;
+    }
+
+    const fullSystemPrompt = systemPrompt + knowledgeContext + contextMessage + rankingContext + userContextBlock +
       "\n\nIMPORTANTE: Seja sucinto e direto. Nunca entregue respostas incompletas. Complete sempre seu raciocínio.";
     const aiMessages = [
       { role: "system", content: fullSystemPrompt },
