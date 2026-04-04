@@ -496,13 +496,6 @@ export default function SommelierTestPage() {
           TESTE v2
         </Badge>
 
-        {/* Palate stage indicator */}
-        <div className="hidden sm:flex items-center gap-1.5 text-xs">
-          <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className={cn("font-medium", currentStage.color)}>
-            {currentStage.icon} {currentStage.label}
-          </span>
-        </div>
 
         <Button variant="outline" size="sm" onClick={startNewChat} className="text-xs gap-1">
           <Plus className="h-3 w-3" /> Nova
