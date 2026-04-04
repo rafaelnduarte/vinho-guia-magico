@@ -22,6 +22,7 @@ import CursosPage from "@/pages/CursosPage";
 import CursoDetailPage from "@/pages/CursoDetailPage";
 import AulaPage from "@/pages/AulaPage";
 import NotFound from "@/pages/NotFound";
+import SommelierTestPage from "@/pages/SommelierTestPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -63,6 +64,7 @@ const App = () => (
               <Route path="/cursos" element={<CursosPage />} />
               <Route path="/cursos/:cursoId" element={<CursoDetailPage />} />
               <Route path="/cursos/:cursoId/aula/:aulaId" element={<AulaPage />} />
+              <Route path="/sommelier-test" element={<AdminRoute><SommelierTestPage /></AdminRoute>} />
               <Route
                 path="/admin"
                 element={

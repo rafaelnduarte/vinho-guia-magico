@@ -15,3 +15,5 @@ project_id = "hrpnufesbjmaaiqgjwtn"
     verify_jwt = false
   [functions.parse-knowledge-file]
     verify_jwt = false
+  [functions.sommelier-chat-v2]
+    verify_jwt = false
