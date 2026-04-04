@@ -439,6 +439,27 @@ serve(async (req) => {
       "fortificado": "fortificado",
     };
 
+    // Grape detection keywords (normalized, no accents)
+    const grapeKeywords: string[] = [
+      "malbec", "cabernet sauvignon", "cabernet franc", "cabernet", "merlot", "pinot noir", "pinot",
+      "syrah", "shiraz", "tempranillo", "sangiovese", "nebbiolo", "barbera", "grenache", "garnacha",
+      "mourvedre", "monastrell", "carmenere", "tannat", "touriga nacional", "touriga",
+      "chardonnay", "sauvignon blanc", "riesling", "gewurztraminer", "viognier", "chenin blanc",
+      "albarino", "verdejo", "gruner veltliner", "pinot grigio", "pinot gris", "torrontes",
+      "gamay", "petit verdot", "primitivo", "zinfandel", "corvina", "nero d'avola", "nero davola",
+      "aglianico", "montepulciano", "trebbiano", "vermentino", "fiano", "arneis",
+      "alicante bouschet", "castelao", "encruzado", "baga", "tinta roriz",
+      "prosecco", "glera", "muscat", "moscato", "lambrusco",
+    ];
+
+    let detectedGrapes: string[] = [];
+    for (const grape of grapeKeywords) {
+      if (msgLower.includes(grape)) {
+        detectedGrapes.push(grape);
+      }
+    }
+    detectedGrapes = [...new Set(detectedGrapes)];
+
     let detectedCountries: string[] = [];
     for (const [keyword, countries] of Object.entries(countryMap)) {
       if (msgLower.includes(keyword)) {
@@ -465,7 +486,22 @@ serve(async (req) => {
     let priorityWines: typeof allWinesList = [];
     let remainingWines: typeof allWinesList = [];
 
-    if (detectedCountries.length > 0 || detectedType || maxPrice !== null) {
+    if (detectedCountries.length > 0 || detectedType || maxPrice !== null || detectedGrapes.length > 0) {
+      for (const wine of allWinesList) {
+        let matches = true;
+        if (detectedCountries.length > 0 && !detectedCountries.includes(wine.country ?? "")) {
+          matches = false;
+        }
+        if (detectedType && wine.type !== detectedType) {
+          matches = false;
+        }
+        if (detectedGrapes.length > 0) {
+          const wineGrapeNorm = normalizeText(wine.grape ?? "");
+          const grapeMatch = detectedGrapes.some(g => wineGrapeNorm.includes(g));
+          if (!grapeMatch) {
+            matches = false;
+          }
+        }
       for (const wine of allWinesList) {
         let matches = true;
         if (detectedCountries.length > 0 && !detectedCountries.includes(wine.country ?? "")) {
