@@ -498,6 +498,7 @@ serve(async (req) => {
       uva: wine.grape,
       importadora: wine.importer,
       preco: wine.price_range,
+      preco_numerico: wine.price,
       descricao: wine.description?.slice(0, 140),
       notas_degustacao: wine.tasting_notes?.slice(0, 120),
       nota: wine.rating,
