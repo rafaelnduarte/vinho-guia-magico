@@ -647,6 +647,48 @@ export type Database = {
           },
         ]
       }
+      recommendation_history: {
+        Row: {
+          context: string | null
+          id: string
+          recommended_at: string
+          session_id: string | null
+          user_id: string
+          wine_id: string
+        }
+        Insert: {
+          context?: string | null
+          id?: string
+          recommended_at?: string
+          session_id?: string | null
+          user_id: string
+          wine_id: string
+        }
+        Update: {
+          context?: string | null
+          id?: string
+          recommended_at?: string
+          session_id?: string | null
+          user_id?: string
+          wine_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recommendation_history_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "chat_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recommendation_history_wine_id_fkey"
+            columns: ["wine_id"]
+            isOneToOne: false
+            referencedRelation: "wines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       seals: {
         Row: {
           category: string
@@ -862,6 +904,41 @@ export type Database = {
         }
         Relationships: []
       }
+      user_preference_log: {
+        Row: {
+          comment: string | null
+          created_at: string
+          feedback: string
+          id: string
+          user_id: string
+          wine_id: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          feedback: string
+          id?: string
+          user_id: string
+          wine_id: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          feedback?: string
+          id?: string
+          user_id?: string
+          wine_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_preference_log_wine_id_fkey"
+            columns: ["wine_id"]
+            isOneToOne: false
+            referencedRelation: "wines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           id: string
@@ -876,6 +953,69 @@ export type Database = {
         Update: {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_wine_profile: {
+        Row: {
+          created_at: string
+          id: string
+          palate_stage: Database["public"]["Enums"]["palate_stage"]
+          preferred_countries: string[] | null
+          preferred_grapes: string[] | null
+          preferred_regions: string[] | null
+          preferred_types: string[] | null
+          price_range_max: number | null
+          price_range_min: number | null
+          taste_summary: string | null
+          total_negative_feedback: number
+          total_positive_feedback: number
+          total_recommendations: number
+          unique_countries_explored: number
+          unique_grapes_explored: number
+          unique_regions_explored: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          palate_stage?: Database["public"]["Enums"]["palate_stage"]
+          preferred_countries?: string[] | null
+          preferred_grapes?: string[] | null
+          preferred_regions?: string[] | null
+          preferred_types?: string[] | null
+          price_range_max?: number | null
+          price_range_min?: number | null
+          taste_summary?: string | null
+          total_negative_feedback?: number
+          total_positive_feedback?: number
+          total_recommendations?: number
+          unique_countries_explored?: number
+          unique_grapes_explored?: number
+          unique_regions_explored?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          palate_stage?: Database["public"]["Enums"]["palate_stage"]
+          preferred_countries?: string[] | null
+          preferred_grapes?: string[] | null
+          preferred_regions?: string[] | null
+          preferred_types?: string[] | null
+          price_range_max?: number | null
+          price_range_min?: number | null
+          taste_summary?: string | null
+          total_negative_feedback?: number
+          total_positive_feedback?: number
+          total_recommendations?: number
+          unique_countries_explored?: number
+          unique_grapes_explored?: number
+          unique_regions_explored?: number
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
@@ -1198,6 +1338,7 @@ export type Database = {
         }[]
       }
       get_user_id_by_email: { Args: { _email: string }; Returns: string }
+      get_user_sommelier_context: { Args: { _user_id: string }; Returns: Json }
       get_wine_rankings: {
         Args: { period?: string }
         Returns: {
@@ -1219,6 +1360,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      infer_user_preferences: { Args: { _user_id: string }; Returns: undefined }
       list_members_paginated: {
         Args: {
           _membership_type?: string
@@ -1230,9 +1372,18 @@ export type Database = {
         }
         Returns: Json
       }
+      update_palate_stage: {
+        Args: { _user_id: string }
+        Returns: Database["public"]["Enums"]["palate_stage"]
+      }
     }
     Enums: {
       app_role: "admin" | "member"
+      palate_stage:
+        | "descoberta"
+        | "exploracao"
+        | "aprofundamento"
+        | "conhecedor"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1361,6 +1512,12 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "member"],
+      palate_stage: [
+        "descoberta",
+        "exploracao",
+        "aprofundamento",
+        "conhecedor",
+      ],
     },
   },
 } as const
