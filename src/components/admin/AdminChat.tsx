@@ -506,6 +506,73 @@ function SystemPromptEditor() {
   );
 }
 
+// ---- SYSTEM PROMPT V2 EDITOR ----
+function SystemPromptV2Editor() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: config, isLoading } = useQuery({
+    queryKey: ["admin-chat-config"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("ai_pricing_config").select("*").limit(1);
+      if (error) throw error;
+      return data?.[0] ?? null;
+    },
+  });
+
+  const [prompt, setPrompt] = useState("");
+  const [initialized, setInitialized] = useState(false);
+
+  useEffect(() => {
+    if (config && !initialized) {
+      setPrompt(config.system_prompt_v2 ?? "");
+      setInitialized(true);
+    }
+  }, [config, initialized]);
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!config) return;
+      const { error } = await supabase
+        .from("ai_pricing_config")
+        .update({ system_prompt_v2: prompt })
+        .eq("id", config.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: "System prompt v2 salvo!" });
+      queryClient.invalidateQueries({ queryKey: ["admin-chat-config"] });
+    },
+    onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+
+  if (isLoading) return <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>;
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
+        <FileText className="h-4 w-4" /> System Prompt v2
+      </h3>
+      <p className="text-xs text-muted-foreground">
+        Prompt de teste usado apenas no /sommelier-test. Não afeta a produção.
+      </p>
+      <Textarea
+        value={prompt}
+        onChange={e => setPrompt(e.target.value)}
+        rows={16}
+        className="font-mono text-xs"
+        placeholder="Insira o system prompt v2..."
+      />
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-muted-foreground">{prompt.length} caracteres</span>
+        <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="gap-2">
+          <Save className="h-4 w-4" /> Salvar Prompt v2
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 // ---- KNOWLEDGE BASE ----
 function KnowledgeBase() {
   const { toast } = useToast();
