@@ -1196,6 +1196,7 @@ export type Database = {
           importer: string | null
           is_published: boolean
           name: string
+          price: number | null
           price_range: string | null
           producer: string | null
           rating: number | null
@@ -1219,6 +1220,7 @@ export type Database = {
           importer?: string | null
           is_published?: boolean
           name: string
+          price?: number | null
           price_range?: string | null
           producer?: string | null
           rating?: number | null
@@ -1242,6 +1244,7 @@ export type Database = {
           importer?: string | null
           is_published?: boolean
           name?: string
+          price?: number | null
           price_range?: string | null
           producer?: string | null
           rating?: number | null
