@@ -419,8 +419,16 @@ serve(async (req) => {
       "alemanha": ["Alemanha"], "alemao": ["Alemanha"], "alema": ["Alemanha"],
       "austria": ["Áustria"], "austriaco": ["Áustria"],
       "argentina": ["Argentina"], "argentino": ["Argentina"],
-      "chile": ["Chile"], "chileno": ["Chile"],
-      "africa do sul": ["África do Sul"], "sul-africano": ["África do Sul"],
+      "chile": ["Chile"], "chileno": ["Chile"], "chilena": ["Chile"],
+      "africa do sul": ["África do Sul"], "sul-africano": ["África do Sul"], "sul-africana": ["África do Sul"],
+      "australia": ["Austrália"], "australiano": ["Austrália"], "australiana": ["Austrália"],
+      "nova zelandia": ["Nova Zelândia"], "neozerlandes": ["Nova Zelândia"], "neozelandes": ["Nova Zelândia"],
+      "uruguai": ["Uruguai"], "uruguaio": ["Uruguai"],
+      "grecia": ["Grécia"], "grego": ["Grécia"], "grega": ["Grécia"],
+      "libano": ["Líbano"], "libanes": ["Líbano"],
+      "estados unidos": ["Estados Unidos"], "americano": ["Estados Unidos"], "california": ["Estados Unidos"], "napa": ["Estados Unidos"], "oregon": ["Estados Unidos"],
+      "hungria": ["Hungria"], "hungaro": ["Hungria"],
+      "georgia": ["Geórgia"], "georgiano": ["Geórgia"],
     };
 
     const typeMap: Record<string, string> = {
