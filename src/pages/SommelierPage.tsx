@@ -130,6 +130,17 @@ export default function SommelierPage() {
     return normalizeChatMessages([...(data ?? [])].reverse());
   }, []);
 
+  const sendFeedback = async (wineIds: string[], feedback: "liked" | "disliked", msgIndex: number) => {
+    if (!user || feedbackSent[msgIndex] !== undefined) return;
+    setFeedbackSent(prev => ({ ...prev, [msgIndex]: feedback }));
+    for (const wineId of wineIds) {
+      await supabase.from("user_preference_log").upsert(
+        { user_id: user.id, wine_id: wineId, feedback },
+        { onConflict: "user_id,wine_id" }
+      );
+    }
+  };
+
   const hydrateSessionMessages = useCallback(async (sid: string) => {
     const { data: allMsgs } = await supabase
       .from("chat_messages")
