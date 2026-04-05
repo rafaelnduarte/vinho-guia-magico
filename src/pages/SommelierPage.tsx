@@ -309,6 +309,7 @@ export default function SommelierPage() {
     setMessages([]);
     setShowSidebar(false);
     setWarning(null);
+    setFeedbackSent({});
     latestPendingMessageRef.current = null;
     recoveryAttemptedRef.current = false;
     inputRef.current?.focus();
