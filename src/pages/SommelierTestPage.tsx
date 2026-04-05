@@ -344,7 +344,7 @@ export default function SommelierTestPage() {
     setShowSidebar(false);
     setWarning(null);
     setFeedbackSent({});
-    wineIdsMapRef.current = new Map();
+    
     latestPendingMessageRef.current = null;
     recoveryAttemptedRef.current = false;
     inputRef.current?.focus();
