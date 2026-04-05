@@ -167,10 +167,9 @@ export default function SommelierTestPage() {
 
   const sendFeedback = async (wineIds: string[], feedback: "liked" | "disliked", msgIndex: number) => {
     if (!user) return;
-    const currentFeedback = feedbackSent[msgIndex];
+    const current = feedbackSent[msgIndex];
 
-    // Same button clicked → remove feedback
-    if (currentFeedback === feedback) {
+    if (current === feedback) {
       setFeedbackSent(prev => {
         const next = { ...prev };
         delete next[msgIndex];
@@ -179,16 +178,14 @@ export default function SommelierTestPage() {
       for (const wineId of wineIds) {
         await supabase.from("user_preference_log").delete().eq("user_id", user.id).eq("wine_id", wineId);
       }
-      return;
-    }
-
-    // Different or new feedback → upsert
-    setFeedbackSent(prev => ({ ...prev, [msgIndex]: feedback }));
-    for (const wineId of wineIds) {
-      await supabase.from("user_preference_log").upsert(
-        { user_id: user.id, wine_id: wineId, feedback },
-        { onConflict: "user_id,wine_id" }
-      );
+    } else {
+      setFeedbackSent(prev => ({ ...prev, [msgIndex]: feedback }));
+      for (const wineId of wineIds) {
+        await supabase.from("user_preference_log").upsert(
+          { user_id: user.id, wine_id: wineId, feedback },
+          { onConflict: "user_id,wine_id" }
+        );
+      }
     }
   };
 
