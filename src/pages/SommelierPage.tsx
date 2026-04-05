@@ -435,11 +435,18 @@ export default function SommelierPage() {
 
       if (!wasRecoveredByPolling) {
         latestPendingMessageRef.current = null;
-        setMessages(prev => [...prev, {
-          role: "assistant",
-          content: assistantText,
-          recommended_wine_ids: data.recommended_wine_ids ?? [],
-        }]);
+        const trimmedReply = assistantText.trim();
+        setMessages(prev => {
+          const last = prev[prev.length - 1];
+          if (last?.role === "assistant" && last.content.trim() === trimmedReply) {
+            return prev;
+          }
+          return [...prev, {
+            role: "assistant",
+            content: assistantText,
+            recommended_wine_ids: data.recommended_wine_ids ?? [],
+          }];
+        });
       }
 
       if (data.usage) {
