@@ -195,9 +195,8 @@ export default function SommelierTestPage() {
     await hydrateSessionMessages(sid);
     setIsLoading(false);
     latestPendingMessageRef.current = null;
-    refetchUsage();
     return true;
-  }, [fetchRecentSessionMessages, hydrateSessionMessages, refetchUsage]);
+  }, [fetchRecentSessionMessages, hydrateSessionMessages]);
 
   const recoverPendingConversation = useCallback(async () => {
     if (!user || !isLoading || recoveryAttemptedRef.current) return false;
@@ -480,6 +479,7 @@ export default function SommelierTestPage() {
       if (sessionId) {
         const recoveredFromSession = await tryHydratePendingReply(sessionId);
         if (recoveredFromSession) {
+          refetchUsage();
           return;
         }
       }
@@ -522,6 +522,7 @@ export default function SommelierTestPage() {
       if (sessionId) {
         const recoveredFromSession = await tryHydratePendingReply(sessionId);
         if (recoveredFromSession) {
+          refetchUsage();
           return;
         }
       }
@@ -549,6 +550,7 @@ export default function SommelierTestPage() {
       if (sessionId) {
         const recoveredFromSession = await tryHydratePendingReply(sessionId);
         if (recoveredFromSession) {
+          refetchUsage();
           return;
         }
       }
