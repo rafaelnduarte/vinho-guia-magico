@@ -95,7 +95,7 @@ export default function SommelierTestPage() {
       .order("created_at", { ascending: true });
 
     const normalized = normalizeChatMessages(allMsgs ?? []);
-    // Preserve recommended_wine_ids from current messages so feedback buttons don't disappear
+    // Preserve recommended_wine_ids and append any local-only messages not yet in DB
     setMessages(prev => {
       const wineIdsByContent = new Map<string, string[]>();
       prev.forEach(m => {
@@ -103,7 +103,7 @@ export default function SommelierTestPage() {
           wineIdsByContent.set(m.content.slice(0, 200), m.recommended_wine_ids);
         }
       });
-      return normalized.map(m => {
+      const merged = normalized.map(m => {
         const key = m.content.slice(0, 200);
         const existingWineIds = wineIdsByContent.get(key);
         if (m.role === "assistant" && existingWineIds) {
@@ -111,6 +111,10 @@ export default function SommelierTestPage() {
         }
         return m;
       });
+      // Keep local-only user messages (not yet saved to DB) at the end
+      const dbContentKeys = new Set(normalized.map(m => m.role + ":" + m.content.slice(0, 200)));
+      const localOnly = prev.filter(m => !dbContentKeys.has(m.role + ":" + m.content.slice(0, 200)));
+      return [...merged, ...localOnly];
     });
     return normalized;
   }, []);
