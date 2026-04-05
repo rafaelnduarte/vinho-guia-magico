@@ -21,8 +21,13 @@ interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   created_at?: string;
-  recommended_wine_ids?: string[];
 }
+
+const extractWineIdsFromContent = (content: string): string[] => {
+  const matches = content.match(/radar\.jovemdovinho\.com\.br\/curadoria\/([a-f0-9-]{36})/g);
+  if (!matches) return [];
+  return [...new Set(matches.map(m => m.replace(/.*\/curadoria\//, '')))];
+};
 
 interface ChatSession {
   id: string;
@@ -51,26 +56,6 @@ const getMessageContentKey = (message: Pick<ChatMessage, "role" | "content">) =>
   `${message.role}:${message.content.trim().slice(0, 200)}`;
 
 const mergeHydratedMessages = (previousMessages: ChatMessage[], hydratedMessages: ChatMessage[]) => {
-  const assistantWineIdQueues = new Map<string, string[][]>();
-
-  previousMessages.forEach((message) => {
-    if (message.role !== "assistant" || !message.recommended_wine_ids?.length) return;
-
-    const key = getMessageContentKey(message);
-    const queue = assistantWineIdQueues.get(key) ?? [];
-    queue.push(message.recommended_wine_ids);
-    assistantWineIdQueues.set(key, queue);
-  });
-
-  const mergedMessages = hydratedMessages.map((message) => {
-    if (message.role !== "assistant") return message;
-
-    const queue = assistantWineIdQueues.get(getMessageContentKey(message));
-    const recommended_wine_ids = queue?.shift();
-
-    return recommended_wine_ids ? { ...message, recommended_wine_ids } : message;
-  });
-
   const hydratedUserCounts = new Map<string, number>();
 
   hydratedMessages.forEach((message) => {
@@ -91,7 +76,7 @@ const mergeHydratedMessages = (previousMessages: ChatMessage[], hydratedMessages
     return seenCount >= (hydratedUserCounts.get(key) ?? 0);
   });
 
-  return [...mergedMessages, ...localOnlyUsers];
+  return [...hydratedMessages, ...localOnlyUsers];
 };
 
 const hasAssistantReplyAfterPendingMessage = (allMsgs: ChatMessage[], pendingText?: string | null) => {
@@ -140,7 +125,7 @@ export default function SommelierPage() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const latestPendingMessageRef = useRef<string | null>(null);
   const recoveryAttemptedRef = useRef(false);
-  const wineIdsMapRef = useRef<Map<string, string[]>>(new Map());
+  
 
   const isAdmin = role === "admin";
 
@@ -339,7 +324,6 @@ export default function SommelierPage() {
     recoveryAttemptedRef.current = false;
     latestPendingMessageRef.current = null;
     setFeedbackSent({});
-    wineIdsMapRef.current = new Map();
     await hydrateSessionMessages(sid);
   };
 
@@ -349,7 +333,7 @@ export default function SommelierPage() {
     setShowSidebar(false);
     setWarning(null);
     setFeedbackSent({});
-    wineIdsMapRef.current = new Map();
+    
     latestPendingMessageRef.current = null;
     recoveryAttemptedRef.current = false;
     inputRef.current?.focus();
@@ -436,10 +420,6 @@ export default function SommelierPage() {
       if (!wasRecoveredByPolling) {
         latestPendingMessageRef.current = null;
         const trimmedReply = assistantText.trim();
-        const wineIds = data.recommended_wine_ids ?? [];
-        if (wineIds.length > 0) {
-          wineIdsMapRef.current.set(`assistant:${trimmedReply.slice(0, 200)}`, wineIds);
-        }
         setMessages(prev => {
           const last = prev[prev.length - 1];
           if (last?.role === "assistant" && last.content.trim() === trimmedReply) {
@@ -448,7 +428,6 @@ export default function SommelierPage() {
           return [...prev, {
             role: "assistant",
             content: assistantText,
-            recommended_wine_ids: wineIds,
           }];
         });
       }
@@ -790,10 +769,8 @@ export default function SommelierPage() {
                     </div>
                   </div>
                   {msg.role === "assistant" && (() => {
-                    const wineIds = msg.recommended_wine_ids?.length
-                      ? msg.recommended_wine_ids
-                      : wineIdsMapRef.current.get(getMessageContentKey(msg));
-                    return wineIds && wineIds.length > 0 ? (
+                    const wineIds = extractWineIdsFromContent(msg.content);
+                    return wineIds.length > 0 ? (
                     <div className="flex justify-start mt-2 ml-1">
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <span>Gostou das recomendações?</span>
