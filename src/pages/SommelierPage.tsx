@@ -769,10 +769,8 @@ export default function SommelierPage() {
                     </div>
                   </div>
                   {msg.role === "assistant" && (() => {
-                    const wineIds = msg.recommended_wine_ids?.length
-                      ? msg.recommended_wine_ids
-                      : wineIdsMapRef.current.get(getMessageContentKey(msg));
-                    return wineIds && wineIds.length > 0 ? (
+                    const wineIds = extractWineIdsFromContent(msg.content);
+                    return wineIds.length > 0 ? (
                     <div className="flex justify-start mt-2 ml-1">
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <span>Gostou das recomendações?</span>
