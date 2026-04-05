@@ -820,7 +820,19 @@ export default function SommelierPage() {
                       </div>
                     </div>
                     ) : null;
-                  })()}
+                   })()}
+                </div>
+              ))}
+
+              {isLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-card border border-border rounded-xl px-4 py-3 flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    <span className="text-sm text-muted-foreground">Pensando...</span>
+                  </div>
+                </div>
+              )}
+
               {warning && !budgetExceeded && (
                 <div className="flex justify-center">
                   <div className="bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2 text-xs text-destructive flex items-center gap-2">
