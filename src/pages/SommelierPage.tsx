@@ -111,6 +111,17 @@ export default function SommelierPage() {
 
   const isAdmin = role === "admin";
 
+  const fetchRecentSessionMessages = useCallback(async (sid: string) => {
+    const { data } = await supabase
+      .from("chat_messages")
+      .select("id, role, content, created_at")
+      .eq("session_id", sid)
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    return normalizeChatMessages([...(data ?? [])].reverse());
+  }, []);
+
   const hydrateSessionMessages = useCallback(async (sid: string) => {
     const { data: allMsgs } = await supabase
       .from("chat_messages")
@@ -119,9 +130,24 @@ export default function SommelierPage() {
       .order("created_at", { ascending: true });
 
     const normalized = normalizeChatMessages(allMsgs ?? []);
-    setMessages(normalized);
+    setMessages((prev) => mergeHydratedMessages(prev, normalized));
     return normalized;
   }, []);
+
+  const tryHydratePendingReply = useCallback(async (sid: string) => {
+    const pendingText = latestPendingMessageRef.current;
+    if (!pendingText) return false;
+
+    const recentMessages = await fetchRecentSessionMessages(sid);
+    if (!hasAssistantReplyAfterPendingMessage(recentMessages, pendingText)) {
+      return false;
+    }
+
+    await hydrateSessionMessages(sid);
+    setIsLoading(false);
+    latestPendingMessageRef.current = null;
+    return true;
+  }, [fetchRecentSessionMessages, hydrateSessionMessages]);
 
   const recoverPendingConversation = useCallback(async () => {
     if (!user || !isLoading || recoveryAttemptedRef.current) return false;
@@ -152,11 +178,11 @@ export default function SommelierPage() {
         ? normalized.some((m) => m.role === "user" && m.content.trim().toLowerCase() === pendingText)
         : normalized.some((m) => m.role === "user");
 
-      const hasAssistantReply = hasRenderableAssistantReply(normalized);
+      const hasAssistantReply = hasAssistantReplyAfterPendingMessage(normalized, pendingText);
 
       if (hasMatchingUserMessage) {
         setSessionId(session.id);
-        setMessages(normalized);
+        setMessages((prev) => mergeHydratedMessages(prev, normalized));
 
         if (hasAssistantReply) {
           setIsLoading(false);
