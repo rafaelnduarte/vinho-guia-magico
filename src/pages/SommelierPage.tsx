@@ -111,6 +111,7 @@ export default function SommelierPage() {
   const [warning, setWarning] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(false);
   const [sessionSearch, setSessionSearch] = useState("");
+  const [feedbackSent, setFeedbackSent] = useState<Record<number, string>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const latestPendingMessageRef = useRef<string | null>(null);
