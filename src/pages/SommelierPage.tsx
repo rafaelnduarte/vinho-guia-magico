@@ -44,6 +44,48 @@ const normalizeChatMessages = (allMsgs: Array<any>): ChatMessage[] =>
 const hasRenderableAssistantReply = (allMsgs: ChatMessage[]) =>
   allMsgs.some((m) => m.role === "assistant" && m.content.trim().length > 0);
 
+const getMessageContentKey = (message: Pick<ChatMessage, "role" | "content">) =>
+  `${message.role}:${message.content.trim().slice(0, 200)}`;
+
+const mergeHydratedMessages = (previousMessages: ChatMessage[], hydratedMessages: ChatMessage[]) => {
+  const hydratedUserCounts = new Map<string, number>();
+  hydratedMessages.forEach((message) => {
+    if (message.role !== "user") return;
+    const key = getMessageContentKey(message);
+    hydratedUserCounts.set(key, (hydratedUserCounts.get(key) ?? 0) + 1);
+  });
+
+  const seenUserCounts = new Map<string, number>();
+  const localOnlyUsers = previousMessages.filter((message) => {
+    if (message.role !== "user") return false;
+    const key = getMessageContentKey(message);
+    const seenCount = seenUserCounts.get(key) ?? 0;
+    seenUserCounts.set(key, seenCount + 1);
+    return seenCount >= (hydratedUserCounts.get(key) ?? 0);
+  });
+
+  return [...hydratedMessages, ...localOnlyUsers];
+};
+
+const hasAssistantReplyAfterPendingMessage = (allMsgs: ChatMessage[], pendingText?: string | null) => {
+  const normalizedPendingText = pendingText?.trim().toLowerCase();
+  if (!normalizedPendingText) {
+    return hasRenderableAssistantReply(allMsgs);
+  }
+  let matchedUserIndex = -1;
+  for (let index = allMsgs.length - 1; index >= 0; index -= 1) {
+    const message = allMsgs[index];
+    if (message.role === "user" && message.content.trim().toLowerCase() === normalizedPendingText) {
+      matchedUserIndex = index;
+      break;
+    }
+  }
+  if (matchedUserIndex === -1) return false;
+  return allMsgs.slice(matchedUserIndex + 1).some(
+    (message) => message.role === "assistant" && message.content.trim().length > 0,
+  );
+};
+
 const QUICK_SUGGESTIONS = [
   { label: "🍷 Harmonização", prompt: "Me ajuda com harmonização! Qual vinho do portal combina com um jantar de massas?" },
   { label: "✈️ Flight de 4", prompt: "Monte um flight de 4 vinhos do portal por um tema interessante." },
