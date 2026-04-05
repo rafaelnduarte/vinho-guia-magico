@@ -8,7 +8,8 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
   Wine, Send, Loader2, Sparkles, AlertTriangle,
-  MessageSquare, Plus, ChevronLeft, Search, X
+  MessageSquare, Plus, ChevronLeft, Search, X,
+  ThumbsUp, ThumbsDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -20,6 +21,7 @@ interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   created_at?: string;
+  recommended_wine_ids?: string[];
 }
 
 interface ChatSession {
@@ -49,9 +51,31 @@ const getMessageContentKey = (message: Pick<ChatMessage, "role" | "content">) =>
   `${message.role}:${message.content.trim().slice(0, 200)}`;
 
 const mergeHydratedMessages = (previousMessages: ChatMessage[], hydratedMessages: ChatMessage[]) => {
+  const assistantWineIdQueues = new Map<string, string[][]>();
+
+  previousMessages.forEach((message) => {
+    if (message.role !== "assistant" || !message.recommended_wine_ids?.length) return;
+
+    const key = getMessageContentKey(message);
+    const queue = assistantWineIdQueues.get(key) ?? [];
+    queue.push(message.recommended_wine_ids);
+    assistantWineIdQueues.set(key, queue);
+  });
+
+  const mergedMessages = hydratedMessages.map((message) => {
+    if (message.role !== "assistant") return message;
+
+    const queue = assistantWineIdQueues.get(getMessageContentKey(message));
+    const recommended_wine_ids = queue?.shift();
+
+    return recommended_wine_ids ? { ...message, recommended_wine_ids } : message;
+  });
+
   const hydratedUserCounts = new Map<string, number>();
+
   hydratedMessages.forEach((message) => {
     if (message.role !== "user") return;
+
     const key = getMessageContentKey(message);
     hydratedUserCounts.set(key, (hydratedUserCounts.get(key) ?? 0) + 1);
   });
@@ -59,13 +83,15 @@ const mergeHydratedMessages = (previousMessages: ChatMessage[], hydratedMessages
   const seenUserCounts = new Map<string, number>();
   const localOnlyUsers = previousMessages.filter((message) => {
     if (message.role !== "user") return false;
+
     const key = getMessageContentKey(message);
     const seenCount = seenUserCounts.get(key) ?? 0;
     seenUserCounts.set(key, seenCount + 1);
+
     return seenCount >= (hydratedUserCounts.get(key) ?? 0);
   });
 
-  return [...hydratedMessages, ...localOnlyUsers];
+  return [...mergedMessages, ...localOnlyUsers];
 };
 
 const hasAssistantReplyAfterPendingMessage = (allMsgs: ChatMessage[], pendingText?: string | null) => {
@@ -109,6 +135,7 @@ export default function SommelierPage() {
   const [warning, setWarning] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(false);
   const [sessionSearch, setSessionSearch] = useState("");
+  const [feedbackSent, setFeedbackSent] = useState<Record<number, string>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const latestPendingMessageRef = useRef<string | null>(null);
@@ -126,6 +153,17 @@ export default function SommelierPage() {
 
     return normalizeChatMessages([...(data ?? [])].reverse());
   }, []);
+
+  const sendFeedback = async (wineIds: string[], feedback: "liked" | "disliked", msgIndex: number) => {
+    if (!user || feedbackSent[msgIndex] !== undefined) return;
+    setFeedbackSent(prev => ({ ...prev, [msgIndex]: feedback }));
+    for (const wineId of wineIds) {
+      await supabase.from("user_preference_log").upsert(
+        { user_id: user.id, wine_id: wineId, feedback },
+        { onConflict: "user_id,wine_id" }
+      );
+    }
+  };
 
   const hydrateSessionMessages = useCallback(async (sid: string) => {
     const { data: allMsgs } = await supabase
@@ -286,6 +324,7 @@ export default function SommelierPage() {
     setShowSidebar(false);
     recoveryAttemptedRef.current = false;
     latestPendingMessageRef.current = null;
+    setFeedbackSent({});
     await hydrateSessionMessages(sid);
   };
 
@@ -294,6 +333,7 @@ export default function SommelierPage() {
     setMessages([]);
     setShowSidebar(false);
     setWarning(null);
+    setFeedbackSent({});
     latestPendingMessageRef.current = null;
     recoveryAttemptedRef.current = false;
     inputRef.current?.focus();
@@ -379,7 +419,11 @@ export default function SommelierPage() {
 
       if (!wasRecoveredByPolling) {
         latestPendingMessageRef.current = null;
-        setMessages(prev => [...prev, { role: "assistant", content: assistantText }]);
+        setMessages(prev => [...prev, {
+          role: "assistant",
+          content: assistantText,
+          recommended_wine_ids: data.recommended_wine_ids ?? [],
+        }]);
       }
 
       if (data.usage) {
@@ -692,30 +736,61 @@ export default function SommelierPage() {
               )}
 
               {messages.map((msg, i) => (
-                <div key={i} className={cn("flex", msg.role === "user" ? "justify-end" : "justify-start")}>
-                  <div className={cn(
-                    "max-w-[85%] rounded-xl px-4 py-3 text-sm",
-                    msg.role === "user"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-card border border-border text-foreground"
-                  )}>
-                    {msg.role === "assistant" ? (
-                      <div className="prose prose-sm max-w-none dark:prose-invert [&>p]:mb-2 [&>ul]:mb-2 [&>ol]:mb-2">
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
-                          components={{
-                            a: ({ href, children }) => (
-                              <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80">
-                                {children}
-                              </a>
-                            ),
-                          }}
-                        >{linkifyContent(msg.content)}</ReactMarkdown>
-                      </div>
-                    ) : (
-                      <p className="whitespace-pre-wrap">{msg.content}</p>
-                    )}
+                <div key={i}>
+                  <div className={cn("flex", msg.role === "user" ? "justify-end" : "justify-start")}>
+                    <div className={cn(
+                      "max-w-[85%] rounded-xl px-4 py-3 text-sm",
+                      msg.role === "user"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-card border border-border text-foreground"
+                    )}>
+                      {msg.role === "assistant" ? (
+                        <div className="prose prose-sm max-w-none dark:prose-invert [&>p]:mb-2 [&>ul]:mb-2 [&>ol]:mb-2">
+                          <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            components={{
+                              a: ({ href, children }) => (
+                                <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80">
+                                  {children}
+                                </a>
+                              ),
+                            }}
+                          >{linkifyContent(msg.content)}</ReactMarkdown>
+                        </div>
+                      ) : (
+                        <p className="whitespace-pre-wrap">{msg.content}</p>
+                      )}
+                    </div>
                   </div>
+                  {msg.role === "assistant" && msg.recommended_wine_ids && msg.recommended_wine_ids.length > 0 && (
+                    <div className="flex justify-start mt-2 ml-1">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span>Gostou das recomendações?</span>
+                        <button
+                          onClick={() => sendFeedback(msg.recommended_wine_ids!, "liked", i)}
+                          disabled={feedbackSent[i] !== undefined}
+                          className={cn(
+                            "p-1 rounded transition-colors",
+                            feedbackSent[i] === "liked" ? "text-emerald-500" : "hover:text-emerald-500 text-muted-foreground",
+                            feedbackSent[i] !== undefined && "opacity-70"
+                          )}
+                        >
+                          <ThumbsUp className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => sendFeedback(msg.recommended_wine_ids!, "disliked", i)}
+                          disabled={feedbackSent[i] !== undefined}
+                          className={cn(
+                            "p-1 rounded transition-colors",
+                            feedbackSent[i] === "disliked" ? "text-destructive" : "hover:text-destructive text-muted-foreground",
+                            feedbackSent[i] !== undefined && "opacity-70"
+                          )}
+                        >
+                          <ThumbsDown className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
 
