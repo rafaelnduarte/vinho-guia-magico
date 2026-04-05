@@ -111,9 +111,10 @@ export default function SommelierTestPage() {
         }
         return m;
       });
-      // Keep local-only user messages (not yet saved to DB) at the end
+      // Keep local-only USER messages (not yet saved to DB) at the end
+      // Never keep local-only assistant messages — they come from DB via hydration
       const dbContentKeys = new Set(normalized.map(m => m.role + ":" + m.content.slice(0, 200)));
-      const localOnly = prev.filter(m => !dbContentKeys.has(m.role + ":" + m.content.slice(0, 200)));
+      const localOnly = prev.filter(m => m.role === "user" && !dbContentKeys.has(m.role + ":" + m.content.slice(0, 200)));
       return [...merged, ...localOnly];
     });
     return normalized;
