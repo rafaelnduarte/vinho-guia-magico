@@ -324,7 +324,6 @@ export default function SommelierPage() {
     recoveryAttemptedRef.current = false;
     latestPendingMessageRef.current = null;
     setFeedbackSent({});
-    wineIdsMapRef.current = new Map();
     await hydrateSessionMessages(sid);
   };
 
