@@ -712,30 +712,61 @@ export default function SommelierPage() {
               )}
 
               {messages.map((msg, i) => (
-                <div key={i} className={cn("flex", msg.role === "user" ? "justify-end" : "justify-start")}>
-                  <div className={cn(
-                    "max-w-[85%] rounded-xl px-4 py-3 text-sm",
-                    msg.role === "user"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-card border border-border text-foreground"
-                  )}>
-                    {msg.role === "assistant" ? (
-                      <div className="prose prose-sm max-w-none dark:prose-invert [&>p]:mb-2 [&>ul]:mb-2 [&>ol]:mb-2">
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
-                          components={{
-                            a: ({ href, children }) => (
-                              <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80">
-                                {children}
-                              </a>
-                            ),
-                          }}
-                        >{linkifyContent(msg.content)}</ReactMarkdown>
-                      </div>
-                    ) : (
-                      <p className="whitespace-pre-wrap">{msg.content}</p>
-                    )}
+                <div key={i}>
+                  <div className={cn("flex", msg.role === "user" ? "justify-end" : "justify-start")}>
+                    <div className={cn(
+                      "max-w-[85%] rounded-xl px-4 py-3 text-sm",
+                      msg.role === "user"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-card border border-border text-foreground"
+                    )}>
+                      {msg.role === "assistant" ? (
+                        <div className="prose prose-sm max-w-none dark:prose-invert [&>p]:mb-2 [&>ul]:mb-2 [&>ol]:mb-2">
+                          <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            components={{
+                              a: ({ href, children }) => (
+                                <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80">
+                                  {children}
+                                </a>
+                              ),
+                            }}
+                          >{linkifyContent(msg.content)}</ReactMarkdown>
+                        </div>
+                      ) : (
+                        <p className="whitespace-pre-wrap">{msg.content}</p>
+                      )}
+                    </div>
                   </div>
+                  {msg.role === "assistant" && msg.recommended_wine_ids && msg.recommended_wine_ids.length > 0 && (
+                    <div className="flex justify-start mt-2 ml-1">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span>Gostou das recomendações?</span>
+                        <button
+                          onClick={() => sendFeedback(msg.recommended_wine_ids!, "liked", i)}
+                          disabled={feedbackSent[i] !== undefined}
+                          className={cn(
+                            "p-1 rounded transition-colors",
+                            feedbackSent[i] === "liked" ? "text-emerald-500" : "hover:text-emerald-500 text-muted-foreground",
+                            feedbackSent[i] !== undefined && "opacity-70"
+                          )}
+                        >
+                          <ThumbsUp className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => sendFeedback(msg.recommended_wine_ids!, "disliked", i)}
+                          disabled={feedbackSent[i] !== undefined}
+                          className={cn(
+                            "p-1 rounded transition-colors",
+                            feedbackSent[i] === "disliked" ? "text-destructive" : "hover:text-destructive text-muted-foreground",
+                            feedbackSent[i] !== undefined && "opacity-70"
+                          )}
+                        >
+                          <ThumbsDown className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
 
