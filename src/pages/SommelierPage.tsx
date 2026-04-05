@@ -821,43 +821,6 @@ export default function SommelierPage() {
                     </div>
                     ) : null;
                   })()}
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span>Gostou das recomendações?</span>
-                        <button
-                          type="button"
-                          onClick={() => sendFeedback(msg.recommended_wine_ids!, "liked", i)}
-                          className={cn(
-                            "p-1 rounded transition-colors",
-                            feedbackSent[i] === "liked" ? "text-emerald-500" : "hover:text-emerald-500 text-muted-foreground"
-                          )}
-                        >
-                          <ThumbsUp className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => sendFeedback(msg.recommended_wine_ids!, "disliked", i)}
-                          className={cn(
-                            "p-1 rounded transition-colors",
-                            feedbackSent[i] === "disliked" ? "text-destructive" : "hover:text-destructive text-muted-foreground"
-                          )}
-                        >
-                          <ThumbsDown className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-
-              {isLoading && (
-                <div className="flex justify-start">
-                  <div className="bg-card border border-border rounded-xl px-4 py-3 flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                    <span className="text-sm text-muted-foreground">Pensando...</span>
-                  </div>
-                </div>
-              )}
-
               {warning && !budgetExceeded && (
                 <div className="flex justify-center">
                   <div className="bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2 text-xs text-destructive flex items-center gap-2">
