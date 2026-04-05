@@ -787,6 +787,7 @@ export default function SommelierPage() {
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <span>Gostou das recomendações?</span>
                         <button
+                          type="button"
                           onClick={() => sendFeedback(msg.recommended_wine_ids!, "liked", i)}
                           className={cn(
                             "p-1 rounded transition-colors",
@@ -796,6 +797,7 @@ export default function SommelierPage() {
                           <ThumbsUp className="h-3.5 w-3.5" />
                         </button>
                         <button
+                          type="button"
                           onClick={() => sendFeedback(msg.recommended_wine_ids!, "disliked", i)}
                           className={cn(
                             "p-1 rounded transition-colors",
