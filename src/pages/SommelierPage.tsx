@@ -155,7 +155,23 @@ export default function SommelierPage() {
   }, []);
 
   const sendFeedback = async (wineIds: string[], feedback: "liked" | "disliked", msgIndex: number) => {
-    if (!user || feedbackSent[msgIndex] !== undefined) return;
+    if (!user) return;
+    const currentFeedback = feedbackSent[msgIndex];
+
+    // Same button clicked → remove feedback
+    if (currentFeedback === feedback) {
+      setFeedbackSent(prev => {
+        const next = { ...prev };
+        delete next[msgIndex];
+        return next;
+      });
+      for (const wineId of wineIds) {
+        await supabase.from("user_preference_log").delete().eq("user_id", user.id).eq("wine_id", wineId);
+      }
+      return;
+    }
+
+    // Different or new feedback → upsert
     setFeedbackSent(prev => ({ ...prev, [msgIndex]: feedback }));
     for (const wineId of wineIds) {
       await supabase.from("user_preference_log").upsert(
@@ -419,11 +435,18 @@ export default function SommelierPage() {
 
       if (!wasRecoveredByPolling) {
         latestPendingMessageRef.current = null;
-        setMessages(prev => [...prev, {
-          role: "assistant",
-          content: assistantText,
-          recommended_wine_ids: data.recommended_wine_ids ?? [],
-        }]);
+        const trimmedReply = assistantText.trim();
+        setMessages(prev => {
+          const last = prev[prev.length - 1];
+          if (last?.role === "assistant" && last.content.trim() === trimmedReply) {
+            return prev;
+          }
+          return [...prev, {
+            role: "assistant",
+            content: assistantText,
+            recommended_wine_ids: data.recommended_wine_ids ?? [],
+          }];
+        });
       }
 
       if (data.usage) {
@@ -768,22 +791,18 @@ export default function SommelierPage() {
                         <span>Gostou das recomendações?</span>
                         <button
                           onClick={() => sendFeedback(msg.recommended_wine_ids!, "liked", i)}
-                          disabled={feedbackSent[i] !== undefined}
                           className={cn(
                             "p-1 rounded transition-colors",
-                            feedbackSent[i] === "liked" ? "text-emerald-500" : "hover:text-emerald-500 text-muted-foreground",
-                            feedbackSent[i] !== undefined && "opacity-70"
+                            feedbackSent[i] === "liked" ? "text-emerald-500" : "hover:text-emerald-500 text-muted-foreground"
                           )}
                         >
                           <ThumbsUp className="h-3.5 w-3.5" />
                         </button>
                         <button
                           onClick={() => sendFeedback(msg.recommended_wine_ids!, "disliked", i)}
-                          disabled={feedbackSent[i] !== undefined}
                           className={cn(
                             "p-1 rounded transition-colors",
-                            feedbackSent[i] === "disliked" ? "text-destructive" : "hover:text-destructive text-muted-foreground",
-                            feedbackSent[i] !== undefined && "opacity-70"
+                            feedbackSent[i] === "disliked" ? "text-destructive" : "hover:text-destructive text-muted-foreground"
                           )}
                         >
                           <ThumbsDown className="h-3.5 w-3.5" />
