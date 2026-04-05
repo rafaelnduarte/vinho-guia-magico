@@ -44,6 +44,48 @@ const normalizeChatMessages = (allMsgs: Array<any>): ChatMessage[] =>
 const hasRenderableAssistantReply = (allMsgs: ChatMessage[]) =>
   allMsgs.some((m) => m.role === "assistant" && m.content.trim().length > 0);
 
+const getMessageContentKey = (message: Pick<ChatMessage, "role" | "content">) =>
+  `${message.role}:${message.content.trim().slice(0, 200)}`;
+
+const mergeHydratedMessages = (previousMessages: ChatMessage[], hydratedMessages: ChatMessage[]) => {
+  const hydratedUserCounts = new Map<string, number>();
+  hydratedMessages.forEach((message) => {
+    if (message.role !== "user") return;
+    const key = getMessageContentKey(message);
+    hydratedUserCounts.set(key, (hydratedUserCounts.get(key) ?? 0) + 1);
+  });
+
+  const seenUserCounts = new Map<string, number>();
+  const localOnlyUsers = previousMessages.filter((message) => {
+    if (message.role !== "user") return false;
+    const key = getMessageContentKey(message);
+    const seenCount = seenUserCounts.get(key) ?? 0;
+    seenUserCounts.set(key, seenCount + 1);
+    return seenCount >= (hydratedUserCounts.get(key) ?? 0);
+  });
+
+  return [...hydratedMessages, ...localOnlyUsers];
+};
+
+const hasAssistantReplyAfterPendingMessage = (allMsgs: ChatMessage[], pendingText?: string | null) => {
+  const normalizedPendingText = pendingText?.trim().toLowerCase();
+  if (!normalizedPendingText) {
+    return hasRenderableAssistantReply(allMsgs);
+  }
+  let matchedUserIndex = -1;
+  for (let index = allMsgs.length - 1; index >= 0; index -= 1) {
+    const message = allMsgs[index];
+    if (message.role === "user" && message.content.trim().toLowerCase() === normalizedPendingText) {
+      matchedUserIndex = index;
+      break;
+    }
+  }
+  if (matchedUserIndex === -1) return false;
+  return allMsgs.slice(matchedUserIndex + 1).some(
+    (message) => message.role === "assistant" && message.content.trim().length > 0,
+  );
+};
+
 const QUICK_SUGGESTIONS = [
   { label: "🍷 Harmonização", prompt: "Me ajuda com harmonização! Qual vinho do portal combina com um jantar de massas?" },
   { label: "✈️ Flight de 4", prompt: "Monte um flight de 4 vinhos do portal por um tema interessante." },
@@ -69,6 +111,17 @@ export default function SommelierPage() {
 
   const isAdmin = role === "admin";
 
+  const fetchRecentSessionMessages = useCallback(async (sid: string) => {
+    const { data } = await supabase
+      .from("chat_messages")
+      .select("id, role, content, created_at")
+      .eq("session_id", sid)
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    return normalizeChatMessages([...(data ?? [])].reverse());
+  }, []);
+
   const hydrateSessionMessages = useCallback(async (sid: string) => {
     const { data: allMsgs } = await supabase
       .from("chat_messages")
@@ -77,9 +130,24 @@ export default function SommelierPage() {
       .order("created_at", { ascending: true });
 
     const normalized = normalizeChatMessages(allMsgs ?? []);
-    setMessages(normalized);
+    setMessages((prev) => mergeHydratedMessages(prev, normalized));
     return normalized;
   }, []);
+
+  const tryHydratePendingReply = useCallback(async (sid: string) => {
+    const pendingText = latestPendingMessageRef.current;
+    if (!pendingText) return false;
+
+    const recentMessages = await fetchRecentSessionMessages(sid);
+    if (!hasAssistantReplyAfterPendingMessage(recentMessages, pendingText)) {
+      return false;
+    }
+
+    await hydrateSessionMessages(sid);
+    setIsLoading(false);
+    latestPendingMessageRef.current = null;
+    return true;
+  }, [fetchRecentSessionMessages, hydrateSessionMessages]);
 
   const recoverPendingConversation = useCallback(async () => {
     if (!user || !isLoading || recoveryAttemptedRef.current) return false;
@@ -110,11 +178,11 @@ export default function SommelierPage() {
         ? normalized.some((m) => m.role === "user" && m.content.trim().toLowerCase() === pendingText)
         : normalized.some((m) => m.role === "user");
 
-      const hasAssistantReply = hasRenderableAssistantReply(normalized);
+      const hasAssistantReply = hasAssistantReplyAfterPendingMessage(normalized, pendingText);
 
       if (hasMatchingUserMessage) {
         setSessionId(session.id);
-        setMessages(normalized);
+        setMessages((prev) => mergeHydratedMessages(prev, normalized));
 
         if (hasAssistantReply) {
           setIsLoading(false);
@@ -301,9 +369,13 @@ export default function SommelierPage() {
         return;
       }
 
-      latestPendingMessageRef.current = null;
+      const wasRecoveredByPolling = latestPendingMessageRef.current === null;
       recoveryAttemptedRef.current = false;
-      setMessages(prev => [...prev, { role: "assistant", content: assistantText }]);
+
+      if (!wasRecoveredByPolling) {
+        latestPendingMessageRef.current = null;
+        setMessages(prev => [...prev, { role: "assistant", content: assistantText }]);
+      }
 
       if (data.usage) {
         setUsageBrl(data.usage.cost_brl);
@@ -353,10 +425,9 @@ export default function SommelierPage() {
       }
 
       if (sessionId) {
-        const reloaded = await hydrateSessionMessages(sessionId);
-        if (hasRenderableAssistantReply(reloaded)) {
-          setIsLoading(false);
-          latestPendingMessageRef.current = null;
+        const recoveredFromSession = await tryHydratePendingReply(sessionId);
+        if (recoveredFromSession) {
+          refetchUsage();
           return;
         }
       }
@@ -391,19 +462,14 @@ export default function SommelierPage() {
     if (!isLoading && !hasPendingRecovery) return;
 
     const pollInterval = setInterval(async () => {
-      if (sessionId) {
-        const { data: latestMessages } = await supabase
-          .from("chat_messages")
-          .select("id, role, content, created_at")
-          .eq("session_id", sessionId)
-          .order("created_at", { ascending: false })
-          .limit(3);
+      const pendingText = latestPendingMessageRef.current;
+      if (!pendingText) {
+        return;
+      }
 
-        const normalizedLatest = normalizeChatMessages(latestMessages ?? []);
-        if (hasRenderableAssistantReply(normalizedLatest)) {
-          await hydrateSessionMessages(sessionId);
-          setIsLoading(false);
-          latestPendingMessageRef.current = null;
+      if (sessionId) {
+        const recoveredFromSession = await tryHydratePendingReply(sessionId);
+        if (recoveredFromSession) {
           refetchUsage();
           return;
         }
@@ -417,7 +483,7 @@ export default function SommelierPage() {
     }, 5000);
 
     return () => clearInterval(pollInterval);
-  }, [isLoading, sessionId, hydrateSessionMessages, recoverPendingConversation, refetchSessions, refetchUsage]);
+  }, [isLoading, sessionId, recoverPendingConversation, refetchSessions, tryHydratePendingReply, refetchUsage]);
 
   useEffect(() => {
     const hasPendingRecovery = !!latestPendingMessageRef.current;
@@ -426,11 +492,12 @@ export default function SommelierPage() {
     const handleVisibilityRecovery = async () => {
       if (document.visibilityState !== "visible") return;
 
+      const pendingText = latestPendingMessageRef.current;
+      if (!pendingText) return;
+
       if (sessionId) {
-        const reloaded = await hydrateSessionMessages(sessionId);
-        if (hasRenderableAssistantReply(reloaded)) {
-          setIsLoading(false);
-          latestPendingMessageRef.current = null;
+        const recoveredFromSession = await tryHydratePendingReply(sessionId);
+        if (recoveredFromSession) {
           refetchUsage();
           return;
         }
@@ -450,7 +517,7 @@ export default function SommelierPage() {
       document.removeEventListener("visibilitychange", handleVisibilityRecovery);
       window.removeEventListener("focus", handleVisibilityRecovery);
     };
-  }, [isLoading, sessionId, hydrateSessionMessages, recoverPendingConversation, refetchSessions, refetchUsage]);
+  }, [isLoading, sessionId, recoverPendingConversation, refetchSessions, tryHydratePendingReply, refetchUsage]);
 
   const usageCredits = Math.round(usageBrl * 10);
   const capCredits = Math.round(capBrl * 10);
