@@ -425,10 +425,9 @@ export default function SommelierPage() {
       }
 
       if (sessionId) {
-        const reloaded = await hydrateSessionMessages(sessionId);
-        if (hasRenderableAssistantReply(reloaded)) {
-          setIsLoading(false);
-          latestPendingMessageRef.current = null;
+        const recoveredFromSession = await tryHydratePendingReply(sessionId);
+        if (recoveredFromSession) {
+          refetchUsage();
           return;
         }
       }
