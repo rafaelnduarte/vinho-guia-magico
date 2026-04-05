@@ -26,6 +26,94 @@ REGRAS:
 const MAX_KNOWLEDGE_CHARS = 12_000;
 const MAX_WINES_IN_CONTEXT = 60;
 
+// ── Palate journey helpers ──────────────────────────────────
+const STAGE_LABELS: Record<string, string> = {
+  descoberta: "Descoberta — iniciante, buscando vinhos acessíveis e frutados",
+  exploracao: "Exploração — já experimentou vários estilos, aberto a novidades",
+  aprofundamento: "Aprofundamento — preferências definidas, pronto para complexidade",
+  conhecedor: "Conhecedor — paladar refinado, busca rótulos de produtor e terroir",
+};
+
+const STAGE_GUIDANCE: Record<string, string> = {
+  descoberta: "Priorize vinhos frutados, de boa relação custo-benefício e fáceis de apreciar. Evite rótulos muito tânicos, complexos ou de nicho. Use linguagem simples e didática.",
+  exploracao: "Sugira variedade: uvas e regiões que o usuário ainda não experimentou. Pode apresentar vinhos com um pouco mais de estrutura. Equilibre clareza e explicação técnica.",
+  aprofundamento: "Recomende vinhos com maior complexidade, terroir, safras específicas. Explore sub-regiões e produtores. Aumente a profundidade técnica.",
+  conhecedor: "Priorize vinhos de produtor, crus, rótulos de nicho, safras especiais. Use linguagem técnica sem simplificações. Trate o usuário como expert.",
+};
+
+interface UserSommelierContext {
+  profile: {
+    palate_stage: string;
+    preferred_types: string[];
+    preferred_countries: string[];
+    preferred_regions: string[];
+    preferred_grapes: string[];
+    price_range_min: number | null;
+    price_range_max: number | null;
+    total_recommendations: number;
+    taste_summary: string | null;
+    unique_countries_explored: number;
+    unique_regions_explored: number;
+    unique_grapes_explored: number;
+  } | null;
+  recent_recommendations: Array<{
+    wine_name: string; type: string; country: string; region: string; grape: string;
+    recommended_at: string; context: string;
+  }> | null;
+  all_recommended_wine_ids: string[] | null;
+  feedback_summary: {
+    total_liked: number; total_disliked: number;
+    liked_wines: Array<{ name: string; type: string; country: string; grape: string }> | null;
+    disliked_wines: Array<{ name: string; type: string; country: string; grape: string }> | null;
+  } | null;
+}
+
+const buildUserContextBlock = (ctx: UserSommelierContext): string => {
+  if (!ctx.profile) return "";
+  const parts: string[] = [];
+  const p = ctx.profile;
+  const stage = p.palate_stage || "descoberta";
+  parts.push(`\n\n--- CONTEXTO PERSONALIZADO DO USUÁRIO ---`);
+  parts.push(`Estágio da jornada: ${STAGE_LABELS[stage] || stage}`);
+  parts.push(`Orientação para este estágio: ${STAGE_GUIDANCE[stage] || ""}`);
+  parts.push(`Total de vinhos já recomendados: ${p.total_recommendations}`);
+  parts.push(`Diversidade explorada: ${p.unique_countries_explored} países, ${p.unique_regions_explored} regiões, ${p.unique_grapes_explored} uvas`);
+  if (p.preferred_types?.length) parts.push(`Tipos preferidos: ${p.preferred_types.join(", ")}`);
+  if (p.preferred_countries?.length) parts.push(`Países preferidos: ${p.preferred_countries.join(", ")}`);
+  if (p.preferred_regions?.length) parts.push(`Regiões preferidas: ${p.preferred_regions.join(", ")}`);
+  if (p.preferred_grapes?.length) parts.push(`Uvas preferidas: ${p.preferred_grapes.join(", ")}`);
+  if (p.price_range_min || p.price_range_max) parts.push(`Faixa de preço habitual: R$ ${p.price_range_min ?? "?"} – R$ ${p.price_range_max ?? "?"}`);
+  if (p.taste_summary) parts.push(`Resumo do perfil de gosto: ${p.taste_summary}`);
+  const fb = ctx.feedback_summary;
+  if (fb) {
+    if (fb.liked_wines?.length) parts.push(`\nVinhos que o usuário GOSTOU: ${fb.liked_wines.map((w) => `${w.name} (${w.type}, ${w.country})`).join("; ")}`);
+    if (fb.disliked_wines?.length) {
+      parts.push(`Vinhos que o usuário NÃO GOSTOU: ${fb.disliked_wines.map((w) => `${w.name} (${w.type}, ${w.country})`).join("; ")}`);
+      parts.push(`IMPORTANTE: Evite vinhos com perfil semelhante aos que o usuário não gostou.`);
+    }
+  }
+  if (ctx.recent_recommendations?.length) {
+    parts.push(`\nÚltimas recomendações feitas (NÃO repetir estes vinhos):`);
+    ctx.recent_recommendations.forEach((r) => {
+      parts.push(`- ${r.wine_name} (${r.type}, ${r.country}, ${r.region}) — ${r.context || "sem contexto"}`);
+    });
+  }
+  parts.push(`\nREGRA ABSOLUTA: NUNCA recomende um vinho que já foi recomendado para este usuário. Sempre sugira vinhos novos.`);
+  parts.push(`--- FIM DO CONTEXTO PERSONALIZADO ---\n`);
+  return parts.join("\n");
+};
+
+const extractRecommendedWineIds = (assistantContent: string, contextPack: Array<{ id: string; nome: string }>): string[] => {
+  const mentioned: string[] = [];
+  const contentLower = normalizeText(assistantContent);
+  for (const wine of contextPack) {
+    if (!wine.nome) continue;
+    const nameLower = normalizeText(wine.nome);
+    if (contentLower.includes(nameLower)) mentioned.push(wine.id);
+  }
+  return [...new Set(mentioned)];
+};
+
 class HttpError extends Error {
   status: number;
   code: string;
@@ -154,8 +242,10 @@ serve(async (req) => {
     const pricing = pricingArr?.[0];
     if (!pricing) throw new HttpError(500, "server_config", "Configuração de preços não encontrada");
 
+    // PRODUCTION: use original config fields (system_prompt, model_name, max_tokens_detalhado)
     const systemPrompt = pricing.system_prompt || FALLBACK_SYSTEM_PROMPT;
     const maxTokens = pricing.max_tokens_detalhado;
+
     const selectedModel = typeof pricing.model_name === "string" && pricing.model_name.trim().length > 0
       ? pricing.model_name.trim()
       : "google/gemini-3-flash-preview";
@@ -287,6 +377,19 @@ serve(async (req) => {
       conversationMessages = allHistory;
     }
 
+    // ── Fetch user sommelier context (profile + history) ──
+    const { data: userContextRaw } = await adminClient.rpc("get_user_sommelier_context", { _user_id: user.id });
+    const userContext: UserSommelierContext = userContextRaw ?? {
+      profile: null,
+      recent_recommendations: null,
+      all_recommended_wine_ids: null,
+      feedback_summary: null,
+    };
+    const alreadyRecommendedIds = new Set<string>(userContext.all_recommended_wine_ids ?? []);
+
+    // ── Fetch wine rankings ──
+    const { data: wineRankings } = await adminClient.rpc("get_wine_rankings", { period: "all" });
+
     const { data: allWines } = await adminClient
       .from("wines")
       .select("id, name, producer, country, region, vintage, type, grape, importer, price_range, price, description, tasting_notes, rating, status")
@@ -303,7 +406,125 @@ serve(async (req) => {
       new Set(querySource.split(/[^a-z0-9]+/g).filter((token) => token.length >= 3))
     ).slice(0, 25);
 
-    const scoredWines = allWinesList
+    // ── Smart pre-filter: detect country, type, and price from user message ──
+    const msgLower = message.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+    const countryMap: Record<string, string[]> = {
+      "franca": ["França"], "frances": ["França"], "francesa": ["França"], "franceses": ["França"], "borgonha": ["França"], "bordeaux": ["França"], "champagne": ["França"], "beaujolais": ["França"],
+      "italia": ["Itália"], "italiano": ["Itália"], "italiana": ["Itália"], "italianos": ["Itália"], "toscana": ["Itália"], "piemonte": ["Itália"],
+      "espanha": ["Espanha"], "espanhol": ["Espanha"], "espanhola": ["Espanha"], "espanhois": ["Espanha"],
+      "portugal": ["Portugal"], "portugues": ["Portugal"], "portuguesa": ["Portugal"],
+      "brasil": ["Brasil"], "brasileiro": ["Brasil"], "brasileira": ["Brasil"], "brasileiros": ["Brasil"],
+      "alemanha": ["Alemanha"], "alemao": ["Alemanha"], "alema": ["Alemanha"],
+      "austria": ["Áustria"], "austriaco": ["Áustria"],
+      "argentina": ["Argentina"], "argentino": ["Argentina"],
+      "chile": ["Chile"], "chileno": ["Chile"], "chilena": ["Chile"],
+      "africa do sul": ["África do Sul"], "sul-africano": ["África do Sul"], "sul-africana": ["África do Sul"],
+      "australia": ["Austrália"], "australiano": ["Austrália"], "australiana": ["Austrália"],
+      "nova zelandia": ["Nova Zelândia"], "neozerlandes": ["Nova Zelândia"], "neozelandes": ["Nova Zelândia"],
+      "uruguai": ["Uruguai"], "uruguaio": ["Uruguai"],
+      "grecia": ["Grécia"], "grego": ["Grécia"], "grega": ["Grécia"],
+      "libano": ["Líbano"], "libanes": ["Líbano"],
+      "estados unidos": ["Estados Unidos"], "americano": ["Estados Unidos"], "california": ["Estados Unidos"], "napa": ["Estados Unidos"], "oregon": ["Estados Unidos"],
+      "hungria": ["Hungria"], "hungaro": ["Hungria"],
+      "georgia": ["Geórgia"], "georgiano": ["Geórgia"],
+    };
+
+    const typeMap: Record<string, string> = {
+      "tinto": "tinto", "tintos": "tinto",
+      "branco": "branco", "brancos": "branco",
+      "rose": "rosé", "roses": "rosé",
+      "espumante": "espumante", "espumantes": "espumante",
+      "fortificado": "fortificado",
+    };
+
+    // Grape detection keywords (normalized, no accents)
+    const grapeKeywords: string[] = [
+      "malbec", "cabernet sauvignon", "cabernet franc", "cabernet", "merlot", "pinot noir", "pinot",
+      "syrah", "shiraz", "tempranillo", "sangiovese", "nebbiolo", "barbera", "grenache", "garnacha",
+      "mourvedre", "monastrell", "carmenere", "tannat", "touriga nacional", "touriga",
+      "chardonnay", "sauvignon blanc", "riesling", "gewurztraminer", "viognier", "chenin blanc",
+      "albarino", "verdejo", "gruner veltliner", "pinot grigio", "pinot gris", "torrontes",
+      "gamay", "petit verdot", "primitivo", "zinfandel", "corvina", "nero d'avola", "nero davola",
+      "aglianico", "montepulciano", "trebbiano", "vermentino", "fiano", "arneis",
+      "alicante bouschet", "castelao", "encruzado", "baga", "tinta roriz",
+      "prosecco", "glera", "muscat", "moscato", "lambrusco",
+    ];
+
+    let detectedGrapes: string[] = [];
+    for (const grape of grapeKeywords) {
+      if (msgLower.includes(grape)) {
+        detectedGrapes.push(grape);
+      }
+    }
+    detectedGrapes = [...new Set(detectedGrapes)];
+
+    let detectedCountries: string[] = [];
+    for (const [keyword, countries] of Object.entries(countryMap)) {
+      if (msgLower.includes(keyword)) {
+        detectedCountries.push(...countries);
+      }
+    }
+    detectedCountries = [...new Set(detectedCountries)];
+
+    let detectedType: string | null = null;
+    for (const [keyword, type] of Object.entries(typeMap)) {
+      if (msgLower.includes(keyword)) {
+        detectedType = type;
+        break;
+      }
+    }
+
+    const priceMatch = msgLower.match(/(?:ate|abaixo de|menos de|no maximo|max|budget)\s*(?:r\$\s*)?([\d.,]+)/);
+    let maxPrice: number | null = null;
+    if (priceMatch) {
+      maxPrice = parseFloat(priceMatch[1].replace(/\./g, "").replace(",", "."));
+    }
+
+    // Pre-filter: ensure matching wines get into context
+    let priorityWines: typeof allWinesList = [];
+    let remainingWines: typeof allWinesList = [];
+
+    if (detectedCountries.length > 0 || detectedType || maxPrice !== null || detectedGrapes.length > 0) {
+      for (const wine of allWinesList) {
+        let matches = true;
+        if (detectedCountries.length > 0 && !detectedCountries.includes(wine.country ?? "")) {
+          matches = false;
+        }
+        if (detectedType && wine.type !== detectedType) {
+          matches = false;
+        }
+        if (detectedGrapes.length > 0) {
+          const wineGrapeNorm = normalizeText(wine.grape ?? "");
+          const grapeMatch = detectedGrapes.some(g => wineGrapeNorm.includes(g));
+          if (!grapeMatch) {
+            matches = false;
+          }
+        }
+        if (maxPrice !== null && wine.price) {
+          if (Number(wine.price) > maxPrice) {
+            matches = false;
+          }
+        }
+        if (wine.status !== "curadoria") {
+          matches = false;
+        }
+        if (matches) {
+          priorityWines.push(wine);
+        } else {
+          remainingWines.push(wine);
+        }
+      }
+    } else {
+      remainingWines = allWinesList;
+    }
+
+    // Use priority wines first, fill remaining slots with other wines
+    const maxPriority = Math.min(priorityWines.length, MAX_WINES_IN_CONTEXT);
+    const maxRemaining = MAX_WINES_IN_CONTEXT - maxPriority;
+
+    const winesForScoring = [...priorityWines, ...remainingWines.slice(0, maxRemaining)];
+    const scoredWines = winesForScoring
       .map((wine) => {
         const searchable = normalizeText(
           [wine.name, wine.producer, wine.country, wine.region, wine.type, wine.grape, wine.importer]
@@ -317,6 +538,24 @@ serve(async (req) => {
           if (normalizeText(wine.name ?? "").includes(token)) score += 5;
           else if (normalizeText(wine.grape ?? "").includes(token) || normalizeText(wine.type ?? "").includes(token)) score += 3;
           else score += 1;
+        }
+
+        // Filter by price when user specified a budget
+        if (maxPrice !== null) {
+          const winePrice = parseFloat((wine.price_range ?? '0').replace(/[^\d.,]/g, '').replace(/\./g, '').replace(',', '.'));
+          if (!isNaN(winePrice) && winePrice > maxPrice) {
+            score = -100;
+          }
+        }
+
+        // Boost priority wines that match user filters
+        if (priorityWines.some(pw => pw.id === wine.id)) {
+          score += 20;
+        }
+
+        // Penalize already-recommended wines so new ones are prioritized
+        if (alreadyRecommendedIds.has(wine.id)) {
+          score = Math.max(score - 10, -1);
         }
 
         return { wine, score };
@@ -396,7 +635,18 @@ serve(async (req) => {
       mode: "detalhado",
     });
 
-    const fullSystemPrompt = systemPrompt + knowledgeContext + contextMessage +
+    const userContextBlock = buildUserContextBlock(userContext);
+
+    let rankingContext = "";
+    if (wineRankings && wineRankings.length > 0) {
+      const top20 = wineRankings.slice(0, 20);
+      const rankingLines = top20.map((r: any, i: number) =>
+        `${i + 1}. ${r.wine_name} (${r.wine_type ?? ""}, ${r.wine_country ?? ""}) — ${r.total_points} pontos (${r.vote_count} votos, ${r.comment_count} comentários)`
+      );
+      rankingContext = `\n\nRANKING DO PORTAL (top 20 por votos e comentários dos membros, all-time):\n${rankingLines.join("\n")}`;
+    }
+
+    const fullSystemPrompt = systemPrompt + knowledgeContext + contextMessage + rankingContext + userContextBlock +
       "\n\nIMPORTANTE: Seja sucinto e direto. Nunca entregue respostas incompletas. Complete sempre seu raciocínio.";
     const aiMessages = [
       { role: "system", content: fullSystemPrompt },
@@ -519,6 +769,72 @@ serve(async (req) => {
       });
     }
 
+    // ── Track recommended wines & update palate journey ──
+    const rankingWineEntries = (wineRankings ?? []).map((r: any) => ({ id: r.wine_id, nome: r.wine_name }));
+    const allKnownWines = [...contextPack, ...rankingWineEntries];
+    const recommendedWineIds = extractRecommendedWineIds(assistantContent, allKnownWines);
+    if (recommendedWineIds.length > 0) {
+      const newRecs = recommendedWineIds
+        .filter((wid) => !alreadyRecommendedIds.has(wid))
+        .map((wid) => ({
+          user_id: user.id,
+          wine_id: wid,
+          session_id: sessionId,
+          context: message.slice(0, 200),
+        }));
+
+      if (newRecs.length > 0) {
+        await adminClient
+          .from("recommendation_history")
+          .upsert(newRecs, { onConflict: "user_id,wine_id", ignoreDuplicates: true });
+
+        await adminClient
+          .from("user_wine_profile")
+          .update({
+            total_recommendations: (userContext.profile?.total_recommendations ?? 0) + newRecs.length,
+          })
+          .eq("user_id", user.id);
+
+        adminClient.rpc("update_palate_stage", { _user_id: user.id }).then(() => {
+          console.log("Palate stage updated for user", user.id);
+        }).catch(console.error);
+      }
+    }
+
+    // ── Update taste summary every 15 recommendations ──
+    const totalRecs = (userContext.profile?.total_recommendations ?? 0) + recommendedWineIds.length;
+    if (totalRecs > 0 && totalRecs % 15 === 0 && userContext.profile) {
+      const summaryInput = [
+        `Preferências: tipos=${(userContext.profile.preferred_types || []).join(",")}`,
+        `países=${(userContext.profile.preferred_countries || []).join(",")}`,
+        `uvas=${(userContext.profile.preferred_grapes || []).join(",")}`,
+        `Feedback positivo: ${userContext.feedback_summary?.total_liked ?? 0}`,
+        `Feedback negativo: ${userContext.feedback_summary?.total_disliked ?? 0}`,
+        `Últimas recs: ${(userContext.recent_recommendations || []).map((r) => r.wine_name).join(", ")}`,
+      ].join(". ");
+
+      fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: aiHeaders,
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash-lite",
+          messages: [
+            { role: "system", content: "Resuma o perfil de gosto deste usuário de vinho em 2-3 frases em português. Foque em padrões de preferência." },
+            { role: "user", content: summaryInput },
+          ],
+          max_completion_tokens: 100,
+        }),
+      }).then(async (res) => {
+        if (res.ok) {
+          const data = await res.json();
+          const summary = extractAssistantContent(data).trim();
+          if (summary) {
+            await adminClient.from("user_wine_profile").update({ taste_summary: summary }).eq("user_id", user.id);
+          }
+        }
+      }).catch(console.error);
+    }
+
     if (allHistory.length === 0) {
       fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
@@ -594,6 +910,8 @@ serve(async (req) => {
           tokens_out: tokensOut,
         },
         wine_ids: wineContext.map((w) => w.id),
+        recommended_wine_ids: recommendedWineIds,
+        palate_stage: userContext.profile?.palate_stage ?? "descoberta",
         warning: usagePercent >= 80 ? "Seus créditos estão acabando." : null,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
