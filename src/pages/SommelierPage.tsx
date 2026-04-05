@@ -56,26 +56,6 @@ const getMessageContentKey = (message: Pick<ChatMessage, "role" | "content">) =>
   `${message.role}:${message.content.trim().slice(0, 200)}`;
 
 const mergeHydratedMessages = (previousMessages: ChatMessage[], hydratedMessages: ChatMessage[]) => {
-  const assistantWineIdQueues = new Map<string, string[][]>();
-
-  previousMessages.forEach((message) => {
-    if (message.role !== "assistant" || !message.recommended_wine_ids?.length) return;
-
-    const key = getMessageContentKey(message);
-    const queue = assistantWineIdQueues.get(key) ?? [];
-    queue.push(message.recommended_wine_ids);
-    assistantWineIdQueues.set(key, queue);
-  });
-
-  const mergedMessages = hydratedMessages.map((message) => {
-    if (message.role !== "assistant") return message;
-
-    const queue = assistantWineIdQueues.get(getMessageContentKey(message));
-    const recommended_wine_ids = queue?.shift();
-
-    return recommended_wine_ids ? { ...message, recommended_wine_ids } : message;
-  });
-
   const hydratedUserCounts = new Map<string, number>();
 
   hydratedMessages.forEach((message) => {
@@ -96,7 +76,7 @@ const mergeHydratedMessages = (previousMessages: ChatMessage[], hydratedMessages
     return seenCount >= (hydratedUserCounts.get(key) ?? 0);
   });
 
-  return [...mergedMessages, ...localOnlyUsers];
+  return [...hydratedMessages, ...localOnlyUsers];
 };
 
 const hasAssistantReplyAfterPendingMessage = (allMsgs: ChatMessage[], pendingText?: string | null) => {
