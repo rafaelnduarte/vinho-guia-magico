@@ -462,19 +462,14 @@ export default function SommelierPage() {
     if (!isLoading && !hasPendingRecovery) return;
 
     const pollInterval = setInterval(async () => {
-      if (sessionId) {
-        const { data: latestMessages } = await supabase
-          .from("chat_messages")
-          .select("id, role, content, created_at")
-          .eq("session_id", sessionId)
-          .order("created_at", { ascending: false })
-          .limit(3);
+      const pendingText = latestPendingMessageRef.current;
+      if (!pendingText) {
+        return;
+      }
 
-        const normalizedLatest = normalizeChatMessages(latestMessages ?? []);
-        if (hasRenderableAssistantReply(normalizedLatest)) {
-          await hydrateSessionMessages(sessionId);
-          setIsLoading(false);
-          latestPendingMessageRef.current = null;
+      if (sessionId) {
+        const recoveredFromSession = await tryHydratePendingReply(sessionId);
+        if (recoveredFromSession) {
           refetchUsage();
           return;
         }
@@ -488,7 +483,7 @@ export default function SommelierPage() {
     }, 5000);
 
     return () => clearInterval(pollInterval);
-  }, [isLoading, sessionId, hydrateSessionMessages, recoverPendingConversation, refetchSessions, refetchUsage]);
+  }, [isLoading, sessionId, recoverPendingConversation, refetchSessions, tryHydratePendingReply, refetchUsage]);
 
   useEffect(() => {
     const hasPendingRecovery = !!latestPendingMessageRef.current;
@@ -497,11 +492,12 @@ export default function SommelierPage() {
     const handleVisibilityRecovery = async () => {
       if (document.visibilityState !== "visible") return;
 
+      const pendingText = latestPendingMessageRef.current;
+      if (!pendingText) return;
+
       if (sessionId) {
-        const reloaded = await hydrateSessionMessages(sessionId);
-        if (hasRenderableAssistantReply(reloaded)) {
-          setIsLoading(false);
-          latestPendingMessageRef.current = null;
+        const recoveredFromSession = await tryHydratePendingReply(sessionId);
+        if (recoveredFromSession) {
           refetchUsage();
           return;
         }
@@ -521,7 +517,7 @@ export default function SommelierPage() {
       document.removeEventListener("visibilitychange", handleVisibilityRecovery);
       window.removeEventListener("focus", handleVisibilityRecovery);
     };
-  }, [isLoading, sessionId, hydrateSessionMessages, recoverPendingConversation, refetchSessions, refetchUsage]);
+  }, [isLoading, sessionId, recoverPendingConversation, refetchSessions, tryHydratePendingReply, refetchUsage]);
 
   const usageCredits = Math.round(usageBrl * 10);
   const capCredits = Math.round(capBrl * 10);
