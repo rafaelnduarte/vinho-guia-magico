@@ -300,6 +300,7 @@ export default function SommelierPage() {
     setShowSidebar(false);
     recoveryAttemptedRef.current = false;
     latestPendingMessageRef.current = null;
+    setFeedbackSent({});
     await hydrateSessionMessages(sid);
   };
 
