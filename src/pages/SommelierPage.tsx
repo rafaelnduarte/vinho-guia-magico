@@ -140,6 +140,7 @@ export default function SommelierPage() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const latestPendingMessageRef = useRef<string | null>(null);
   const recoveryAttemptedRef = useRef(false);
+  const wineIdsMapRef = useRef<Map<string, string[]>>(new Map());
 
   const isAdmin = role === "admin";
 
