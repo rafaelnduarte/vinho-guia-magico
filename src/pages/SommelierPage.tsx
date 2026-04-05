@@ -21,6 +21,7 @@ interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   created_at?: string;
+  recommended_wine_ids?: string[];
 }
 
 interface ChatSession {
