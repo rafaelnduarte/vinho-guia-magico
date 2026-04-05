@@ -789,8 +789,38 @@ export default function SommelierPage() {
                       )}
                     </div>
                   </div>
-                  {msg.role === "assistant" && msg.recommended_wine_ids && msg.recommended_wine_ids.length > 0 && (
+                  {msg.role === "assistant" && (() => {
+                    const wineIds = msg.recommended_wine_ids?.length
+                      ? msg.recommended_wine_ids
+                      : wineIdsMapRef.current.get(getMessageContentKey(msg));
+                    return wineIds && wineIds.length > 0 ? (
                     <div className="flex justify-start mt-2 ml-1">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span>Gostou das recomendações?</span>
+                        <button
+                          type="button"
+                          onClick={() => sendFeedback(wineIds, "liked", i)}
+                          className={cn(
+                            "p-1 rounded transition-colors",
+                            feedbackSent[i] === "liked" ? "text-emerald-500" : "hover:text-emerald-500 text-muted-foreground"
+                          )}
+                        >
+                          <ThumbsUp className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => sendFeedback(wineIds, "disliked", i)}
+                          className={cn(
+                            "p-1 rounded transition-colors",
+                            feedbackSent[i] === "disliked" ? "text-destructive" : "hover:text-destructive text-muted-foreground"
+                          )}
+                        >
+                          <ThumbsDown className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                    ) : null;
+                  })()}
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <span>Gostou das recomendações?</span>
                         <button
