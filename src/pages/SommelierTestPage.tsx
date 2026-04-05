@@ -151,6 +151,7 @@ export default function SommelierTestPage() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const latestPendingMessageRef = useRef<string | null>(null);
   const recoveryAttemptedRef = useRef(false);
+  const wineIdsMapRef = useRef<Map<string, string[]>>(new Map());
 
   const isAdmin = role === "admin";
 
@@ -349,6 +350,7 @@ export default function SommelierTestPage() {
     recoveryAttemptedRef.current = false;
     latestPendingMessageRef.current = null;
     setFeedbackSent({});
+    wineIdsMapRef.current = new Map();
     await hydrateSessionMessages(sid);
   };
 
@@ -358,6 +360,7 @@ export default function SommelierTestPage() {
     setShowSidebar(false);
     setWarning(null);
     setFeedbackSent({});
+    wineIdsMapRef.current = new Map();
     latestPendingMessageRef.current = null;
     recoveryAttemptedRef.current = false;
     inputRef.current?.focus();
@@ -445,6 +448,10 @@ export default function SommelierTestPage() {
       if (!wasRecoveredByPolling) {
         latestPendingMessageRef.current = null;
         const trimmedReply = assistantText.trim();
+        const wineIds = data.recommended_wine_ids ?? [];
+        if (wineIds.length > 0) {
+          wineIdsMapRef.current.set(`assistant:${trimmedReply.slice(0, 200)}`, wineIds);
+        }
         setMessages(prev => {
           const last = prev[prev.length - 1];
           if (last?.role === "assistant" && last.content.trim() === trimmedReply) {
@@ -453,7 +460,7 @@ export default function SommelierTestPage() {
           return [...prev, {
             role: "assistant",
             content: assistantText,
-            recommended_wine_ids: data.recommended_wine_ids ?? [],
+            recommended_wine_ids: wineIds,
           }];
         });
       }
@@ -801,14 +808,17 @@ export default function SommelierTestPage() {
                       )}
                     </div>
                   </div>
-                  {/* Feedback buttons for assistant messages with recommendations */}
-                  {msg.role === "assistant" && msg.recommended_wine_ids && msg.recommended_wine_ids.length > 0 && (
+                  {msg.role === "assistant" && (() => {
+                    const wineIds = msg.recommended_wine_ids?.length
+                      ? msg.recommended_wine_ids
+                      : wineIdsMapRef.current.get(getMessageContentKey(msg));
+                    return wineIds && wineIds.length > 0 ? (
                     <div className="flex justify-start mt-2 ml-1">
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <span>Gostou das recomendações?</span>
                         <button
                           type="button"
-                          onClick={() => sendFeedback(msg.recommended_wine_ids!, "liked", i)}
+                          onClick={() => sendFeedback(wineIds, "liked", i)}
                           className={cn(
                             "p-1 rounded transition-colors",
                             feedbackSent[i] === "liked" ? "text-emerald-500" : "hover:text-emerald-500 text-muted-foreground"
@@ -818,7 +828,7 @@ export default function SommelierTestPage() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => sendFeedback(msg.recommended_wine_ids!, "disliked", i)}
+                          onClick={() => sendFeedback(wineIds, "disliked", i)}
                           className={cn(
                             "p-1 rounded transition-colors",
                             feedbackSent[i] === "disliked" ? "text-destructive" : "hover:text-destructive text-muted-foreground"
@@ -828,7 +838,8 @@ export default function SommelierTestPage() {
                         </button>
                       </div>
                     </div>
-                  )}
+                    ) : null;
+                  })()}
                 </div>
               ))}
 
