@@ -5,6 +5,7 @@ import MemberBadge from "@/components/MemberBadge";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   Wine, Send, Loader2, Sparkles, AlertTriangle,
   MessageSquare, Plus, ChevronLeft, Search, X,
@@ -122,6 +123,9 @@ const hasAssistantReplyAfterPendingMessage = (allMsgs: ChatMessage[], pendingTex
     (message) => message.role === "assistant" && message.content.trim().length > 0,
   );
 };
+
+const linkifyContent = (text: string) =>
+  text.replace(/(https?:\/\/[^\s\)]+)/g, (url) => `[${url}](${url})`);
 
 const QUICK_SUGGESTIONS = [
   { label: "🍷 Harmonização", prompt: "Me ajuda com harmonização! Qual vinho do portal combina com um jantar de massas?" },
@@ -760,7 +764,16 @@ export default function SommelierTestPage() {
                     )}>
                       {msg.role === "assistant" ? (
                         <div className="prose prose-sm max-w-none dark:prose-invert [&>p]:mb-2 [&>ul]:mb-2 [&>ol]:mb-2">
-                          <ReactMarkdown>{msg.content}</ReactMarkdown>
+                          <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            components={{
+                              a: ({ href, children }) => (
+                                <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80">
+                                  {children}
+                                </a>
+                              ),
+                            }}
+                          >{linkifyContent(msg.content)}</ReactMarkdown>
                         </div>
                       ) : (
                         <p className="whitespace-pre-wrap">{msg.content}</p>
