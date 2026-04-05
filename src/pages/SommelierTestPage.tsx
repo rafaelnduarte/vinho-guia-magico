@@ -167,10 +167,9 @@ export default function SommelierTestPage() {
 
   const sendFeedback = async (wineIds: string[], feedback: "liked" | "disliked", msgIndex: number) => {
     if (!user) return;
-    const currentFeedback = feedbackSent[msgIndex];
+    const current = feedbackSent[msgIndex];
 
-    // Same button clicked → remove feedback
-    if (currentFeedback === feedback) {
+    if (current === feedback) {
       setFeedbackSent(prev => {
         const next = { ...prev };
         delete next[msgIndex];
@@ -179,16 +178,14 @@ export default function SommelierTestPage() {
       for (const wineId of wineIds) {
         await supabase.from("user_preference_log").delete().eq("user_id", user.id).eq("wine_id", wineId);
       }
-      return;
-    }
-
-    // Different or new feedback → upsert
-    setFeedbackSent(prev => ({ ...prev, [msgIndex]: feedback }));
-    for (const wineId of wineIds) {
-      await supabase.from("user_preference_log").upsert(
-        { user_id: user.id, wine_id: wineId, feedback },
-        { onConflict: "user_id,wine_id" }
-      );
+    } else {
+      setFeedbackSent(prev => ({ ...prev, [msgIndex]: feedback }));
+      for (const wineId of wineIds) {
+        await supabase.from("user_preference_log").upsert(
+          { user_id: user.id, wine_id: wineId, feedback },
+          { onConflict: "user_id,wine_id" }
+        );
+      }
     }
   };
 
@@ -810,6 +807,7 @@ export default function SommelierTestPage() {
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <span>Gostou das recomendações?</span>
                         <button
+                          type="button"
                           onClick={() => sendFeedback(msg.recommended_wine_ids!, "liked", i)}
                           className={cn(
                             "p-1 rounded transition-colors",
@@ -819,6 +817,7 @@ export default function SommelierTestPage() {
                           <ThumbsUp className="h-3.5 w-3.5" />
                         </button>
                         <button
+                          type="button"
                           onClick={() => sendFeedback(msg.recommended_wine_ids!, "disliked", i)}
                           className={cn(
                             "p-1 rounded transition-colors",
