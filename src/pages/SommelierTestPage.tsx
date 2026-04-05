@@ -421,13 +421,17 @@ export default function SommelierTestPage() {
         return;
       }
 
-      latestPendingMessageRef.current = null;
+      const wasRecoveredByPolling = latestPendingMessageRef.current === null;
       recoveryAttemptedRef.current = false;
-      setMessages(prev => [...prev, {
-        role: "assistant",
-        content: assistantText,
-        recommended_wine_ids: data.recommended_wine_ids ?? [],
-      }]);
+
+      if (!wasRecoveredByPolling) {
+        latestPendingMessageRef.current = null;
+        setMessages(prev => [...prev, {
+          role: "assistant",
+          content: assistantText,
+          recommended_wine_ids: data.recommended_wine_ids ?? [],
+        }]);
+      }
 
       if (data.usage) {
         setUsageBrl(data.usage.cost_brl);
