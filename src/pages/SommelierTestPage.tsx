@@ -247,6 +247,7 @@ export default function SommelierTestPage() {
     setShowSidebar(false);
     recoveryAttemptedRef.current = false;
     latestPendingMessageRef.current = null;
+    setFeedbackSent({});
     await hydrateSessionMessages(sid);
   };
 
@@ -255,6 +256,7 @@ export default function SommelierTestPage() {
     setMessages([]);
     setShowSidebar(false);
     setWarning(null);
+    setFeedbackSent({});
     latestPendingMessageRef.current = null;
     recoveryAttemptedRef.current = false;
     inputRef.current?.focus();
