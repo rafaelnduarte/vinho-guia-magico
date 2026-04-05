@@ -804,22 +804,18 @@ export default function SommelierTestPage() {
                         <span>Gostou das recomendações?</span>
                         <button
                           onClick={() => sendFeedback(msg.recommended_wine_ids!, "liked", i)}
-                          disabled={feedbackSent[i] !== undefined}
                           className={cn(
                             "p-1 rounded transition-colors",
-                            feedbackSent[i] === "liked" ? "text-emerald-500" : "hover:text-emerald-500 text-muted-foreground",
-                            feedbackSent[i] !== undefined && "opacity-70"
+                            feedbackSent[i] === "liked" ? "text-emerald-500" : "hover:text-emerald-500 text-muted-foreground"
                           )}
                         >
                           <ThumbsUp className="h-3.5 w-3.5" />
                         </button>
                         <button
                           onClick={() => sendFeedback(msg.recommended_wine_ids!, "disliked", i)}
-                          disabled={feedbackSent[i] !== undefined}
                           className={cn(
                             "p-1 rounded transition-colors",
-                            feedbackSent[i] === "disliked" ? "text-destructive" : "hover:text-destructive text-muted-foreground",
-                            feedbackSent[i] !== undefined && "opacity-70"
+                            feedbackSent[i] === "disliked" ? "text-destructive" : "hover:text-destructive text-muted-foreground"
                           )}
                         >
                           <ThumbsDown className="h-3.5 w-3.5" />
