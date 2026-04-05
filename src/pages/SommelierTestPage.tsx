@@ -124,6 +124,9 @@ const hasAssistantReplyAfterPendingMessage = (allMsgs: ChatMessage[], pendingTex
   );
 };
 
+const linkifyContent = (text: string) =>
+  text.replace(/(https?:\/\/[^\s\)]+)/g, (url) => `[${url}](${url})`);
+
 const QUICK_SUGGESTIONS = [
   { label: "🍷 Harmonização", prompt: "Me ajuda com harmonização! Qual vinho do portal combina com um jantar de massas?" },
   { label: "✈️ Flight de 4", prompt: "Monte um flight de 4 vinhos do portal por um tema interessante." },
