@@ -88,7 +88,8 @@ const hasAssistantReplyAfterPendingMessage = (allMsgs: ChatMessage[], pendingTex
 };
 
 const linkifyContent = (text: string) =>
-  text.replace(/(?<!\]\()(?<!\()(https?:\/\/[^\s\)]+)(?!\))/g, (url) => `[${url}](${url})`);
+  text.replace(/(\[.*?\]\(https?:\/\/[^\)]+\))|(https?:\/\/[^\s\)]+)/g, (match, mdLink, bareUrl) =>
+    mdLink ? mdLink : `[${bareUrl}](${bareUrl})`);
 
 const QUICK_SUGGESTIONS = [
   { label: "🍷 Harmonização", prompt: "Me ajuda com harmonização! Qual vinho do portal combina com um jantar de massas?" },
