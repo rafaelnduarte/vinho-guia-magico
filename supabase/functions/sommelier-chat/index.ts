@@ -620,7 +620,7 @@ serve(async (req) => {
       status: wine.status,
       selos: sealMap[wine.id] ?? [],
       notas_thomas: notesMap[wine.id] ?? [],
-      link: `https://radar.jovemdovinho.com.br/curadoria/${wine.id}`,
+      link_plataforma: `https://radar.jovemdovinho.com.br/curadoria/${wine.id}`,
     }));
 
     const allWineNames = allWinesList.map((wine) => wine.name).join(" | ").slice(0, 6000);
