@@ -21,8 +21,13 @@ interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   created_at?: string;
-  recommended_wine_ids?: string[];
 }
+
+const extractWineIdsFromContent = (content: string): string[] => {
+  const matches = content.match(/radar\.jovemdovinho\.com\.br\/curadoria\/([a-f0-9-]{36})/g);
+  if (!matches) return [];
+  return [...new Set(matches.map(m => m.replace(/.*\/curadoria\//, '')))];
+};
 
 interface ChatSession {
   id: string;
