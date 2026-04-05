@@ -5,6 +5,7 @@ import MemberBadge from "@/components/MemberBadge";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   Wine, Send, Loader2, Sparkles, AlertTriangle,
   MessageSquare, Plus, ChevronLeft, Search, X
