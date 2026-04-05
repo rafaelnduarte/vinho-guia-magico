@@ -8,7 +8,8 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
   Wine, Send, Loader2, Sparkles, AlertTriangle,
-  MessageSquare, Plus, ChevronLeft, Search, X
+  MessageSquare, Plus, ChevronLeft, Search, X,
+  ThumbsUp, ThumbsDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
