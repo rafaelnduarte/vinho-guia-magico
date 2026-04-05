@@ -369,9 +369,13 @@ export default function SommelierPage() {
         return;
       }
 
-      latestPendingMessageRef.current = null;
+      const wasRecoveredByPolling = latestPendingMessageRef.current === null;
       recoveryAttemptedRef.current = false;
-      setMessages(prev => [...prev, { role: "assistant", content: assistantText }]);
+
+      if (!wasRecoveredByPolling) {
+        latestPendingMessageRef.current = null;
+        setMessages(prev => [...prev, { role: "assistant", content: assistantText }]);
+      }
 
       if (data.usage) {
         setUsageBrl(data.usage.cost_brl);
