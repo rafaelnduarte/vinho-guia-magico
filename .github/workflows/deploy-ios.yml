@@ -4,11 +4,12 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: macos-latest
-
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -18,21 +19,32 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Install dependencies
-        run: npm install
+      - name: Cache node modules
+        uses: actions/cache@v3
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
 
-      - name: Build for iOS
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Install Capacitor CLI globally
+        run: npm install -g @capacitor/cli
+
+      - name: Build Angular/React/Vue app
         run: npm run build
 
-      - name: Sync Capacitor
+      - name: Sync Capacitor with iOS
         run: npx cap sync ios
 
-      - name: Setup iOS app
+      - name: Setup CocoaPods
         run: |
           cd ios/App
-          pod install
+          pod install --repo-update
 
-      - name: Create App Store Connect API Key
+      - name: Create API Key file
         env:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
         run: |
@@ -40,38 +52,45 @@ jobs:
           echo "$APPLE_API_KEY" > ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.APPLE_KEY_ID }}.p8
           chmod 600 ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.APPLE_KEY_ID }}.p8
 
-      - name: Build and Upload to App Store
+      - name: Build iOS app for App Store
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
           APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
         run: |
           cd ios/App
-          xcodebuild -workspace App.xcworkspace \
+          xcodebuild archive \
+            -workspace App.xcworkspace \
             -scheme App \
             -configuration Release \
-            -sdk iphoneos \
-            -derivedDataPath build \
+            -archivePath build/App.xcarchive \
             -allowProvisioningUpdates \
             CODE_SIGN_IDENTITY="Apple Distribution" \
+            DEVELOPMENT_TEAM=$APPLE_TEAM_ID \
             PROVISIONING_PROFILE_SPECIFIER="App Store"
 
-      - name: Upload IPA to App Store Connect
+      - name: Create IPA from archive
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath ios/App/build/App.xcarchive \
+            -exportPath ios/App/build/ipa \
+            -exportOptionsPlist ios/App/ExportOptions.plist
+
+      - name: Upload to App Store Connect
         env:
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
           APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
         run: |
           xcrun altool --upload-app \
-            --file build/Release-iphoneos/*.ipa \
+            --file ios/App/build/ipa/App.ipa \
             --type ios \
             --apiKey ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.APPLE_KEY_ID }}.p8 \
             --apiIssuer $APPLE_ISSUER_ID
 
-      - name: Notify on Success
+      - name: Notify Success
         if: success()
-        run: echo "✅ App uploaded to App Store successfully!"
+        run: echo "✅ App successfully deployed to App Store!"
 
-      - name: Notify on Failure
+      - name: Notify Failure
         if: failure()
-        run: echo "❌ Deployment failed. Check logs above."
+        run: echo "❌ Deployment failed. Check logs above for details."
