@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Radar Jovem do Vinho</string>
+    <string name="title_activity_main">Radar Jovem do Vinho</string>
+    <string name="package_name">com.radarjovemdovinho.app</string>
+    <string name="custom_url_scheme">com.radarjovemdovinho.app</string>
+</resources>
