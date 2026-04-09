@@ -2,14 +2,12 @@ name: Deploy iOS
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: macos-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -20,17 +18,22 @@ jobs:
           node-version: 22
 
       - name: Install dependencies
-        run: |
-          echo "Instalando dependências com flags legacy-peer-deps e force..."
-          npm install --legacy-peer-deps --force
+        run: npm install --legacy-peer-deps --force
 
       - name: Build project
-        run: |
-          echo "Executando build do projeto..."
-          npm run build
+        run: npm run build
 
-      - name: Add iOS platform
+      - name: Sync iOS platform
+        run: npx cap sync ios
+
+      - name: Build iOS app
         run: |
-          echo "Adicionando plataforma iOS com Capacitor..."
-          run: npx cap sync ios
-          echo "Plataforma iOS adicionada com sucesso."
+          xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Release -destination generic/platform=iOS build
+          echo "iOS app built successfully"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-app
+          path: ios/App/build/Release-iphoneos/App.app
+          retention-days: 30
