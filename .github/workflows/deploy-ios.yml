@@ -2,88 +2,58 @@ name: Deploy to App Store
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: macos-latest
-    timeout-minutes: 60
-    env:
-      API_KEY_ID: ${{ secrets.APPSTORE_CONNECT_KEY_ID }}
-      API_KEY_ISSUER_ID: ${{ secrets.APPSTORE_CONNECT_ISSUER_ID }}
-      API_KEY_PATH: private_key.p8
-      APP_IDENTIFIER: com.radarjovemdovinho
-      TEAM_ID: CRZS87SK92
-      APP_NAME: RadarJovemdoVinho
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Setup Node.js 20
-      uses: actions/setup-node@v4
-      with:
-        node-version: 20
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
 
-    - name: Install dependencies
-      run: |
-        echo "Instalando dependências..."
-        npm install --legacy-peer-deps --force
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps --force
 
-    - name: Build project
-      run: |
-        echo "Executando build do projeto..."
-        npm run build
+      - name: Build app
+        run: npm run build
 
-    - name: Sync Capacitor iOS
-      run: |
-        echo "Sincronizando Capacitor para iOS..."
-        npx cap sync ios
+      - name: Sync Capacitor
+        run: npx cap sync ios
 
-    - name: Install Fastlane
-      run: |
-        echo "Instalando Fastlane..."
-        gem install fastlane
+      - name: Setup Fastlane
+        run: |
+          gem install bundler
+          bundle install
 
-    - name: Create API Key File
-      run: |
-        echo "Criando arquivo de chave privada da API..."
-        echo "$APPSTORE_CONNECT_PRIVATE_KEY" > private_key.p8
-      env:
-        APPSTORE_CONNECT_PRIVATE_KEY: ${{ secrets.APPSTORE_CONNECT_PRIVATE_KEY }}
+      - name: Setup certificates and provisioning profiles
+        run: |
+          bundle exec fastlane match appstore --readonly --team_id CRZS87SK92
+          bundle exec fastlane match development --readonly --team_id CRZS87SK92
 
-    - name: Generate Development Certificate
-      run: |
-        echo "Gerando certificado de desenvolvimento..."
-        fastlane run cert development:true api_key_path:$API_KEY_PATH api_key_id:$API_KEY_ID api_key_issuer_id:$API_KEY_ISSUER_ID team_id:$TEAM_ID
+      - name: Build iOS app
+        run: |
+          cd ios/App
+          bundle exec fastlane build_app scheme: "App" export_method: "app-store" team_id: "CRZS87SK92" bundle_id: "com.radarjovemdovinho"
 
-    - name: Generate Distribution Certificate
-      run: |
-        echo "Gerando certificado de distribuição..."
-        fastlane run cert development:false api_key_path:$API_KEY_PATH api_key_id:$API_KEY_ID api_key_issuer_id:$API_KEY_ISSUER_ID team_id:$TEAM_ID
+      - name: Upload to TestFlight
+        run: |
+          bundle exec fastlane upload_to_testflight api_key_path: ./fastlane/api_key.json team_id: "CRZS87SK92"
 
-    - name: Generate Development Provisioning Profile
-      run: |
-        echo "Gerando perfil de provisionamento de desenvolvimento..."
-        fastlane run sigh development:true app_identifier:$APP_IDENTIFIER api_key_path:$API_KEY_PATH api_key_id:$API_KEY_ID api_key_issuer_id:$API_KEY_ISSUER_ID team_id:$TEAM_ID
+      - name: Cleanup
+        run: |
+          rm -rf ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision
+          rm -rf ~/Library/Keychains/login.keychain-db
 
-    - name: Generate Distribution Provisioning Profile
-      run: |
-        echo "Gerando perfil de provisionamento de distribuição..."
-        fastlane run sigh development:false app_identifier:$APP_IDENTIFIER api_key_path:$API_KEY_PATH api_key_id:$API_KEY_ID api_key_issuer_id:$API_KEY_ISSUER_ID team_id:$TEAM_ID
-
-    - name: Build iOS App
-      run: |
-        echo "Compilando app iOS..."
-        fastlane run gym workspace:ios/App/App.xcworkspace scheme:App configuration:Release clean:true export_method:app-store output_directory:./build output_name:$APP_NAME.ipa api_key_path:$API_KEY_PATH api_key_id:$API_KEY_ID api_key_issuer_id:$API_KEY_ISSUER_ID team_id:$TEAM_ID
-
-    - name: Upload to TestFlight
-      run: |
-        echo "Fazendo upload para TestFlight..."
-        fastlane run pilot ipa:./build/$APP_NAME.ipa api_key_path:$API_KEY_PATH api_key_id:$API_KEY_ID api_key_issuer_id:$API_KEY_ISSUER_ID team_id:$TEAM_ID app_identifier:$APP_IDENTIFIER
-
-    - name: Cleanup
-      if: always()
-      run: |
-        echo "Limpando arquivos temporários..."
-        rm -f private_key.p8
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      APPSTORE_CONNECT_KEY_ID: ${{ secrets.APPSTORE_CONNECT_KEY_ID }}
+      APPSTORE_CONNECT_ISSUER_ID: ${{ secrets.APPSTORE_CONNECT_ISSUER_ID }}
+      APPSTORE_CONNECT_PRIVATE_KEY: ${{ secrets.APPSTORE_CONNECT_PRIVATE_KEY }}
