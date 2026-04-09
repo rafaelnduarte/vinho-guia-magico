@@ -1,73 +1,36 @@
-name: Deploy to App Store
+name: Deploy iOS
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: macos-latest
-    timeout-minutes: 90
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        run: echo "Código do repositório foi baixado com sucesso."
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
-        run: echo "Node.js 22 configurado."
 
       - name: Install dependencies
         run: |
+          echo "Instalando dependências com flags legacy-peer-deps e force..."
           npm install --legacy-peer-deps --force
-          echo "Dependências instaladas com sucesso."
 
-      - name: Build app
+      - name: Build project
         run: |
+          echo "Executando build do projeto..."
           npm run build
-          echo "Aplicativo construído com sucesso."
 
       - name: Add iOS platform
         run: |
+          echo "Adicionando plataforma iOS com Capacitor..."
           npx cap add ios
-          echo "Plataforma iOS adicionada do zero para resolver o erro 'ios platform has not been added yet'."
-
-      - name: Install Fastlane
-        run: |
-          gem install fastlane
-          echo "Fastlane instalado."
-
-      - name: Create API key file
-        run: |
-          echo "${{ secrets.APPSTORE_CONNECT_PRIVATE_KEY }}" > AuthKey_ZGSFX66YG2.p8
-          echo "Arquivo de chave API criado."
-
-      - name: Generate certificates and profiles
-        run: |
-          fastlane match development --app_identifier com.radarjovemdovinho --team_id CRZS87SK92
-          fastlane match appstore --app_identifier com.radarjovemdovinho --team_id CRZS87SK92
-          echo "Certificados e perfis de provisionamento gerados para desenvolvimento e distribuição."
-
-      - name: Build iOS app
-        run: |
-          fastlane build_app --scheme RadarJovemdoVinho --workspace ios/App/App.xcworkspace --output_directory ./build
-          echo "Aplicativo iOS (.ipa) construído com sucesso."
-        env:
-          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
-
-      - name: Upload to TestFlight
-        run: |
-          fastlane upload_to_testflight --ipa ./build/RadarJovemdoVinho.ipa
-          echo "Aplicativo enviado para TestFlight."
-        env:
-          APP_STORE_CONNECT_API_KEY_KEY_ID: ZGSFX66YG2
-          APP_STORE_CONNECT_API_KEY_ISSUER_ID: 1b1daf24-9d5a-4e53-8fee-be8dda98bc81
-          APP_STORE_CONNECT_API_KEY_KEY: AuthKey_ZGSFX66YG2.p8
-
-      - name: Cleanup
-        run: |
-          rm -f AuthKey_ZGSFX66YG2.p8
-          echo "Limpeza realizada: arquivo de chave removido."
+          echo "Plataforma iOS adicionada com sucesso."
