@@ -2,58 +2,72 @@ name: Deploy to App Store
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: macos-latest
-
+    timeout-minutes: 90
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        run: echo "Código do repositório foi baixado com sucesso."
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: 22
+        run: echo "Node.js 22 configurado."
 
       - name: Install dependencies
-        run: npm install --legacy-peer-deps --force
+        run: |
+          npm install --legacy-peer-deps --force
+          echo "Dependências instaladas com sucesso."
 
       - name: Build app
-        run: npm run build
-
-      - name: Sync Capacitor
-        run: npx cap sync ios
-
-      - name: Setup Fastlane
         run: |
-          gem install bundler
-          bundle install
+          npm run build
+          echo "Aplicativo construído com sucesso."
 
-      - name: Setup certificates and provisioning profiles
+      - name: Add iOS platform
         run: |
-          bundle exec fastlane match appstore --readonly --team_id CRZS87SK92
-          bundle exec fastlane match development --readonly --team_id CRZS87SK92
+          npx cap add ios
+          echo "Plataforma iOS adicionada do zero para resolver o erro 'ios platform has not been added yet'."
+
+      - name: Install Fastlane
+        run: |
+          gem install fastlane
+          echo "Fastlane instalado."
+
+      - name: Create API key file
+        run: |
+          echo "${{ secrets.APPSTORE_CONNECT_PRIVATE_KEY }}" > AuthKey_ZGSFX66YG2.p8
+          echo "Arquivo de chave API criado."
+
+      - name: Generate certificates and profiles
+        run: |
+          fastlane match development --app_identifier com.radarjovemdovinho --team_id CRZS87SK92
+          fastlane match appstore --app_identifier com.radarjovemdovinho --team_id CRZS87SK92
+          echo "Certificados e perfis de provisionamento gerados para desenvolvimento e distribuição."
 
       - name: Build iOS app
         run: |
-          cd ios/App
-          bundle exec fastlane build_app scheme: "App" export_method: "app-store" team_id: "CRZS87SK92" bundle_id: "com.radarjovemdovinho"
+          fastlane build_app --scheme RadarJovemdoVinho --workspace ios/App/App.xcworkspace --output_directory ./build
+          echo "Aplicativo iOS (.ipa) construído com sucesso."
+        env:
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
 
       - name: Upload to TestFlight
         run: |
-          bundle exec fastlane upload_to_testflight api_key_path: ./fastlane/api_key.json team_id: "CRZS87SK92"
+          fastlane upload_to_testflight --ipa ./build/RadarJovemdoVinho.ipa
+          echo "Aplicativo enviado para TestFlight."
+        env:
+          APP_STORE_CONNECT_API_KEY_KEY_ID: ZGSFX66YG2
+          APP_STORE_CONNECT_API_KEY_ISSUER_ID: 1b1daf24-9d5a-4e53-8fee-be8dda98bc81
+          APP_STORE_CONNECT_API_KEY_KEY: AuthKey_ZGSFX66YG2.p8
 
       - name: Cleanup
         run: |
-          rm -rf ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision
-          rm -rf ~/Library/Keychains/login.keychain-db
-
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-      APPSTORE_CONNECT_KEY_ID: ${{ secrets.APPSTORE_CONNECT_KEY_ID }}
-      APPSTORE_CONNECT_ISSUER_ID: ${{ secrets.APPSTORE_CONNECT_ISSUER_ID }}
-      APPSTORE_CONNECT_PRIVATE_KEY: ${{ secrets.APPSTORE_CONNECT_PRIVATE_KEY }}
+          rm -f AuthKey_ZGSFX66YG2.p8
+          echo "Limpeza realizada: arquivo de chave removido."
