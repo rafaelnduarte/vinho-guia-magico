@@ -32,5 +32,5 @@ jobs:
       - name: Add iOS platform
         run: |
           echo "Adicionando plataforma iOS com Capacitor..."
-          npx cap add ios
+          run: npx cap sync ios
           echo "Plataforma iOS adicionada com sucesso."
